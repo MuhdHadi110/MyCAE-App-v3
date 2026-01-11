@@ -7,11 +7,11 @@ export default defineConfig({
   base: "./",
   server: {
     host: "0.0.0.0",
-    port: 3001,
+    port: 3003,
     proxy: {
       // Proxy API calls to backend in development
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:3001',
         changeOrigin: true,
         secure: false,
       },

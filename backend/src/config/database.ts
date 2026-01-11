@@ -5,7 +5,11 @@ import dotenv from 'dotenv';
 import { Activity } from '../entities/Activity';
 import { Checkout } from '../entities/Checkout';
 import { Client } from '../entities/Client';
+import { Company } from '../entities/Company';
+import { CompanySettings } from '../entities/CompanySettings';
 import { Computer } from '../entities/Computer';
+import { Contact } from '../entities/Contact';
+import { ExchangeRate } from '../entities/ExchangeRate';
 import { InventoryItem } from '../entities/InventoryItem';
 import { Invoice } from '../entities/Invoice';
 import { IssuedPO } from '../entities/IssuedPO';
@@ -14,6 +18,7 @@ import { Project } from '../entities/Project';
 import { ProjectHourlyRate } from '../entities/ProjectHourlyRate';
 import { PurchaseOrder } from '../entities/PurchaseOrder';
 import { ResearchProject } from '../entities/ResearchProject';
+import { ScheduledMaintenance } from '../entities/ScheduledMaintenance';
 import { TeamMember } from '../entities/TeamMember';
 import { Timesheet } from '../entities/Timesheet';
 import { User } from '../entities/User';
@@ -24,7 +29,11 @@ const entities = [
   Activity,
   Checkout,
   Client,
+  Company,
+  CompanySettings,
   Computer,
+  Contact,
+  ExchangeRate,
   InventoryItem,
   Invoice,
   IssuedPO,
@@ -33,6 +42,7 @@ const entities = [
   ProjectHourlyRate,
   PurchaseOrder,
   ResearchProject,
+  ScheduledMaintenance,
   TeamMember,
   Timesheet,
   User,
@@ -42,8 +52,8 @@ export const AppDataSource = new DataSource({
   type: 'mysql',
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT || '3306'),
-  username: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
+  username: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME,
   synchronize: false, // Disabled for performance
   logging: false, // Disabled for performance
