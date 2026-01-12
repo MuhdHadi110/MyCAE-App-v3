@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { X, User, Mail, Phone, Briefcase, Copy, Check } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import apiService from '../../services/api.service';
+import teamService from '../../services/api.service';
 import type { UserRole, Department } from '../../types/team.types';
+import { logger } from '../../lib/logger';
 
 interface AddTeamMemberModalProps {
   isOpen: boolean;
@@ -51,7 +52,7 @@ export const AddTeamMemberModal: React.FC<AddTeamMemberModalProps> = ({ isOpen, 
         status: 'active',
       };
 
-      const data = await apiService.createTeamMember(teamMemberData);
+      const data = await teamService.createTeamMember(teamMemberData);
 
       if (data) {
 
@@ -84,7 +85,7 @@ export const AddTeamMemberModal: React.FC<AddTeamMemberModalProps> = ({ isOpen, 
                             error.response.data.errors[0]?.msg : '') ||
                           error?.message ||
                           'Failed to add team member';
-      console.error('Error adding team member:', errorMessage);
+      logger.error('Error adding team member:', errorMessage);
       toast.error(errorMessage);
     } finally {
       setLoading(false);

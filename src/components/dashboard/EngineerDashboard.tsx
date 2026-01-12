@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
 import {
   TrendingUp,
-  TrendingDown,
   Clock,
   Target,
   CheckCircle2,
@@ -39,6 +38,7 @@ export const EngineerDashboard: React.FC = () => {
 
   // Calculate personal KPIs
   const kpis = useMemo(() => {
+    if (!user) return { myActiveProjects: 0, myTotalProjects: 0, prelimProjects: 0, completedProjects: 0, thisMonthHours: 0, completionRate: 0 };
     const myProjects = projects.filter((p) => p.engineerId === user.id);
     const myTimesheets = (Array.isArray(timesheets) ? timesheets : []).filter((ts) => ts.engineerId === user.id);
 
@@ -57,10 +57,11 @@ export const EngineerDashboard: React.FC = () => {
       thisMonthHours,
       completionRate,
     };
-  }, [projects, timesheets, user.id]);
+  }, [projects, timesheets, user?.id]);
 
   // Activity data for personal chart
   const activityData = useMemo(() => {
+    if (!user) return [];
     const dataMap: Record<string, { label: string; hours: number }> = {};
 
     const myTimesheets = (Array.isArray(timesheets) ? timesheets : []).filter((ts) => ts.engineerId === user.id);
@@ -91,11 +92,12 @@ export const EngineerDashboard: React.FC = () => {
     });
 
     return Object.values(dataMap).sort((a, b) => a.label.localeCompare(b.label));
-  }, [timesheets, user.id, timeFilter]);
+  }, [timesheets, user?.id, timeFilter]);
 
   // Work category distribution
   const workCategoryData = useMemo(() => {
-    const categoryTotals = {
+    if (!user) return [];
+    const categoryTotals: Record<string, number> = {
       engineering: 0,
       'project-management': 0,
       'measurement-site': 0,
@@ -136,16 +138,17 @@ export const EngineerDashboard: React.FC = () => {
         color: '#EF4444',
       },
     ].filter((item) => item.value > 0);
-  }, [timesheets, user.id]);
+  }, [timesheets, user?.id]);
 
   // Filter projects for this engineer
   const filteredProjects = useMemo(() => {
+    if (!user) return [];
     const myProjects = projects.filter((p) => p.engineerId === user.id);
     if (projectStatusFilter === 'all') {
       return myProjects;
     }
     return myProjects.filter((p) => p.status === projectStatusFilter);
-  }, [projects, user.id, projectStatusFilter]);
+  }, [projects, user?.id, projectStatusFilter]);
 
   return (
     <div className="min-h-full bg-gradient-to-br from-gray-50 to-gray-100">
@@ -159,7 +162,7 @@ export const EngineerDashboard: React.FC = () => {
 
         {/* Welcome Section */}
         <div className="mb-10">
-          <h1 className="text-4xl font-extrabold text-gray-900 mb-2">Welcome back, {user.name}!</h1>
+          <h1 className="text-4xl font-extrabold text-gray-900 mb-2">Welcome back, {user?.name}!</h1>
           <p className="text-lg text-gray-500">Your project assignments and progress overview.</p>
         </div>
 
@@ -449,7 +452,7 @@ export const EngineerDashboard: React.FC = () => {
                 <tbody className="divide-y divide-gray-100">
                   {filteredProjects.map((project) => {
                     const client = clients.find((c) => c.id === project.clientId);
-                    const progress = project.plannedHours > 0 ? (project.actualHours / project.plannedHours) * 100 : 0;
+                    const progress = project.plannedHours > 0 ? ((project.actualHours || 0) / project.plannedHours) * 100 : 0;
 
                     return (
                       <tr key={project.id} className="hover:bg-gray-50 transition-colors">

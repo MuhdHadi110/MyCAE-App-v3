@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { InventoryItem, InventoryFilters, InventoryStats } from '../types/inventory.types';
-import apiService from '../services/api.service';
+import inventoryService from '../services/api.service';
 import toast from 'react-hot-toast';
 
 interface InventoryStore {
@@ -32,7 +32,7 @@ export const useInventoryStore = create<InventoryStore>((set, get) => ({
   fetchInventory: async () => {
     set({ loading: true });
     try {
-      const items = await apiService.getInventoryItems();
+      const items = await inventoryService.getInventoryItems();
       set({ items, filteredItems: items });
       get().calculateStats();
     } catch (error) {
@@ -50,7 +50,7 @@ export const useInventoryStore = create<InventoryStore>((set, get) => ({
   createItem: async (item: Omit<InventoryItem, 'id'>) => {
     set({ loading: true });
     try {
-      const created = await apiService.createInventoryItem(item);
+      const created = await inventoryService.createInventoryItem(item);
       set(state => ({
         items: [...state.items, created],
         filteredItems: [...state.filteredItems, created],
@@ -67,7 +67,7 @@ export const useInventoryStore = create<InventoryStore>((set, get) => ({
   updateItem: async (id: string, updates: Partial<InventoryItem>) => {
     set({ loading: true });
     try {
-      await apiService.updateInventoryItem(id, updates);
+      await inventoryService.updateInventoryItem(id, updates);
       set(state => ({
         items: state.items.map(item => (item.id === id ? { ...item, ...updates } : item)),
         filteredItems: state.filteredItems.map(item => (item.id === id ? { ...item, ...updates } : item)),
@@ -84,7 +84,7 @@ export const useInventoryStore = create<InventoryStore>((set, get) => ({
   deleteItem: async (id: string) => {
     set({ loading: true });
     try {
-      await apiService.deleteInventoryItem(id);
+      await inventoryService.deleteInventoryItem(id);
       set(state => ({
         items: state.items.filter(item => item.id !== id),
         filteredItems: state.filteredItems.filter(item => item.id !== id),
@@ -150,7 +150,7 @@ export const useInventoryStore = create<InventoryStore>((set, get) => ({
 
   scanBarcode: async (barcode: string) => {
     try {
-      const items = await apiService.getInventoryItems({ search: barcode });
+      const items = await inventoryService.getInventoryItems({ search: barcode });
       if (items.length > 0) {
         toast.success(`Found: ${items[0].title}`);
         return items[0];

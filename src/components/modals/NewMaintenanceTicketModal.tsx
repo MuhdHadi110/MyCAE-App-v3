@@ -1,29 +1,65 @@
-import React, { useState } from 'react';
-import { X, Wrench } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Wrench, AlertCircle } from 'lucide-react';
 import { useMaintenanceStore } from '../../store/maintenanceStore';
 import { useInventoryStore } from '../../store/inventoryStore';
 import { toast } from 'react-hot-toast';
 import type { MaintenanceTicket } from '../../types/maintenance.types';
+import { logger } from '../../lib/logger';
+import {
+  InventoryAction,
+  inventoryActionLabels,
+  inventoryActionDescriptions,
+} from '../../types/scheduledMaintenance.types';
+
+const ticketStatusLabels = {
+  'open': 'Open',
+  'in-progress': 'In Progress',
+  'resolved': 'Resolved',
+  'closed': 'Closed',
+};
 
 interface NewMaintenanceTicketModalProps {
   isOpen: boolean;
   onClose: () => void;
+  editingTicket?: MaintenanceTicket | null;
 }
 
-export const NewMaintenanceTicketModal: React.FC<NewMaintenanceTicketModalProps> = ({ isOpen, onClose }) => {
-  const { createTicket } = useMaintenanceStore();
-  const { items } = useInventoryStore();
+export const NewMaintenanceTicketModal: React.FC<NewMaintenanceTicketModalProps> = ({ isOpen, onClose, editingTicket }) => {
+  const { createTicket, updateTicket } = useMaintenanceStore();
+  const { items, fetchInventory } = useInventoryStore();
 
   const [formData, setFormData] = useState({
     title: '',
     itemId: '',
     itemName: '',
     description: '',
-    status: 'Pending' as const,
-    priority: 'Medium' as const,
+    status: 'open' as const,
+    priority: 'medium' as const,
     category: '',
     assignedTo: '',
+    inventoryAction: 'none' as InventoryAction,
+    quantityAffected: 1,
   });
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchInventory();
+      if (editingTicket) {
+        setFormData({
+          title: editingTicket.title || '',
+          itemId: editingTicket.itemId || '',
+          itemName: editingTicket.itemName || '',
+          description: editingTicket.description || '',
+          status: editingTicket.status as any,
+          priority: editingTicket.priority,
+          category: editingTicket.category || '',
+          assignedTo: editingTicket.assignedTo || '',
+          inventoryAction: editingTicket.inventoryAction || 'none',
+          quantityAffected: editingTicket.quantityAffected || 1,
+        });
+      }
+    }
+  }, [isOpen, fetchInventory, editingTicket]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -62,28 +98,55 @@ export const NewMaintenanceTicketModal: React.FC<NewMaintenanceTicketModalProps>
       return;
     }
 
+    // Validate quantity if deducting from inventory
+    if (formData.inventoryAction === 'deduct' && formData.itemId) {
+      const selectedItem = items.find(i => i.id === formData.itemId);
+      if (selectedItem && formData.quantityAffected > selectedItem.quantity) {
+        toast.error(`Cannot deduct more than available quantity (${selectedItem.quantity})`);
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     try {
-      const newTicket: Omit<MaintenanceTicket, 'id'> = {
-        title: formData.title.trim(),
-        description: formData.description.trim(),
-        status: formData.status,
-        priority: formData.priority,
-        category: formData.category,
-        createdDate: new Date().toISOString(),
-        itemId: formData.itemId || undefined,
-        itemName: formData.itemName || undefined,
-        assignedTo: formData.assignedTo || undefined,
-      };
+      if (editingTicket) {
+        // Update existing ticket
+        const updates: Partial<MaintenanceTicket> = {
+          title: formData.title.trim(),
+          description: formData.description.trim(),
+          status: formData.status,
+          priority: formData.priority,
+          category: formData.category,
+          assignedTo: formData.assignedTo || undefined,
+        };
+        await updateTicket(editingTicket.id, updates);
+      } else {
+        // Create new ticket
+        const newTicket: Omit<MaintenanceTicket, 'id'> = {
+          title: formData.title.trim(),
+          description: formData.description.trim(),
+          status: formData.status,
+          priority: formData.priority,
+          category: formData.category,
+          createdDate: new Date().toISOString(),
+          itemId: formData.itemId || undefined,
+          itemName: formData.itemName || undefined,
+          assignedTo: formData.assignedTo || undefined,
+          inventoryAction: formData.itemId ? formData.inventoryAction : undefined,
+          quantityAffected: formData.itemId && formData.inventoryAction === 'deduct' ? formData.quantityAffected : undefined,
+        };
 
-      await createTicket(newTicket);
+        await createTicket(newTicket);
+      }
       handleClose();
     } catch (error) {
-      console.error('Error creating ticket:', error);
+      logger.error('Error saving ticket:', error);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const selectedItem = items.find(i => i.id === formData.itemId);
 
   const handleClose = () => {
     setFormData({
@@ -91,10 +154,12 @@ export const NewMaintenanceTicketModal: React.FC<NewMaintenanceTicketModalProps>
       itemId: '',
       itemName: '',
       description: '',
-      status: 'Pending',
-      priority: 'Medium',
+      status: 'open',
+      priority: 'medium',
       category: '',
       assignedTo: '',
+      inventoryAction: 'none',
+      quantityAffected: 1,
     });
     onClose();
   };
@@ -109,8 +174,12 @@ export const NewMaintenanceTicketModal: React.FC<NewMaintenanceTicketModalProps>
               <Wrench className="w-5 h-5 text-primary-600" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">New Maintenance Ticket</h2>
-              <p className="text-sm text-gray-600 mt-0.5">Create a new maintenance request</p>
+              <h2 className="text-xl font-bold text-gray-900">
+                {editingTicket ? 'Edit Maintenance Ticket' : 'New Maintenance Ticket'}
+              </h2>
+              <p className="text-sm text-gray-600 mt-0.5">
+                {editingTicket ? 'Update ticket details and status' : 'Create a new maintenance request'}
+              </p>
             </div>
           </div>
           <button
@@ -153,8 +222,8 @@ export const NewMaintenanceTicketModal: React.FC<NewMaintenanceTicketModalProps>
             />
           </div>
 
-          {/* Grid: Category and Priority */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Grid: Category, Priority, and Status */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Category */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -186,12 +255,31 @@ export const NewMaintenanceTicketModal: React.FC<NewMaintenanceTicketModalProps>
                 onChange={(e) => handleInputChange('priority', e.target.value as any)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               >
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-                <option value="Urgent">Urgent</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
               </select>
             </div>
+
+            {/* Status - only show when editing */}
+            {editingTicket && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Status <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => handleInputChange('status', e.target.value as any)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                >
+                  <option value="open">Open</option>
+                  <option value="in-progress">In Progress</option>
+                  <option value="resolved">Resolved</option>
+                  <option value="closed">Closed</option>
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Grid: Item and Assigned To */}
@@ -230,6 +318,70 @@ export const NewMaintenanceTicketModal: React.FC<NewMaintenanceTicketModalProps>
             </div>
           </div>
 
+          {/* Inventory Impact Section - Only show when an item is selected */}
+          {formData.itemId && (
+            <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Inventory Impact
+              </label>
+              <div className="space-y-3">
+                {(Object.keys(inventoryActionLabels) as InventoryAction[]).map((action) => (
+                  <label
+                    key={action}
+                    className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-all ${
+                      formData.inventoryAction === action
+                        ? 'border-primary-500 bg-white shadow-sm'
+                        : 'border-gray-200 bg-white hover:border-gray-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="inventoryAction"
+                      value={action}
+                      checked={formData.inventoryAction === action}
+                      onChange={(e) => handleInputChange('inventoryAction', e.target.value)}
+                      className="mt-1"
+                    />
+                    <div>
+                      <div className="font-medium text-gray-900">{inventoryActionLabels[action]}</div>
+                      <div className="text-sm text-gray-500">{inventoryActionDescriptions[action]}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+
+              {/* Quantity input - only show for deduct action */}
+              {formData.inventoryAction === 'deduct' && (
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Quantity to Deduct
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={selectedItem?.quantity || 100}
+                    value={formData.quantityAffected}
+                    onChange={(e) => handleInputChange('quantityAffected', e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                  {selectedItem && (
+                    <p className="mt-1 text-sm text-gray-500">
+                      Available: {selectedItem.quantity} {selectedItem.unitOfMeasure || 'units'}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Info box */}
+              <div className="flex items-start gap-2 mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <AlertCircle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-blue-800">
+                  Inventory will be restored automatically when this ticket is marked as completed or resolved.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Buttons */}
           <div className="flex gap-3 pt-4 border-t border-gray-200">
             <button
@@ -244,7 +396,13 @@ export const NewMaintenanceTicketModal: React.FC<NewMaintenanceTicketModalProps>
               disabled={isSubmitting}
               className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium disabled:opacity-50"
             >
-              {isSubmitting ? 'Creating...' : 'Create Ticket'}
+              {editingTicket
+                ? isSubmitting
+                  ? 'Saving...'
+                  : 'Save Changes'
+                : isSubmitting
+                  ? 'Creating...'
+                  : 'Create Ticket'}
             </button>
           </div>
         </form>

@@ -11,6 +11,7 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import { User } from './User';
 import { InventoryItem } from './InventoryItem';
+import { ScheduledMaintenance, InventoryAction } from './ScheduledMaintenance';
 
 export enum TicketPriority {
   LOW = 'low',
@@ -83,6 +84,28 @@ export class MaintenanceTicket {
 
   @Column({ type: 'varchar', length: 100, nullable: true })
   category?: string;
+
+  // Link to scheduled maintenance (if created from schedule)
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  scheduled_maintenance_id?: string;
+
+  @ManyToOne(() => ScheduledMaintenance, { nullable: true })
+  @JoinColumn({ name: 'scheduled_maintenance_id' })
+  scheduledMaintenance?: ScheduledMaintenance;
+
+  // Inventory impact tracking
+  @Column({
+    type: 'enum',
+    enum: InventoryAction,
+    nullable: true,
+  })
+  inventory_action?: InventoryAction;
+
+  @Column({ type: 'int', default: 0 })
+  quantity_deducted: number;
+
+  @Column({ type: 'boolean', default: false })
+  inventory_restored: boolean;
 
   @CreateDateColumn()
   created_at: Date;

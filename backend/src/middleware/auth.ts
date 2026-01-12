@@ -7,7 +7,8 @@ export interface AuthRequest extends Request {
     id: string;
     email: string;
     name: string;
-    role: UserRole;
+    role: UserRole; // Primary role (for backward compatibility)
+    roles: UserRole[]; // All roles
   };
 }
 
@@ -36,11 +37,16 @@ export const authenticate = (
 
     const decoded = jwt.verify(token, secret) as any;
 
+    // Support both old tokens (single role) and new tokens (roles array)
+    const roles = decoded.roles || (decoded.role ? [decoded.role] : [UserRole.ENGINEER]);
+    const primaryRole = roles[0] || UserRole.ENGINEER;
+
     req.user = {
       id: decoded.id,
       email: decoded.email,
       name: decoded.name || decoded.email.split('@')[0], // Fallback to email username if name not in token
-      role: decoded.role || UserRole.ENGINEER,
+      role: primaryRole, // Primary role for backward compatibility
+      roles: roles, // All roles
     };
 
     next();
@@ -51,6 +57,7 @@ export const authenticate = (
 
 /**
  * Check if user has one of the required roles
+ * Now supports multi-role: checks if user has ANY of the allowed roles
  */
 export const authorize = (...allowedRoles: UserRole[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -58,8 +65,11 @@ export const authorize = (...allowedRoles: UserRole[]) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    // Check if user has one of the allowed roles
-    if (!allowedRoles.includes(req.user.role)) {
+    // Check if user has ANY of the allowed roles (supports multi-role)
+    const userRoles = req.user.roles || [req.user.role];
+    const hasPermission = userRoles.some(role => allowedRoles.includes(role));
+
+    if (!hasPermission) {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
 
@@ -72,21 +82,24 @@ export const authorize = (...allowedRoles: UserRole[]) => {
  * @param userId - User ID
  * @param email - User email
  * @param name - User name
- * @param role - User role
+ * @param roles - User roles array
  */
-export const generateToken = (userId: string, email: string, name: string, role: UserRole): string => {
+export const generateToken = (userId: string, email: string, name: string, roles: UserRole[]): string => {
   const secret = process.env.JWT_SECRET;
 
   if (!secret) {
     throw new Error('JWT_SECRET environment variable is not set');
   }
 
+  const primaryRole = roles[0] || UserRole.ENGINEER;
+
   return jwt.sign(
     {
       id: userId,
       email,
       name,
-      role,
+      role: primaryRole, // For backward compatibility
+      roles, // All roles
     },
     secret,
     { expiresIn: '7d' }

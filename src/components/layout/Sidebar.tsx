@@ -2,7 +2,6 @@ import { NavLink } from 'react-router-dom';
 import {
   Home,
   Package,
-  Scan,
   Wrench,
   Settings,
   X,
@@ -16,18 +15,16 @@ import {
   DollarSign,
   FileText,
   BarChart3,
-  MapPin,
-  LogOut,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { getPermissions, getRoleInfo } from '../../lib/permissions';
-import { UserRole } from '../../types/auth.types';
+import { UserRole, ROLE_HIERARCHY } from '../../types/auth.types';
 
 interface SidebarProps {
   isOpen?: boolean;
   onClose?: () => void;
-  onLogout?: () => void;
 }
 
 const navItems = [
@@ -38,27 +35,37 @@ const navItems = [
   { to: '/timesheets', icon: Clock, label: 'Timesheets', section: 'projects' },
   { to: '/team-workload', icon: Users, label: 'Team Workload', section: 'projects' },
   { to: '/team', icon: Users, label: 'Team Members', section: 'people' },
-  { to: '/clients', icon: Building2, label: 'Business Contacts', section: 'people' },
+  { to: '/companies', icon: Building2, label: 'Business Contacts', section: 'people' },
   { to: '/finance', icon: DollarSign, label: 'Finance Overview', section: 'finance', requiresPermission: 'canAccessFinance' },
-  { to: '/finance/project-analytics', icon: BarChart3, label: 'Project Analytics', section: 'finance', requiresPermission: 'canAccessFinance' },
   { to: '/finance/documents', icon: FileText, label: 'Finance Documents', section: 'finance', requiresPermission: 'canAccessFinance' },
+  { to: '/finance/exchange-rates', icon: ArrowLeftRight, label: 'Exchange Rates', section: 'finance', requiresPermission: 'canAccessFinance' },
   { to: '/inventory', icon: Package, label: 'Inventory', section: 'equipment' },
   { to: '/equipment', icon: ClipboardList, label: 'Equipment Management', section: 'equipment' },
   { to: '/pcs', icon: Monitor, label: 'PC Assignment', section: 'equipment' },
-  { to: '/scan', icon: Scan, label: 'Scan', section: 'equipment' },
   { to: '/maintenance', icon: Wrench, label: 'Maintenance', section: 'equipment' },
   { to: '/settings', icon: Settings, label: 'Settings', section: 'system' },
 ];
 
-export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose, onLogout }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose }) => {
   const { user } = useAuth();
 
   if (!user) {
     return null;
   }
 
-  const permissions = getPermissions(user.role as UserRole);
-  const roleInfo = getRoleInfo(user.role as UserRole);
+  const userRoles = user.roles || [user.role as UserRole];
+  const permissions = getPermissions(userRoles);
+
+  // Get the highest role for display purposes
+  const highestRole = userRoles.length > 0
+    ? userRoles.reduce((highest, role) => {
+        const currentLevel = ROLE_HIERARCHY[role] || 0;
+        const highestLevel = ROLE_HIERARCHY[highest] || 0;
+        return currentLevel > highestLevel ? role : highest;
+      }, userRoles[0])
+    : user.role as UserRole;
+
+  const roleInfo = getRoleInfo(highestRole);
 
   // Filter nav items based on permissions
   const getFilteredNavItems = (section: string) => {
@@ -90,19 +97,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose, onLogo
       >
         <div className="flex flex-col h-full">
           {/* Logo/Brand */}
-          <div className="flex items-center justify-between px-4 py-5 border-b border-slate-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-800">
-            <div className="flex items-center gap-3 w-full">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
-                  <span className="text-white font-bold text-lg">MC</span>
-                </div>
-                <span className="text-slate-900 dark:text-gray-100 font-bold text-xl tracking-tight">MYCAE</span>
-              </div>
+          <div className="relative flex items-center justify-center px-5 py-6 border-b border-slate-200 dark:border-gray-700">
+            <div className="flex flex-col items-center">
+              <span className="text-3xl font-extrabold tracking-tight">
+                <span className="text-slate-800 dark:text-gray-100">My</span>
+                <span className="bg-gradient-to-r from-emerald-500 to-teal-500 bg-clip-text text-transparent">CAE</span>
+              </span>
+              <span className="text-xs font-semibold text-slate-500 dark:text-gray-400 tracking-[0.2em] uppercase mt-0.5">Technologies</span>
             </div>
             {onClose && (
               <button
                 onClick={onClose}
-                className="md:hidden p-2 hover:bg-slate-100 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-300 hover:text-slate-900 dark:hover:text-gray-100 rounded-lg transition-colors"
+                className="absolute right-3 md:hidden p-2 hover:bg-slate-100 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-300 hover:text-slate-900 dark:hover:text-gray-100 rounded-lg transition-colors"
                 aria-label="Close menu"
               >
                 <X className="w-5 h-5" />
@@ -300,9 +306,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose, onLogo
               </div>
             </div>
             {/* Version Info */}
-            <div className="text-xs text-slate-600 dark:text-gray-400">
-              <p>Version 1.0.0</p>
-              <p className="mt-1">© 2025 MYCAE Tracker</p>
+            <div className="text-xs text-slate-500 dark:text-gray-500">
+              <p className="font-medium">v1.0.0</p>
+              <p className="mt-1">© 2025 MyCAE</p>
             </div>
           </div>
         </div>

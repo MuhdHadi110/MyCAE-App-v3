@@ -32,10 +32,10 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
   };
 
   const hoursPercentage = project.plannedHours > 0
-    ? Math.round((project.actualHours / project.plannedHours) * 100)
+    ? Math.round(((project.actualHours || 0) / project.plannedHours) * 100)
     : 0;
 
-  const isOverBudget = project.actualHours > project.plannedHours;
+  const isOverBudget = (project.actualHours || 0) > project.plannedHours;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -69,7 +69,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
               <div className="mb-3">
                 <p className="text-sm text-gray-600 font-medium mb-2">Hours Progress</p>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-bold text-gray-900">{project.actualHours}</span>
+                  <span className="text-2xl font-bold text-gray-900">{project.actualHours || 0}</span>
                   <span className="text-sm text-gray-500">of {project.plannedHours} hrs</span>
                 </div>
               </div>
@@ -83,7 +83,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                 {isOverBudget ? (
                   <span className="flex items-center gap-1">
                     <AlertCircle className="w-3 h-3" />
-                    {project.actualHours - project.plannedHours} hrs over budget
+                    {(project.actualHours || 0) - project.plannedHours} hrs over budget
                   </span>
                 ) : (
                   <span className="flex items-center gap-1">
@@ -127,7 +127,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                 End Date
               </p>
               <p className="text-sm font-medium text-gray-900">
-                {new Date(project.endDate).toLocaleDateString()}
+                {project.endDate ? new Date(project.endDate).toLocaleDateString() : 'Not set'}
               </p>
             </Card>
           </div>
@@ -160,7 +160,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Variance</span>
                 <span className={`font-semibold ${isOverBudget ? 'text-red-600' : 'text-green-600'}`}>
-                  {isOverBudget ? '+' : ''}{project.actualHours - project.plannedHours} hrs
+                  {isOverBudget ? '+' : ''}{(project.actualHours || 0) - project.plannedHours} hrs
                 </span>
               </div>
             </div>

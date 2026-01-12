@@ -13,14 +13,9 @@ import { useClientStore } from '../../store/clientStore';
 import { ProjectDetailModal } from '../modals/ProjectDetailModal';
 import { TeamMemberProjectsModal } from '../modals/TeamMemberProjectsModal';
 import {
-  BarChart,
-  Bar,
   PieChart,
   Pie,
   Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
@@ -28,8 +23,8 @@ import {
 type ProjectStatus = 'pre-lim' | 'ongoing' | 'completed';
 
 export const ProjectOverviewDashboard: React.FC = () => {
-  const { projects, timesheets, fetchProjects, fetchTimesheets } = useProjectStore();
-  const { teamMembers, fetchTeamMembers } = useTeamStore();
+  const { projects, fetchProjects, fetchTimesheets } = useProjectStore();
+  const { fetchTeamMembers } = useTeamStore();
   const { clients, fetchClients } = useClientStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | ProjectStatus>('all');
@@ -159,12 +154,6 @@ export const ProjectOverviewDashboard: React.FC = () => {
   const handleViewProject = (project: any) => {
     setSelectedProject(project);
     setShowDetailModal(true);
-  };
-
-  const handleViewTeamMember = (teamMemberId: string, teamMemberName: string) => {
-    setSelectedTeamMemberId(teamMemberId);
-    setSelectedTeamMemberName(teamMemberName);
-    setShowTeamMemberModal(true);
   };
 
   return (
@@ -382,8 +371,9 @@ export const ProjectOverviewDashboard: React.FC = () => {
                 <tbody className="divide-y divide-gray-200">
                   {filteredProjects.map((project) => {
                     const client = clients.find((c) => c.id === project.clientId);
-                    const engineer = teamMembers.find((tm) => tm.id === project.engineerId);
-                    const progress = project.plannedHours > 0 ? (project.actualHours / project.plannedHours) * 100 : 0;
+                    // Display lead engineer's name, fallback to manager's name
+                    const engineerName = (project as any).leadEngineer?.name || (project as any).manager?.name || 'Unassigned';
+                    const progress = project.plannedHours > 0 ? ((project.actualHours || 0) / project.plannedHours) * 100 : 0;
 
                     return (
                       <tr
@@ -400,7 +390,7 @@ export const ProjectOverviewDashboard: React.FC = () => {
                           <p className="font-medium text-gray-900 truncate">{project.title}</p>
                         </td>
                         <td className="px-6 py-4 text-gray-700">{client?.name || 'Unknown'}</td>
-                        <td className="px-6 py-4 text-gray-700">{engineer?.name || 'Unassigned'}</td>
+                        <td className="px-6 py-4 text-gray-700">{engineerName}</td>
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-center gap-2">
                             <div className="w-16 bg-gray-200 rounded-full h-2 overflow-hidden">

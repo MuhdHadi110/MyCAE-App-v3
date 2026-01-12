@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Package, Barcode, MapPin, Hash } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
@@ -28,7 +28,35 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onS
     status: 'Active' as const,
     barcode: '',
     notes: '',
+    lastAction: 'added' as const,
+    lastActionDate: new Date().toISOString(),
   });
+
+  // Populate form with initial data when in edit mode
+  useEffect(() => {
+    if (isEditMode && initialData) {
+      setFormData({
+        title: initialData.title || '',
+        sku: initialData.sku || '',
+        category: initialData.category || '',
+        quantity: initialData.quantity || 0,
+        minimumStock: initialData.minimumStock || 0,
+        location: initialData.location || '',
+        unitOfMeasure: initialData.unitOfMeasure || 'units',
+        cost: initialData.cost || 0,
+        price: initialData.price || 0,
+        supplier: initialData.supplier || '',
+        status: (initialData.status as any) || 'Active',
+        barcode: initialData.barcode || '',
+        notes: initialData.notes || '',
+        lastAction: (initialData.lastAction || 'added') as any,
+        lastActionDate: initialData.lastActionDate || new Date().toISOString(),
+      });
+    } else if (!isOpen) {
+      // Reset form when modal closes (and not in edit mode)
+      handleClose();
+    }
+  }, [isOpen, isEditMode, initialData]);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -96,6 +124,8 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onS
       status: 'Active',
       barcode: '',
       notes: '',
+      lastAction: 'added',
+      lastActionDate: new Date().toISOString(),
     });
     setErrors({});
     onClose();

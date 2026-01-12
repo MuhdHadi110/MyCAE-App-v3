@@ -26,6 +26,10 @@ export enum ActivityType {
   USER_LOGIN = 'user-login',
   USER_CREATE = 'user-create',
   BULK_IMPORT = 'bulk-import',
+  INVOICE_CREATE = 'invoice-create',
+  INVOICE_UPDATE = 'invoice-update',
+  INVOICE_STATUS_CHANGE = 'invoice-status-change',
+  INVOICE_AMOUNT_CHANGE = 'invoice-amount-change',
 }
 
 @Entity('activities')

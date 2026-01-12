@@ -10,7 +10,8 @@ export interface TeamMember {
   userId?: string; // User ID from users table (for foreign key relationships)
   name: string;
   email: string;
-  role: UserRole;
+  role: UserRole; // Primary role (first role in roles array, for backward compatibility)
+  roles: UserRole[]; // All roles assigned to the team member
   department: Department;
   phone?: string;
   avatar?: string;

@@ -5,7 +5,7 @@ interface FormFieldProps {
   name: string;
   error?: string;
   required?: boolean;
-  children: React.ReactElement;
+  children: React.ReactElement<{ className?: string; [key: string]: unknown }>;
   hint?: string;
   className?: string;
 }

@@ -1,0 +1,281 @@
+========================================
+MYCAETRACKER - CPANEL DEPLOYMENT GUIDE
+========================================
+
+READY TO UPLOAD FILES:
+✓ Database: mycae_tracker_backup.sql
+✓ Backend: backend/ folder
+✓ Frontend: frontend/ folder
+
+========================================
+STEP 1: CREATE MYSQL DATABASE (5 min)
+========================================
+
+1. Go to: https://mycaetech.com:2083
+2. Login with your cPanel credentials
+
+3. Click "MySQL® Databases"
+
+4. Under "Create New Database":
+   - Database Name: mycae_tracker
+   - Click "Create Database"
+   - ✓ Note: Your full database name will be like "username_mycae_tracker"
+
+5. Scroll down to "Add New User":
+   - Username: mycae_user
+   - Password: Click "Generate Password" (SAVE THIS PASSWORD!)
+   - Click "Create User"
+
+6. Scroll down to "Add User To Database":
+   - User: Select "mycae_user"
+   - Database: Select "mycae_tracker"
+   - Click "Add"
+   - Check "ALL PRIVILEGES"
+   - Click "Make Changes"
+
+✓ WRITE DOWN THESE CREDENTIALS:
+  Database Host: localhost
+  Database Name: _________________________
+  Database User: _________________________
+  Database Password: _____________________
+
+========================================
+STEP 2: IMPORT DATABASE (2 min)
+========================================
+
+1. In cPanel, click "phpMyAdmin"
+
+2. On the left sidebar, click your database name (username_mycae_tracker)
+
+3. Click the "Import" tab at the top
+
+4. Click "Choose File" and select: mycae_tracker_backup.sql
+
+5. Scroll down and click "Import"
+
+6. Wait for "Import has been successfully finished" message
+
+✓ DATABASE IMPORTED!
+
+========================================
+STEP 3: UPLOAD BACKEND FILES (5 min)
+========================================
+
+1. In cPanel, click "File Manager"
+
+2. Navigate to: /home/username/
+
+3. Click "New Folder" button
+   - Name it: mycaetracker-backend
+   - Click "Create New Folder"
+
+4. Open the "mycaetracker-backend" folder
+
+5. Click "Upload" button at the top
+
+6. Upload THESE FILES from the "backend" folder:
+   ✓ package.json
+   ✓ package-lock.json
+
+7. Upload the ENTIRE "dist" folder:
+   - Select all files inside backend/dist/
+   - Drag and drop OR click Select File
+   - Wait for upload to complete
+
+8. After upload, you should see in mycaetracker-backend/:
+   - dist/ (folder)
+   - package.json (file)
+   - package-lock.json (file)
+
+========================================
+STEP 4: CREATE BACKEND .env FILE (2 min)
+========================================
+
+1. Still in File Manager, inside mycaetracker-backend/ folder
+
+2. Click "+ File" button
+   - Name it: .env
+   - Click "Create New File"
+
+3. Right-click on ".env" file → "Edit"
+
+4. Copy and paste THIS (update the database credentials from Step 1):
+
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=<YOUR_DATABASE_USER_FROM_STEP_1>
+DB_PASSWORD=<YOUR_DATABASE_PASSWORD_FROM_STEP_1>
+DB_NAME=<YOUR_DATABASE_NAME_FROM_STEP_1>
+
+NODE_ENV=production
+PORT=3000
+
+CORS_ORIGINS=https://mycaetech.com,https://www.mycaetech.com
+
+JWT_SECRET=a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6
+
+5. Click "Save Changes"
+
+6. Close the editor
+
+========================================
+STEP 5: SETUP NODE.JS APPLICATION (5 min)
+========================================
+
+1. In cPanel, search for and click "Setup Node.js App"
+
+2. Click the blue "Create Application" button
+
+3. Fill in the form:
+
+   Node.js version: Select "18" or "20" (latest available)
+
+   Application mode: Production
+
+   Application root: mycaetracker-backend
+
+   Application URL: (leave empty)
+
+   Application startup file: dist/server.js
+
+   Passenger log file: (leave default checked)
+
+4. Click "Create" button
+
+5. Wait for the app to be created (30 seconds)
+
+6. You'll see a new screen with your app details
+
+7. Scroll down and click the "Run NPM Install" button
+   - This will install all dependencies
+   - Wait 2-3 minutes (you'll see progress)
+   - When done, it will say "Success"
+
+8. After NPM install completes, click "Restart" button at the top
+
+9. Check Status: Should say "Running" (green)
+
+✓ BACKEND IS LIVE!
+
+========================================
+STEP 6: UPLOAD FRONTEND FILES (5 min)
+========================================
+
+1. In cPanel File Manager, navigate to: /public_html/
+
+2. DELETE any existing files EXCEPT:
+   - cgi-bin/ folder (keep this!)
+   - .htaccess (if it exists, you can keep or replace)
+
+3. Click "Upload" button
+
+4. Upload ALL files from the "frontend" folder:
+   ✓ index.html
+   ✓ .htaccess
+   ✓ assets/ (entire folder - may need to zip and unzip)
+   ✓ favicon.svg
+   ✓ logo.svg
+   ✓ mycae-logo.png
+   ✓ mycae-logo.svg
+   ✓ templates/ folder
+   ✓ vite.svg
+
+5. If you can't upload the assets/ folder directly:
+   - Zip the "frontend" folder on your computer
+   - Upload the zip file
+   - Right-click the zip → "Extract"
+   - Move all files from extracted folder to /public_html/
+   - Delete the zip file
+
+6. Verify you see these files in /public_html/:
+   - index.html
+   - .htaccess
+   - assets/ (folder with many files)
+   - favicon.svg
+   - logo files
+
+========================================
+STEP 7: SETUP SSL CERTIFICATE (3 min)
+========================================
+
+1. In cPanel, search for "SSL/TLS Status"
+
+2. Click "Run AutoSSL"
+
+3. Wait for Let's Encrypt certificate to install (1-2 minutes)
+
+4. You should see a green checkmark when done
+
+✓ SSL ENABLED!
+
+========================================
+STEP 8: TEST YOUR SITE! (5 min)
+========================================
+
+1. Open a new browser tab
+
+2. Go to: https://mycaetech.com
+
+3. You should see the MycaeTracker login page!
+
+4. Try logging in with your credentials
+
+5. Check if pages load correctly
+
+6. Test creating/viewing data
+
+✓ IF EVERYTHING WORKS: DEPLOYMENT COMPLETE! 🎉
+
+========================================
+TROUBLESHOOTING
+========================================
+
+Problem: Website shows "404 Not Found"
+Solution:
+- Check .htaccess file is in /public_html/
+- Check index.html is in /public_html/
+
+Problem: "Cannot connect to API" or CORS errors
+Solution:
+- Go to cPanel → Setup Node.js App
+- Click "Restart" on your app
+- Wait 30 seconds and try again
+- Check .env file has correct CORS_ORIGINS
+
+Problem: Backend app won't start
+Solution:
+- Check Node.js App logs in cPanel
+- Verify .env file has correct database credentials
+- Click "Run NPM Install" again
+- Click "Restart"
+
+Problem: Database connection error
+Solution:
+- Double-check database credentials in .env file
+- Make sure database user has ALL PRIVILEGES
+- Database host should be "localhost"
+
+Problem: White screen or blank page
+Solution:
+- Open browser console (F12)
+- Look for errors
+- Check if API URL is correct in requests
+
+========================================
+NEED HELP?
+========================================
+
+1. Check backend logs:
+   - cPanel → Setup Node.js App → Click your app → View logs
+
+2. Check frontend console:
+   - Open website → Press F12 → Check Console tab
+
+3. Verify backend is running:
+   - Visit: https://mycaetech.com/api (you might see error but that's ok)
+
+========================================
+DEPLOYMENT TIME ESTIMATE: 30-40 minutes
+========================================
+
+Good luck! 🚀

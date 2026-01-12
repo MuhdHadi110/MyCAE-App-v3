@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Search, Building2, Mail, Phone, Edit, Trash2, Grid3x3, List as ListIcon, Tag } from 'lucide-react';
 import { useClientStore } from '../store/clientStore';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import type { Client, ClientCategory } from '../types/client.types';
 import { getCurrentUser } from '../lib/auth';
 import { checkPermission, getPermissionMessage } from '../lib/permissions';
 import { AddClientModal } from '../components/modals/AddClientModal';
 import { toast } from 'react-hot-toast';
+import { logger } from '../lib/logger';
 
 export const ClientsScreen: React.FC = () => {
   // 1. Destructure all required actions from the store
@@ -17,6 +19,11 @@ export const ClientsScreen: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState<ClientCategory | 'all'>('all');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    clientId?: string;
+    clientName?: string;
+  }>({ isOpen: false });
 
   const currentUser = getCurrentUser();
   const canAdd = currentUser && checkPermission((currentUser.role || 'engineer') as any, 'canAddBusinessContact');
@@ -49,14 +56,27 @@ export const ClientsScreen: React.FC = () => {
       toast.error(getPermissionMessage('delete business contact', 'engineer'));
       return;
     }
-    if (confirm(`Are you sure you want to delete ${clientName}?`)) {
-      deleteClient(clientId);
-      toast.success(`Client ${clientName} deleted successfully.`);
+    setConfirmDialog({
+      isOpen: true,
+      clientId,
+      clientName,
+    });
+  };
+
+  const confirmDeleteClient = async () => {
+    if (!confirmDialog.clientId) return;
+
+    try {
+      await deleteClient(confirmDialog.clientId);
+      toast.success(`Client ${confirmDialog.clientName} deleted successfully.`);
+      setConfirmDialog({ isOpen: false });
+    } catch (error) {
+      toast.error('Failed to delete client');
     }
   };
 
   // 3. Create a submit handler for the modal form
-  const handleFormSubmit = (clientData: Omit<Client, 'id' | 'createdDate'>) => {
+  const handleFormSubmit = (clientData: Omit<Client, 'id' | 'createdDate' | 'lastUpdated'>) => {
     try {
       if (editingClient) {
         updateClient(editingClient.id, clientData);
@@ -69,7 +89,7 @@ export const ClientsScreen: React.FC = () => {
       setEditingClient(null);
     } catch (error) {
       toast.error('An error occurred while saving the client.');
-      console.error(error);
+      logger.error('Error saving client:', error);
     }
   };
 
@@ -468,6 +488,18 @@ export const ClientsScreen: React.FC = () => {
           onClose={() => setShowAddModal(false)}
           onSubmit={handleFormSubmit}
           client={editingClient}
+        />
+
+        {/* Delete Confirmation Dialog */}
+        <ConfirmDialog
+          isOpen={confirmDialog.isOpen}
+          onClose={() => setConfirmDialog({ isOpen: false })}
+          onConfirm={confirmDeleteClient}
+          title="Delete Business Contact"
+          message={`Are you sure you want to delete ${confirmDialog.clientName}? This action cannot be undone.`}
+          variant="danger"
+          confirmText="Delete"
+          cancelText="Cancel"
         />
       </div>
     </div>

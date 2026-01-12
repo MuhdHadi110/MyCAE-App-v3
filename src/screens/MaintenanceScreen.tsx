@@ -1,45 +1,106 @@
 import { useEffect, useState } from 'react';
-import { Plus, Wrench, Edit2, Trash2, X } from 'lucide-react';
+import { Plus, Wrench, Edit2, Trash2, X, Calendar, AlertTriangle, CheckCircle, PlayCircle } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { NewMaintenanceTicketModal } from '../components/modals/NewMaintenanceTicketModal';
+import { AddScheduledMaintenanceModal } from '../components/modals/AddScheduledMaintenanceModal';
 import { useMaintenanceStore } from '../store/maintenanceStore';
+import { useScheduledMaintenanceStore } from '../store/scheduledMaintenanceStore';
 import { formatDate } from '../lib/utils';
 import { useResponsive } from '../hooks/useResponsive';
 import toast from 'react-hot-toast';
 import type { MaintenanceTicket } from '../types/maintenance.types';
+import type { ScheduledMaintenance } from '../types/scheduledMaintenance.types';
+import { maintenanceTypeLabels, inventoryActionLabels } from '../types/scheduledMaintenance.types';
 
 export const MaintenanceScreen: React.FC = () => {
   const { filteredTickets, fetchMaintenance, loading, stats, updateTicket, deleteTicket } = useMaintenanceStore();
+  const {
+    schedules,
+    stats: scheduledStats,
+    loading: scheduledLoading,
+    fetchSchedules,
+    fetchStats: fetchScheduledStats,
+    deleteSchedule,
+    markCompleted,
+    createTicketFromSchedule,
+  } = useScheduledMaintenanceStore();
   const { isMobile } = useResponsive();
-  const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending');
+  const [activeTab, setActiveTab] = useState<'ongoing' | 'completed' | 'scheduled'>('ongoing');
   const [showNewTicketModal, setShowNewTicketModal] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<MaintenanceTicket | null>(null);
+  const [editingSchedule, setEditingSchedule] = useState<ScheduledMaintenance | null>(null);
+  const [completedSchedules, setCompletedSchedules] = useState<ScheduledMaintenance[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    ticketId?: string;
+    scheduleId?: string;
+    type?: 'ticket' | 'schedule';
+  }>({ isOpen: false });
+
+  const fetchCompletedSchedules = async () => {
+    try {
+      const firstOfMonth = new Date();
+      firstOfMonth.setDate(1);
+      firstOfMonth.setHours(0, 0, 0, 0);
+
+      const response = await (await import('../services/http-client')).httpClient.api.get('/scheduled-maintenance', {
+        params: {
+          is_completed: true,
+          from_date: firstOfMonth.toISOString(),
+        }
+      });
+      setCompletedSchedules(response.data);
+    } catch (error) {
+      console.error('Failed to fetch completed schedules:', error);
+    }
+  };
 
   useEffect(() => {
     fetchMaintenance();
-  }, []);
+    fetchSchedules({ is_completed: false });
+    fetchScheduledStats();
+
+    if (activeTab === 'completed') {
+      fetchCompletedSchedules();
+    }
+  }, [activeTab]);
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, 'warning' | 'info' | 'success' | 'default'> = {
-      Pending: 'warning',
-      'In Progress': 'info',
-      Completed: 'success',
-      Cancelled: 'default',
+      'open': 'warning',
+      'in-progress': 'info',
+      'resolved': 'success',
+      'closed': 'default',
     };
-    return <Badge variant={variants[status] || 'default'}>{status}</Badge>;
+    const labels: Record<string, string> = {
+      'open': 'Open',
+      'in-progress': 'In Progress',
+      'resolved': 'Resolved',
+      'closed': 'Closed',
+    };
+    return <Badge variant={variants[status] || 'default'}>{labels[status] || status}</Badge>;
   };
 
   const getPriorityBadge = (priority: string) => {
     const variants: Record<string, 'danger' | 'warning' | 'info' | 'default'> = {
-      Urgent: 'danger',
-      High: 'warning',
-      Medium: 'info',
-      Low: 'default',
+      'critical': 'danger',
+      'high': 'warning',
+      'medium': 'info',
+      'low': 'default',
     };
-    return <Badge variant={variants[priority] || 'default'} size="sm">{priority}</Badge>;
+    const labels: Record<string, string> = {
+      'critical': 'Critical',
+      'high': 'High',
+      'medium': 'Medium',
+      'low': 'Low',
+    };
+    return <Badge variant={variants[priority] || 'default'} size="sm">{labels[priority] || priority}</Badge>;
   };
 
   const handleEditClick = (ticket: MaintenanceTicket) => {
@@ -48,14 +109,107 @@ export const MaintenanceScreen: React.FC = () => {
   };
 
   const handleDeleteClick = (ticketId: string) => {
-    if (confirm('Are you sure you want to delete this ticket?')) {
-      deleteTicket(ticketId).then(() => {
+    setConfirmDialog({
+      isOpen: true,
+      ticketId,
+      type: 'ticket',
+    });
+  };
+
+  const handleDeleteScheduleClick = (scheduleId: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      scheduleId,
+      type: 'schedule',
+    });
+  };
+
+  const confirmDelete = async () => {
+    try {
+      if (confirmDialog.type === 'ticket' && confirmDialog.ticketId) {
+        await deleteTicket(confirmDialog.ticketId);
         toast.success('Ticket deleted successfully');
         fetchMaintenance();
-      }).catch(() => {
-        toast.error('Failed to delete ticket');
-      });
+      } else if (confirmDialog.type === 'schedule' && confirmDialog.scheduleId) {
+        await deleteSchedule(confirmDialog.scheduleId);
+        toast.success('Scheduled maintenance deleted');
+        fetchSchedules({ is_completed: false });
+        fetchScheduledStats();
+      }
+      setConfirmDialog({ isOpen: false });
+    } catch {
+      toast.error(`Failed to delete ${confirmDialog.type}`);
     }
+  };
+
+  const handleEditSchedule = (schedule: ScheduledMaintenance) => {
+    setEditingSchedule(schedule);
+    setShowScheduleModal(true);
+  };
+
+  const handleMarkCompleted = async (scheduleId: string) => {
+    try {
+      await markCompleted(scheduleId);
+      toast.success('Maintenance marked as completed');
+      fetchSchedules({ is_completed: false });
+      fetchScheduledStats();
+    } catch {
+      toast.error('Failed to mark as completed');
+    }
+  };
+
+  const handleCreateTicket = async (scheduleId: string) => {
+    try {
+      await createTicketFromSchedule(scheduleId);
+      toast.success('Maintenance ticket created');
+      fetchMaintenance();
+      fetchSchedules({ is_completed: false });
+    } catch {
+      toast.error('Failed to create ticket');
+    }
+  };
+
+  const handleViewLinkedTicket = (scheduleId: string) => {
+    const schedule = schedules.find(s => s.id === scheduleId);
+    if (schedule?.ticket_id) {
+      const ticket = filteredTickets.find(t => t.id === schedule.ticket_id);
+      if (ticket) {
+        const isCompleted = ticket.status === 'resolved' || ticket.status === 'closed';
+        setActiveTab(isCompleted ? 'completed' : 'ongoing');
+        toast.success(`Switched to ${isCompleted ? 'Completed' : 'On-going'} tab`);
+      }
+    }
+  };
+
+  const handleViewLinkedSchedule = (ticketId: string) => {
+    const ticket = filteredTickets.find(t => t.id === ticketId);
+    if (ticket?.scheduledMaintenanceId) {
+      setActiveTab('scheduled');
+      toast.success('Switched to Scheduled tab');
+    }
+  };
+
+  const getDaysUntil = (dateString: string): number => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const targetDate = new Date(dateString);
+    targetDate.setHours(0, 0, 0, 0);
+    const diffTime = targetDate.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
+  const getScheduleUrgencyBadge = (dateString: string) => {
+    const daysUntil = getDaysUntil(dateString);
+    if (daysUntil < 0) {
+      return <Badge variant="danger">{Math.abs(daysUntil)} days overdue</Badge>;
+    } else if (daysUntil === 0) {
+      return <Badge variant="danger">Due today</Badge>;
+    } else if (daysUntil <= 7) {
+      return <Badge variant="warning">{daysUntil} days left</Badge>;
+    } else if (daysUntil <= 14) {
+      return <Badge variant="info">{daysUntil} days left</Badge>;
+    }
+    return <Badge variant="success">{daysUntil} days left</Badge>;
   };
 
   const handleEditSubmit = async (updates: Partial<MaintenanceTicket>) => {
@@ -71,9 +225,26 @@ export const MaintenanceScreen: React.FC = () => {
     }
   };
 
-  const displayedTickets = filteredTickets.filter((ticket) =>
-    activeTab === 'pending' ? ticket.status !== 'Completed' : ticket.status === 'Completed'
-  );
+  const filteredBySearch = (item: any) => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase();
+    const title = (item.title || item.itemName || '').toLowerCase();
+    const description = (item.description || '').toLowerCase();
+    const itemTitle = (item.item?.title || '').toLowerCase();
+    return title.includes(query) || description.includes(query) || itemTitle.includes(query);
+  };
+
+  const displayedTickets = filteredTickets
+    .filter((ticket) =>
+      activeTab === 'ongoing'
+        ? ticket.status !== 'resolved' && ticket.status !== 'closed'
+        : ticket.status === 'resolved' || ticket.status === 'closed'
+    )
+    .filter(filteredBySearch);
+
+  const displayedCompletedSchedules = completedSchedules.filter(filteredBySearch);
+
+  const displayedSchedules = schedules.filter(filteredBySearch);
 
   return (
     <div className="min-h-full bg-gray-50">
@@ -84,30 +255,95 @@ export const MaintenanceScreen: React.FC = () => {
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Maintenance</h1>
               <p className="text-gray-600 mt-1">
-                {stats?.pending || 0} pending, {stats?.completed || 0} completed
+                {stats?.pending || 0} on-going, {stats?.completed || 0} completed
+                {scheduledStats && `, ${scheduledStats.total} scheduled`}
               </p>
             </div>
-            <Button
-              onClick={() => setShowNewTicketModal(true)}
-              icon={<Plus className="w-5 h-5" />}
-              size={isMobile ? 'md' : 'lg'}
-            >
-              New Ticket
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => {
+                  setEditingSchedule(null);
+                  setShowScheduleModal(true);
+                }}
+                variant="outline"
+                icon={<Calendar className="w-5 h-5" />}
+                size={isMobile ? 'md' : 'lg'}
+              >
+                Schedule
+              </Button>
+              <Button
+                onClick={() => setShowNewTicketModal(true)}
+                icon={<Plus className="w-5 h-5" />}
+                size={isMobile ? 'md' : 'lg'}
+              >
+                New Ticket
+              </Button>
+            </div>
           </div>
+        </div>
+
+        {/* Maintenance Stats Cards (visible on all tabs) */}
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+                <Wrench className="w-5 h-5 text-amber-600" />
+              </div>
+            </div>
+            <div className="text-sm font-medium text-gray-600">On-going</div>
+            <div className="text-2xl font-bold text-gray-900">{stats?.pending || 0}</div>
+          </div>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+                <Calendar className="w-5 h-5 text-blue-600" />
+              </div>
+            </div>
+            <div className="text-sm font-medium text-gray-600">Scheduled</div>
+            <div className="text-2xl font-bold text-gray-900">{scheduledStats?.total || 0}</div>
+          </div>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+              </div>
+            </div>
+            <div className="text-sm font-medium text-gray-600">Overdue</div>
+            <div className="text-2xl font-bold text-gray-900">{scheduledStats?.overdue || 0}</div>
+          </div>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+              </div>
+            </div>
+            <div className="text-sm font-medium text-gray-600">Completed This Month</div>
+            <div className="text-2xl font-bold text-gray-900">{scheduledStats?.completedThisMonth || 0}</div>
+          </div>
+        </div>
+
+        {/* Search Bar */}
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <input
+            type="text"
+            placeholder="Search by title, description, or item name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          />
         </div>
 
         {/* Tabs */}
         <div className="flex gap-2 mb-6 border-b border-gray-200">
           <button
-            onClick={() => setActiveTab('pending')}
+            onClick={() => setActiveTab('ongoing')}
             className={`px-4 py-2 font-medium transition-colors relative ${
-              activeTab === 'pending'
+              activeTab === 'ongoing'
                 ? 'text-primary-600 border-b-2 border-primary-600'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            Pending
+            On-going
             {stats && stats.pending > 0 && (
               <span className="ml-2 px-2 py-0.5 text-xs bg-primary-100 text-primary-700 rounded-full">
                 {stats.pending}
@@ -129,17 +365,36 @@ export const MaintenanceScreen: React.FC = () => {
               </span>
             )}
           </button>
+          <button
+            onClick={() => setActiveTab('scheduled')}
+            className={`px-4 py-2 font-medium transition-colors relative ${
+              activeTab === 'scheduled'
+                ? 'text-primary-600 border-b-2 border-primary-600'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Scheduled
+            {scheduledStats && (scheduledStats.upcoming > 0 || scheduledStats.overdue > 0) && (
+              <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
+                scheduledStats.overdue > 0
+                  ? 'bg-red-100 text-red-700'
+                  : 'bg-amber-100 text-amber-700'
+              }`}>
+                {scheduledStats.overdue > 0 ? scheduledStats.overdue : scheduledStats.upcoming}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* Loading State */}
-        {loading && (
+        {(loading || scheduledLoading) && (
           <div className="flex justify-center items-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
           </div>
         )}
 
-        {/* Maintenance Tickets */}
-        {!loading && (
+        {/* Maintenance Tickets (Pending/Completed tabs) */}
+        {!loading && activeTab !== 'scheduled' && displayedTickets.length > 0 && (
           <div className="space-y-3">
           {displayedTickets.map((ticket) => (
             <Card key={ticket.id} variant="bordered" padding="md" className="hover:shadow-md transition-shadow cursor-pointer">
@@ -148,6 +403,12 @@ export const MaintenanceScreen: React.FC = () => {
                   <div className="flex items-start gap-2 mb-2">
                     <h3 className="font-semibold text-gray-900 flex-1">{ticket.title}</h3>
                     {getPriorityBadge(ticket.priority)}
+                    {ticket.scheduledMaintenanceId && (
+                      <Badge variant="info" size="sm">
+                        <Calendar className="w-3 h-3 inline mr-1" />
+                        From Schedule
+                      </Badge>
+                    )}
                   </div>
                   {ticket.itemName && (
                     <p className="text-sm text-gray-600 mb-2">Item: {ticket.itemName}</p>
@@ -162,6 +423,15 @@ export const MaintenanceScreen: React.FC = () => {
                 <div className="flex md:flex-col items-center md:items-end gap-2">
                   {getStatusBadge(ticket.status)}
                   <div className="flex gap-2 mt-2 md:mt-0">
+                    {ticket.scheduledMaintenanceId && (
+                      <button
+                        onClick={() => handleViewLinkedSchedule(ticket.id)}
+                        className="p-2 text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                        title="View linked schedule"
+                      >
+                        <Calendar className="w-4 h-4" />
+                      </button>
+                    )}
                     <button
                       onClick={() => handleEditClick(ticket)}
                       className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
@@ -184,13 +454,187 @@ export const MaintenanceScreen: React.FC = () => {
           </div>
         )}
 
-        {/* Empty State */}
-        {!loading && displayedTickets.length === 0 && (
+        {/* Completed Schedules (on Completed tab) */}
+        {!scheduledLoading && activeTab === 'completed' && displayedCompletedSchedules.length > 0 && (
+          <div className="space-y-3">
+            {displayedCompletedSchedules.map((schedule) => (
+              <Card key={`schedule-${schedule.id}`} variant="bordered" padding="md" className="hover:shadow-md transition-shadow">
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="flex items-start gap-2 mb-2">
+                      <h3 className="font-semibold text-gray-900 flex-1">
+                        {schedule.item?.title || 'Unknown Item'} - {maintenanceTypeLabels[schedule.maintenance_type]}
+                      </h3>
+                      <Badge variant="success">Completed</Badge>
+                    </div>
+                    {schedule.description && (
+                      <p className="text-sm text-gray-700 line-clamp-2">{schedule.description}</p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-3 mt-3 text-xs text-gray-500">
+                      <span>Scheduled: {formatDate(schedule.scheduled_date)}</span>
+                      {schedule.completed_date && <span>Completed: {formatDate(schedule.completed_date)}</span>}
+                      {schedule.ticket_id && (
+                        <Badge variant="info" size="sm">
+                          Ticket #{schedule.ticket_id.slice(0, 8)}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Scheduled Maintenance List */}
+        {!scheduledLoading && activeTab === 'scheduled' && displayedSchedules.length > 0 && (
+          <div className="space-y-3">
+            {displayedSchedules.map((schedule) => (
+              <Card key={schedule.id} variant="bordered" padding="md" className="hover:shadow-md transition-shadow">
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="flex items-start gap-2 mb-2">
+                      <h3 className="font-semibold text-gray-900 flex-1">
+                        {schedule.item?.title || 'Unknown Item'}
+                      </h3>
+                      {getScheduleUrgencyBadge(schedule.scheduled_date)}
+                    </div>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      <Badge variant="info" size="sm">
+                        {maintenanceTypeLabels[schedule.maintenance_type]}
+                      </Badge>
+                      <Badge variant="default" size="sm">
+                        {inventoryActionLabels[schedule.inventory_action]}
+                      </Badge>
+                      {schedule.ticket_id && (
+                        <Badge variant="success" size="sm">Ticket Created</Badge>
+                      )}
+                    </div>
+                    {schedule.description && (
+                      <p className="text-sm text-gray-700 line-clamp-2">{schedule.description}</p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-3 mt-3 text-xs text-gray-500">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3 h-3" />
+                        {formatDate(schedule.scheduled_date)}
+                      </span>
+                      {schedule.item?.sku && (
+                        <span>SKU: {schedule.item.sku}</span>
+                      )}
+                      {schedule.inventory_action === 'deduct' && (
+                        <span>Qty: {schedule.quantity_affected}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex md:flex-col items-center gap-2">
+                    <div className="flex gap-1">
+                      {!schedule.ticket_id ? (
+                        <button
+                          onClick={() => handleCreateTicket(schedule.id)}
+                          className="p-2 text-amber-600 hover:bg-amber-50 rounded transition-colors"
+                          title="Create maintenance ticket"
+                        >
+                          <PlayCircle className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleViewLinkedTicket(schedule.id)}
+                          className="p-2 text-green-600 hover:bg-green-50 rounded transition-colors"
+                          title="View linked ticket"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                        </button>
+                      )}
+                      {schedule.ticket_id ? (
+                        <button
+                          disabled
+                          className="p-2 text-gray-400 cursor-not-allowed rounded"
+                          title="Complete by resolving the linked ticket"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleMarkCompleted(schedule.id)}
+                          className="p-2 text-green-600 hover:bg-green-50 rounded transition-colors"
+                          title="Mark as completed"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleEditSchedule(schedule)}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        title="Edit schedule"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteScheduleClick(schedule.id)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title="Delete schedule"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Empty State for Ongoing/Completed Tabs */}
+        {!loading && activeTab !== 'scheduled' && displayedTickets.length === 0 && (
+          <>
+            {displayedCompletedSchedules.length === 0 && (
+              <Card variant="bordered">
+              <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                <Wrench className="w-16 h-16 mb-4 opacity-50" />
+                {searchQuery ? (
+                  <>
+                    <p className="text-lg font-medium mb-2">No results found</p>
+                    <p className="text-sm">Try adjusting your search query</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-lg font-medium mb-2">No {activeTab} tickets</p>
+                    <p className="text-sm">Create a new maintenance ticket to get started</p>
+                  </>
+                )}
+              </div>
+              </Card>
+            )}
+          </>
+        )}
+
+        {/* Empty State for Scheduled */}
+        {!scheduledLoading && activeTab === 'scheduled' && displayedSchedules.length === 0 && (
           <Card variant="bordered">
           <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-            <Wrench className="w-16 h-16 mb-4 opacity-50" />
-            <p className="text-lg font-medium mb-2">No {activeTab} tickets</p>
-            <p className="text-sm">Create a new maintenance ticket to get started</p>
+            <Calendar className="w-16 h-16 mb-4 opacity-50" />
+            {searchQuery ? (
+              <>
+                <p className="text-lg font-medium mb-2">No scheduled maintenance found</p>
+                <p className="text-sm mb-4">Try adjusting your search query</p>
+              </>
+            ) : (
+              <>
+                <p className="text-lg font-medium mb-2">No scheduled maintenance</p>
+                <p className="text-sm mb-4">Schedule equipment maintenance, calibrations, or inspections</p>
+              </>
+            )}
+            {!searchQuery && (
+              <Button
+                onClick={() => {
+                  setEditingSchedule(null);
+                  setShowScheduleModal(true);
+                }}
+                icon={<Plus className="w-5 h-5" />}
+              >
+                Schedule Maintenance
+              </Button>
+            )}
           </div>
           </Card>
         )}
@@ -207,24 +651,45 @@ export const MaintenanceScreen: React.FC = () => {
         )}
       </div>
 
-      {/* New Maintenance Ticket Modal */}
+      {/* New/Edit Maintenance Ticket Modal */}
       <NewMaintenanceTicketModal
-        isOpen={showNewTicketModal}
-        onClose={() => setShowNewTicketModal(false)}
+        isOpen={showNewTicketModal || showEditModal}
+        onClose={() => {
+          setShowNewTicketModal(false);
+          setShowEditModal(false);
+          setSelectedTicket(null);
+          fetchMaintenance();
+        }}
+        editingTicket={selectedTicket || undefined}
       />
 
-      {/* Edit Maintenance Ticket Modal */}
-      {showEditModal && selectedTicket && (
-        <EditMaintenanceTicketModal
-          ticket={selectedTicket}
-          isOpen={showEditModal}
-          onClose={() => {
-            setShowEditModal(false);
-            setSelectedTicket(null);
-          }}
-          onSave={handleEditSubmit}
-        />
-      )}
+      {/* Schedule Maintenance Modal */}
+      <AddScheduledMaintenanceModal
+        isOpen={showScheduleModal}
+        onClose={() => {
+          setShowScheduleModal(false);
+          setEditingSchedule(null);
+          fetchSchedules({ is_completed: false });
+          fetchScheduledStats();
+        }}
+        editingSchedule={editingSchedule}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ isOpen: false })}
+        onConfirm={confirmDelete}
+        title={confirmDialog.type === 'schedule' ? 'Delete Scheduled Maintenance' : 'Delete Maintenance Ticket'}
+        message={
+          confirmDialog.type === 'schedule'
+            ? 'Are you sure you want to delete this scheduled maintenance? This action cannot be undone.'
+            : 'Are you sure you want to delete this ticket? This action cannot be undone.'
+        }
+        variant="danger"
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
     </div>
   );
 };
@@ -316,10 +781,10 @@ const EditMaintenanceTicketModal: React.FC<EditMaintenanceTicketModalProps> = ({
                 onChange={(e) => setFormData({ ...formData, priority: e.target.value as any })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-                <option value="Urgent">Urgent</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
               </select>
             </div>
 
@@ -331,10 +796,10 @@ const EditMaintenanceTicketModal: React.FC<EditMaintenanceTicketModalProps> = ({
                 onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="Pending">Pending</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Completed">Completed</option>
-                <option value="Cancelled">Cancelled</option>
+                <option value="open">Open</option>
+                <option value="in-progress">In Progress</option>
+                <option value="resolved">Resolved</option>
+                <option value="closed">Closed</option>
               </select>
             </div>
           </div>

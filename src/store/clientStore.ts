@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import apiService from '../services/api.service';
+import timesheetService from '../services/api.service';
 import type { Client } from '../types/client.types';
 
 interface ClientStore {
@@ -23,7 +23,7 @@ export const useClientStore = create<ClientStore>((set) => ({
   fetchClients: async (filters?: any) => {
     try {
       set({ loading: true, error: null });
-      const response = await apiService.getAllClients(filters) as any;
+      const response = await timesheetService.getAllClients(filters) as any;
 
       // Handle different response formats from backend
       let clients: any[] = [];
@@ -49,14 +49,14 @@ export const useClientStore = create<ClientStore>((set) => ({
   addClient: async (clientData) => {
     try {
       set({ loading: true, error: null });
-      const newClient = await apiService.createClient(clientData);
+      const newClient = await timesheetService.createClient(clientData);
       set((state) => ({
         clients: [...state.clients, newClient],
         loading: false,
         error: null,
       }));
       // Refetch to ensure data is in sync with backend
-      const response = await apiService.getAllClients() as any;
+      const response = await timesheetService.getAllClients() as any;
       let clients: any[] = [];
       if (Array.isArray(response)) {
         clients = response;
@@ -74,7 +74,7 @@ export const useClientStore = create<ClientStore>((set) => ({
   updateClient: async (id, updates) => {
     try {
       set({ loading: true, error: null });
-      const updatedClient = await apiService.updateClient(id, updates);
+      const updatedClient = await timesheetService.updateClient(id, updates);
       set((state) => ({
         clients: state.clients.map((client) =>
           client.id === id ? updatedClient : client
@@ -83,7 +83,7 @@ export const useClientStore = create<ClientStore>((set) => ({
         error: null,
       }));
       // Refetch to ensure data is in sync with backend
-      const response = await apiService.getAllClients() as any;
+      const response = await timesheetService.getAllClients() as any;
       let clients: any[] = [];
       if (Array.isArray(response)) {
         clients = response;
@@ -101,14 +101,14 @@ export const useClientStore = create<ClientStore>((set) => ({
   deleteClient: async (id) => {
     try {
       set({ loading: true, error: null });
-      await apiService.deleteClient(id);
+      await timesheetService.deleteClient(id);
       set((state) => ({
         clients: state.clients.filter((client) => client.id !== id),
         loading: false,
         error: null,
       }));
       // Refetch to ensure data is in sync with backend
-      const response = await apiService.getAllClients() as any;
+      const response = await timesheetService.getAllClients() as any;
       let clients: any[] = [];
       if (Array.isArray(response)) {
         clients = response;

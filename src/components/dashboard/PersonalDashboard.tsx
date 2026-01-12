@@ -39,13 +39,15 @@ export const PersonalDashboard: React.FC = () => {
 
   // Get my timesheets
   const myTimesheets = useMemo(() => {
+    if (!user) return [];
     return (Array.isArray(timesheets) ? timesheets : []).filter((ts) => ts.engineerId === user.id);
-  }, [timesheets, user.id]);
+  }, [timesheets, user?.id]);
 
   // Get my projects (where I'm the engineer)
   const myProjects = useMemo(() => {
+    if (!user) return [];
     return projects.filter((p) => p.engineerId === user.id);
-  }, [projects, user.id]);
+  }, [projects, user?.id]);
 
   // Filter data by selected year
   const filteredTimesheets = useMemo(() => {
@@ -412,7 +414,7 @@ export const PersonalDashboard: React.FC = () => {
                   <tbody className="divide-y divide-gray-200">
                     {myProjectsWithHours.map((project) => {
                       const client = clients.find((c) => c.id === project.clientId);
-                      const progress = project.plannedHours > 0 ? (project.actualHours / project.plannedHours) * 100 : 0;
+                      const progress = project.plannedHours > 0 ? ((project.actualHours || 0) / project.plannedHours) * 100 : 0;
 
                       return (
                         <tr

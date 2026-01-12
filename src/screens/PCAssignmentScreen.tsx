@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { Monitor, UserPlus, UserMinus, MapPin, Clock, Plus, X, Edit2 } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Monitor, UserPlus, MapPin, Clock, Plus, Edit2, Wrench, CheckCircle, XCircle, Trash2 } from 'lucide-react';
 import { usePCStore } from '../store/pcStore';
 import { getCurrentUser } from '../lib/auth';
 import { checkPermission } from '../lib/permissions';
-import { SoftwareSelection } from '../components/SoftwareSelection';
+import { AddPCModal } from '../components/modals/AddPCModal';
+import { AssignPCModal } from '../components/modals/AssignPCModal';
+import { EditPCModal } from '../components/modals/EditPCModal';
 import type { PC } from '../types/pc.types';
 
 export const PCAssignmentScreen: React.FC = () => {
-  const { pcs, loading, fetchPCs, addPC, assignPC, releasePC, deletePC, updatePC } = usePCStore();
+  const { pcs, fetchPCs, addPC, assignPC, releasePC, deletePC, updatePC, setMaintenanceStatus } = usePCStore();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -39,6 +41,36 @@ export const PCAssignmentScreen: React.FC = () => {
       deletePC(pcId);
     }
   };
+
+  const handleMaintenance = async (pcId: string, inMaintenance: boolean) => {
+    const message = inMaintenance
+      ? 'Mark this PC for maintenance? This will unassign the current user.'
+      : 'End maintenance for this PC?';
+    if (confirm(message)) {
+      try {
+        await setMaintenanceStatus(pcId, inMaintenance);
+      } catch (error) {
+        console.error('Failed to update maintenance status:', error);
+      }
+    }
+  };
+
+  // Sort PCs numerically by name (PC1, PC2, PC3... instead of PC1, PC10, PC11...)
+  const sortedPCs = useMemo(() => {
+    return [...pcs].sort((a, b) => {
+      const aMatch = a.name.match(/^PC(\d+)$/);
+      const bMatch = b.name.match(/^PC(\d+)$/);
+
+      if (aMatch && bMatch) {
+        const aNum = parseInt(aMatch[1]);
+        const bNum = parseInt(bMatch[1]);
+        return aNum - bNum;
+      }
+
+      // Fallback to alphabetical sort for non-PC names
+      return a.name.localeCompare(b.name);
+    });
+  }, [pcs]);
 
   const stats = {
     total: pcs.length,
@@ -73,150 +105,168 @@ export const PCAssignmentScreen: React.FC = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Total PCs</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.total}</p>
-            </div>
-            <Monitor className="w-8 h-8 text-gray-400" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="text-sm font-medium text-gray-600">Total PCs</div>
+            <div className="text-3xl font-bold text-gray-900 mt-2">{stats.total}</div>
           </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Available</p>
-              <p className="text-3xl font-bold text-primary-600">{stats.available}</p>
-            </div>
-            <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
-              <div className="w-3 h-3 bg-primary-600 rounded-full"></div>
-            </div>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="text-sm font-medium text-gray-600">Available</div>
+            <div className="text-3xl font-bold text-green-600 mt-2">{stats.available}</div>
           </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Assigned</p>
-              <p className="text-3xl font-bold text-primary-600">{stats.assigned}</p>
-            </div>
-            <UserPlus className="w-8 h-8 text-gray-400" />
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="text-sm font-medium text-gray-600">Assigned</div>
+            <div className="text-3xl font-bold text-blue-600 mt-2">{stats.assigned}</div>
           </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Maintenance</p>
-              <p className="text-3xl font-bold text-primary-600">{stats.maintenance}</p>
-            </div>
-            <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
-              <div className="w-3 h-3 bg-primary-600 rounded-full"></div>
-            </div>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="text-sm font-medium text-gray-600">Maintenance</div>
+            <div className="text-3xl font-bold text-yellow-600 mt-2">{stats.maintenance}</div>
           </div>
-        </div>
         </div>
 
         {/* PC List */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {pcs.map((pc) => (
-          <div
-            key={pc.id}
-            className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <Monitor className="w-8 h-8 text-gray-700" />
-                <div>
-                  <h3 className="font-bold text-lg text-gray-900">{pc.name}</h3>
-                  <span
-                    className="inline-block px-2 py-1 text-xs rounded-full bg-primary-100 text-primary-700"
-                  >
-                    {pc.status.charAt(0).toUpperCase() + pc.status.slice(1)}
-                  </span>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {sortedPCs.map((pc) => (
+          <div key={pc.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition-shadow">
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <Monitor className={`w-8 h-8 ${
+                    pc.status === 'available' ? 'text-green-600' :
+                    pc.status === 'assigned' ? 'text-blue-600' :
+                    'text-yellow-600'
+                  }`} />
+                  <div>
+                    <h3 className="font-semibold text-lg text-gray-900">{pc.name}</h3>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="space-y-2 mb-4">
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <MapPin className="w-4 h-4" />
-                <span>{pc.location}</span>
-              </div>
-
-              {pc.assignedTo && (
-                <>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <UserPlus className="w-4 h-4" />
-                    <span>{pc.assignedTo}</span>
-                  </div>
-                  {pc.assignedDate && (
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Clock className="w-4 h-4" />
-                      <span>
-                        Since {new Date(pc.assignedDate).toLocaleDateString()}
+              {/* Status Section */}
+              {pc.status === 'assigned' ? (
+                <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-white font-semibold text-sm">
+                        {pc.assignedTo ? pc.assignedTo.charAt(0).toUpperCase() : '?'}
                       </span>
                     </div>
-                  )}
-                </>
-              )}
-
-              {pc.softwareUsed && pc.softwareUsed.length > 0 && (
-                <div className="mt-2 p-2 bg-gray-50 rounded text-sm text-gray-600">
-                  <h4 className="font-semibold">Software Used:</h4>
-                  <ul className="list-disc pl-5">
-                    {pc.softwareUsed.map(software => <li key={software}>{software}</li>)}
-                  </ul>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{pc.assignedTo || 'Unknown User'}</p>
+                      {pc.assignedToEmail && (
+                        <p className="text-sm text-gray-600 truncate">{pc.assignedToEmail}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : pc.status === 'available' ? (
+                <div className="mb-4 p-3 bg-green-50 rounded-lg border border-green-200">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <p className="text-sm font-medium text-green-800">Available for Assignment</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <div className="flex items-center gap-2">
+                    <Wrench className="w-4 h-4 text-yellow-600" />
+                    <p className="text-sm font-medium text-yellow-800">Under Maintenance</p>
+                  </div>
                 </div>
               )}
 
-              {pc.notes && (
-                <div className="mt-2 p-2 bg-gray-50 rounded text-sm text-gray-600">
-                  {pc.notes}
+              {/* Software Licenses */}
+              {pc.status === 'assigned' && pc.softwareUsed && pc.softwareUsed.length > 0 && (
+                <div className="mb-4">
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">Software</h4>
+                  <div className="flex flex-wrap gap-1">
+                    {pc.softwareUsed.map(software => (
+                      <span key={software} className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded">
+                        {software}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
-            </div>
 
-            {/* Actions */}
-            <div className="flex gap-2">
-              {canAddOrRemove && (
-                <button
-                  onClick={() => handleEdit(pc)}
-                  className="flex-1 px-3 py-2 bg-blue-50 text-blue-700 text-sm rounded hover:bg-blue-100 transition-colors flex items-center justify-center gap-2"
-                >
-                  <Edit2 className="w-4 h-4" />
-                  Edit
-                </button>
-              )}
-              {canAssign && (
-                <>
-                  {pc.status === 'available' ? (
-                    <button
-                      onClick={() => handleAssign(pc)}
-                      className="flex-1 px-3 py-2 bg-primary-600 text-white text-sm rounded hover:bg-primary-700 transition-colors"
-                    >
-                      Assign
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleRelease(pc.id)}
-                      className="flex-1 px-3 py-2 bg-primary-600 text-white text-sm rounded hover:bg-primary-700 transition-colors"
-                    >
-                      Release
-                    </button>
-                  )}
-                </>
-              )}
-              {canAddOrRemove && (
-                <button
-                  onClick={() => handleDelete(pc.id)}
-                  className="px-3 py-2 text-sm border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors"
-                >
-                  Delete
-                </button>
-              )}
+              {/* Details */}
+              <div className="space-y-2 mb-6">
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <MapPin className="w-4 h-4" />
+                  <span>{pc.location}</span>
+                </div>
+                {pc.status === 'assigned' && pc.assignedDate && (
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Clock className="w-4 h-4" />
+                    <span>Assigned {new Date(pc.assignedDate).toLocaleDateString()}</span>
+                  </div>
+                )}
+                {pc.notes && (
+                  <div className="mt-2 p-2 bg-gray-50 rounded text-sm text-gray-700">
+                    {pc.notes}
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2">
+                {canAssign && pc.status !== 'maintenance' && (
+                  <>
+                    {pc.status === 'available' ? (
+                      <button
+                        onClick={() => handleAssign(pc)}
+                        className="flex-1 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
+                      >
+                        Assign
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleRelease(pc.id)}
+                        className="flex-1 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
+                      >
+                        Release
+                      </button>
+                    )}
+                  </>
+                )}
+                {canAddOrRemove && (
+                  <button
+                    onClick={() => handleEdit(pc)}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    Edit
+                  </button>
+                )}
+                {canAddOrRemove && (
+                  <button
+                    onClick={() => handleDelete(pc.id)}
+                    className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+                    title="Delete PC"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+                {canAddOrRemove && (
+                  <>
+                    {pc.status === 'maintenance' ? (
+                      <button
+                        onClick={() => handleMaintenance(pc.id, false)}
+                        className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+                      >
+                        End Maint.
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleMaintenance(pc.id, true)}
+                        className="px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-lg hover:bg-yellow-700 transition-colors"
+                      >
+                        Maintenance
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           </div>
         ))}
@@ -243,11 +293,22 @@ export const PCAssignmentScreen: React.FC = () => {
               setShowAssignModal(false);
               setSelectedPC(null);
             }}
-            onAssign={(assignedTo, assignedToEmail, notes, softwareUsed) => {
-              assignPC(selectedPC.id, assignedTo, assignedToEmail, notes, softwareUsed);
-              setShowAssignModal(false);
-              setSelectedPC(null);
-              fetchPCs();
+           onAssign={async (assignedTo, assignedToEmail, notes, softwareUsed) => {
+              const userId = currentUser?.id || currentUser?.userId;
+              if (!userId) {
+                alert('Error: Unable to identify current user. Please log in again.');
+                return;
+              }
+              try {
+                await assignPC(selectedPC.id, userId, assignedTo, assignedToEmail, notes, softwareUsed);
+                setShowAssignModal(false);
+                setSelectedPC(null);
+                fetchPCs();
+              } catch (error: any) {
+                // Error is already handled in the store, but we can show a more specific message
+                const errorMsg = error?.response?.data?.error || error?.message || 'Failed to assign PC';
+                alert(`Assignment failed: ${errorMsg}`);
+              }
             }}
           />
         )}
@@ -268,365 +329,6 @@ export const PCAssignmentScreen: React.FC = () => {
             }}
           />
         )}
-      </div>
-    </div>
-  );
-};
-
-// Add PC Modal Component
-interface AddPCModalProps {
-  onClose: () => void;
-  onAdd: (pc: Omit<PC, 'id' | 'lastUpdated'>) => void;
-}
-
-const AddPCModal: React.FC<AddPCModalProps> = ({ onClose, onAdd }) => {
-  const [formData, setFormData] = useState({
-    name: '',
-    location: '',
-    status: 'available' as const,
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Map frontend format to backend format
-    const backendData = {
-      assetTag: formData.name,
-      deviceName: formData.name,
-      computerType: 'laptop',
-      location: formData.location,
-    };
-    onAdd(backendData as any);
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" onClick={onClose} />
-
-      {/* Modal */}
-      <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full">
-          {/* Header with Gradient */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-primary-50 to-primary-100">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <Monitor className="w-6 h-6 text-primary-600" />
-                Add New PC
-              </h2>
-              <p className="text-sm text-gray-600 mt-1">Register a new computer</p>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="p-6">
-            <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">PC Name *</label>
-              <input
-                type="text"
-                required
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-3 py-2 border rounded-lg"
-                placeholder="e.g., PC1, PC2"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">Location</label>
-              <input
-                type="text"
-                value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                className="w-full px-3 py-2 border rounded-lg"
-                placeholder="e.g., Office Floor 2"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-              <select
-                value={formData.status}
-                onChange={(e) =>
-                  setFormData({ ...formData, status: e.target.value as any })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              >
-                <option value="available">Available</option>
-                <option value="maintenance">Maintenance</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Footer with Buttons */}
-          <div className="flex gap-3 mt-6 border-t border-gray-200 pt-6">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="flex-1 px-4 py-2 bg-primary-600 text-white font-semibold rounded-lg hover:bg-primary-700 transition-colors"
-            >
-              Add PC
-            </button>
-          </div>
-        </form>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Assign PC Modal Component
-interface AssignPCModalProps {
-  pc: PC;
-  currentUser: any;
-  onClose: () => void;
-  onAssign: (assignedTo: string, assignedToEmail: string, notes: string | undefined, softwareUsed: string[]) => void;
-}
-
-const AssignPCModal: React.FC<AssignPCModalProps> = ({
-  pc,
-  currentUser,
-  onClose,
-  onAssign,
-}) => {
-  const [formData, setFormData] = useState({
-    assignedTo: currentUser?.displayName || '',
-    assignedToEmail: currentUser?.email || '',
-    notes: '',
-  });
-  const [selectedSoftware, setSelectedSoftware] = useState<string[]>([]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onAssign(formData.assignedTo, formData.assignedToEmail, formData.notes, selectedSoftware);
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" onClick={onClose} />
-
-      {/* Modal */}
-      <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full">
-          {/* Header with Gradient */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-primary-50 to-primary-100">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <UserPlus className="w-6 h-6 text-primary-600" />
-                Assign {pc.name}
-              </h2>
-              <p className="text-sm text-gray-600 mt-1">Assign this PC to an engineer</p>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Assigned To *</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.assignedTo}
-                  onChange={(e) =>
-                    setFormData({ ...formData, assignedTo: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  placeholder="Staff name"
-                />
-            </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                <input
-                  type="email"
-                  value={formData.assignedToEmail}
-                  onChange={(e) =>
-                    setFormData({ ...formData, assignedToEmail: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  placeholder="staff@email.com"
-                />
-              </div>
-
-              <SoftwareSelection
-                selectedSoftware={selectedSoftware}
-                onSelectionChange={setSelectedSoftware}
-              />
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  rows={3}
-                  placeholder="Any additional notes..."
-                />
-              </div>
-            </div>
-
-            {/* Footer with Buttons */}
-            <div className="flex gap-3 mt-6 border-t border-gray-200 pt-6">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="flex-1 px-4 py-2 bg-primary-600 text-white font-semibold rounded-lg hover:bg-primary-700 transition-colors"
-              >
-                Assign PC
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Edit PC Modal Component
-interface EditPCModalProps {
-  pc: PC;
-  onClose: () => void;
-  onEdit: (updates: Partial<PC>) => void;
-}
-
-const EditPCModal: React.FC<EditPCModalProps> = ({
-  pc,
-  onClose,
-  onEdit,
-}) => {
-  const [formData, setFormData] = useState({
-    name: pc.name,
-    location: pc.location,
-    notes: pc.notes || '',
-  });
-  const [selectedSoftware, setSelectedSoftware] = useState<string[]>(pc.softwareUsed || []);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onEdit({
-      name: formData.name,
-      location: formData.location,
-      notes: formData.notes,
-      softwareUsed: selectedSoftware,
-    });
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" onClick={onClose} />
-
-      {/* Modal */}
-      <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full">
-          {/* Header with Gradient */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <Edit2 className="w-6 h-6 text-blue-600" />
-                Edit {pc.name}
-              </h2>
-              <p className="text-sm text-gray-600 mt-1">Update PC properties</p>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">PC Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="e.g., PC1, PC2"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
-                <input
-                  type="text"
-                  value={formData.location}
-                  onChange={(e) =>
-                    setFormData({ ...formData, location: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="e.g., Office Floor 2"
-                />
-              </div>
-
-              <SoftwareSelection
-                selectedSoftware={selectedSoftware}
-                onSelectionChange={setSelectedSoftware}
-              />
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  rows={3}
-                  placeholder="Any additional notes..."
-                />
-              </div>
-            </div>
-
-            {/* Footer with Buttons */}
-            <div className="flex gap-3 mt-6 border-t border-gray-200 pt-6">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="flex-1 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Save Changes
-              </button>
-            </div>
-          </form>
-        </div>
       </div>
     </div>
   );

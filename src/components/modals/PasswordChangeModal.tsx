@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, Lock, CheckCircle, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import apiService from '../../services/api.service';
+import authService from '../../services/api.service';
 
 interface PasswordChangeModalProps {
   isOpen: boolean;
@@ -88,7 +88,7 @@ export const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({
     setLoading(true);
     try {
       // Call backend API to change password
-      await apiService.changePassword(
+      await authService.changePassword(
         userEmail,
         isFirstTimeLogin ? '' : currentPassword,
         newPassword

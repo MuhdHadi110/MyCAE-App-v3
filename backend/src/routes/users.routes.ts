@@ -2,67 +2,53 @@ import { Router, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { User } from '../entities/User';
 import { authenticate, AuthRequest } from '../middleware/auth';
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
 
 const router = Router();
-
-// Ensure avatars directory exists
-const uploadsDir = path.join(__dirname, '../../uploads/avatars');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-// Configure multer for avatar uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    const userId = (req as AuthRequest).user?.id || 'unknown';
-    const timestamp = Date.now();
-    const ext = path.extname(file.originalname);
-    const filename = `avatar_${userId}_${timestamp}${ext}`;
-    cb(null, filename);
-  },
-});
-
-// File filter - only allow image types
-const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-  const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
-
-  if (allowedTypes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Invalid file type. Only PNG, JPG, GIF, and WebP images are allowed.'));
-  }
-};
-
-const avatarUpload = multer({
-  storage,
-  fileFilter,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB max file size
-  },
-});
 
 // All routes require authentication
 router.use(authenticate);
 
 /**
- * POST /api/users/avatar
- * Upload avatar image
+ * GET /api/users
+ * Get all users (for dropdowns like lead researcher selection)
  */
-router.post('/avatar', avatarUpload.single('avatarFile'), async (req: AuthRequest, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
+    const userRepo = AppDataSource.getRepository(User);
+    const users = await userRepo.find({
+      select: ['id', 'name', 'email', 'roles', 'avatar', 'department'],
+      order: { name: 'ASC' }
+    });
 
+    res.json({
+      data: users,
+      total: users.length
+    });
+  } catch (error: any) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+/**
+ * PATCH /api/users/avatar
+ * Update user avatar (predefined avatar ID)
+ */
+router.patch('/avatar', async (req: AuthRequest, res: Response) => {
+  try {
+    const { avatarId } = req.body;
     const userId = req.user?.id;
+
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Validate avatar ID format
+    const validAvatarPattern = /^(male|female)-(0[1-9]|10)$/;
+    if (!avatarId || !validAvatarPattern.test(avatarId)) {
+      return res.status(400).json({
+        error: 'Invalid avatar ID. Must be male-01 through male-10 or female-01 through female-10'
+      });
     }
 
     const userRepo = AppDataSource.getRepository(User);
@@ -72,40 +58,17 @@ router.post('/avatar', avatarUpload.single('avatarFile'), async (req: AuthReques
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Delete old avatar if exists
-    if (user.avatar && user.avatar.includes('uploads/avatars')) {
-      const oldAvatarPath = path.join(__dirname, '../../', user.avatar);
-      if (fs.existsSync(oldAvatarPath)) {
-        fs.unlinkSync(oldAvatarPath);
-      }
-    }
-
-    // Save new avatar URL
-    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
-    user.avatar = avatarUrl;
+    user.avatar = avatarId;
     await userRepo.save(user);
 
     res.json({
       success: true,
-      avatarUrl,
-      message: 'Avatar uploaded successfully',
+      avatarId,
+      message: 'Avatar updated successfully',
     });
   } catch (error: any) {
-    console.error('Error uploading avatar:', error);
-
-    // Clean up uploaded file if there was an error
-    if (req.file) {
-      const filePath = path.join(uploadsDir, req.file.filename);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-    }
-
-    if (error.message?.includes('Invalid file type')) {
-      return res.status(400).json({ error: 'Invalid file type. Only PNG, JPG, GIF, and WebP images are allowed.' });
-    }
-
-    res.status(500).json({ error: 'Failed to upload avatar' });
+    console.error('Error updating avatar:', error);
+    res.status(500).json({ error: 'Failed to update avatar' });
   }
 });
 

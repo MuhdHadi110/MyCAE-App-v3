@@ -1,12 +1,33 @@
 import { Router, Request, Response } from 'express';
+import rateLimit from 'express-rate-limit';
 import { AppDataSource } from '../config/database';
 import { User, UserRole } from '../entities/User';
 import { generateToken } from '../middleware/auth';
 import bcrypt from 'bcryptjs';
 import { body, validationResult } from 'express-validator';
 import { verifyRecaptcha } from '../utils/recaptcha';
+import crypto from 'crypto';
+import emailService from '../services/email.service';
 
 const router = Router();
+
+// Rate limiting - strict for login/register
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 attempts per 15 minutes (increased for development)
+  message: 'Too many authentication attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Rate limiting - normal for password changes
+const changePasswordLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 100, // limit each IP to 100 requests per minute
+  message: 'Too many password change attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 /**
  * Password complexity validation
@@ -43,6 +64,7 @@ const passwordComplexityValidator = (value: string) => {
  */
 router.post(
   '/register',
+  authLimiter,
   [
     body('name').notEmpty().withMessage('Name is required'),
     body('email').isEmail().withMessage('Valid email is required'),
@@ -81,7 +103,7 @@ router.post(
       await userRepo.save(user);
 
       // Generate token
-      const token = generateToken(user.id, user.email, user.name, user.role);
+      const token = generateToken(user.id, user.email, user.name, user.roles);
 
       res.status(201).json({
         message: 'User registered successfully',
@@ -108,6 +130,7 @@ router.post(
  */
 router.post(
   '/login',
+  authLimiter,
   [
     body('email').isEmail().withMessage('Valid email is required'),
     body('password').notEmpty().withMessage('Password is required'),
@@ -115,11 +138,8 @@ router.post(
   ],
   async (req: Request, res: Response) => {
     try {
-      // Security: Don't log email addresses - use anonymized identifier
-      console.log('🔐 Login attempt received');
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        console.log('❌ Validation errors in login request');
         return res.status(400).json({ errors: errors.array() });
       }
 
@@ -127,7 +147,7 @@ router.post(
 
       // Verify reCAPTCHA if token is provided
       if (captchaToken) {
-        const remoteIp = req.ip || req.connection.remoteAddress;
+        const remoteIp = req.ip || req.socket.remoteAddress;
         const isValidCaptcha = await verifyRecaptcha(captchaToken, remoteIp);
 
         if (!isValidCaptcha) {
@@ -146,18 +166,16 @@ router.post(
       const isValidPassword = await bcrypt.compare(password, hashToCheck);
 
       if (!user || !isValidPassword) {
-        console.log('❌ Failed login attempt');
         return res.status(401).json({ error: 'Invalid credentials' });
       }
-      console.log('✅ Login successful');
 
       // Check if this is first-time login (password is still the default temp password)
       const isFirstTimeLogin = await bcrypt.compare('TempPassword123!', user.password_hash);
 
       // Generate token
-      const token = generateToken(user.id, user.email, user.name, user.role);
+      const token = generateToken(user.id, user.email, user.name, user.roles);
 
-      res.json({
+      const responseData = {
         message: 'Login successful',
         token,
         isFirstTimeLogin,
@@ -166,11 +184,14 @@ router.post(
           name: user.name,
           email: user.email,
           role: user.role,
+          roles: user.roles,
           department: user.department,
           position: user.position,
           avatar: user.avatar,
         },
-      });
+      };
+
+      res.json(responseData);
     } catch (error: any) {
       console.error('Login error:', error);
       res.status(500).json({ error: 'Login failed' });
@@ -184,6 +205,7 @@ router.post(
  */
 router.post(
   '/change-password',
+  changePasswordLimiter,
   [
     body('email').isEmail().withMessage('Valid email is required'),
     body('currentPassword').optional().isString(),
@@ -206,14 +228,19 @@ router.post(
         return res.status(404).json({ error: 'User not found' });
       }
 
-      // Always require current password for security
+      // Check if current password is provided
       if (!currentPassword) {
-        return res.status(400).json({ error: 'Current password is required' });
-      }
-
-      const isValidPassword = await bcrypt.compare(currentPassword, user.password_hash);
-      if (!isValidPassword) {
-        return res.status(401).json({ error: 'Current password is incorrect' });
+        // Allow empty current password only for first-time login (temp password)
+        const isTempPassword = await bcrypt.compare('TempPassword123!', user.password_hash);
+        if (!isTempPassword) {
+          return res.status(400).json({ error: 'Current password is required' });
+        }
+      } else {
+        // Verify current password
+        const isValidPassword = await bcrypt.compare(currentPassword, user.password_hash);
+        if (!isValidPassword) {
+          return res.status(401).json({ error: 'Current password is incorrect' });
+        }
       }
 
       // Hash new password
@@ -230,6 +257,180 @@ router.post(
     } catch (error: any) {
       console.error('Password change error:', error);
       res.status(500).json({ error: 'Password change failed' });
+    }
+  }
+);
+
+/**
+ * POST /api/auth/forgot-password
+ * Request password reset
+ */
+router.post(
+  '/forgot-password',
+  authLimiter,
+  [body('email').isEmail().withMessage('Valid email is required')],
+  async (req: Request, res: Response) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { email } = req.body;
+      const userRepo = AppDataSource.getRepository(User);
+
+      // Find user
+      const user = await userRepo.findOne({ where: { email } });
+
+      // Security: Always return success even if user not found (prevent user enumeration)
+      if (!user) {
+        return res.json({
+          message: 'If an account exists with that email, a password reset link has been sent.',
+          success: true,
+        });
+      }
+
+      // Generate secure random token
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+      // Set token expiry (1 hour from now)
+      const expiryDate = new Date();
+      expiryDate.setHours(expiryDate.getHours() + 1);
+
+      // Save token to database
+      user.reset_token = hashedToken;
+      user.reset_token_expires = expiryDate;
+      await userRepo.save(user);
+
+      // Send email with reset link
+      try {
+        await emailService.sendPasswordResetEmail(user.email, user.name, resetToken);
+        console.log(`✅ Password reset email sent to ${user.email}`);
+      } catch (emailError: any) {
+        console.error('Failed to send password reset email:', emailError);
+        // Don't expose email sending failure to user
+      }
+
+      res.json({
+        message: 'If an account exists with that email, a password reset link has been sent.',
+        success: true,
+      });
+    } catch (error: any) {
+      console.error('Forgot password error:', error);
+      res.status(500).json({ error: 'Password reset request failed' });
+    }
+  }
+);
+
+/**
+ * POST /api/auth/reset-password
+ * Reset password with token
+ */
+router.post(
+  '/reset-password',
+  authLimiter,
+  [
+    body('token').notEmpty().withMessage('Reset token is required'),
+    body('newPassword').custom(passwordComplexityValidator),
+  ],
+  async (req: Request, res: Response) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        const errorMessages = errors.array().map(e => e.msg).join(', ');
+        return res.status(400).json({ error: errorMessages });
+      }
+
+      const { token, newPassword } = req.body;
+      const userRepo = AppDataSource.getRepository(User);
+
+      // Hash the token to compare with database
+      const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+      // Find user with valid token
+      const user = await userRepo
+        .createQueryBuilder('user')
+        .where('user.reset_token = :token', { token: hashedToken })
+        .andWhere('user.reset_token_expires > :now', { now: new Date() })
+        .getOne();
+
+      if (!user) {
+        return res.status(400).json({
+          error: 'Invalid or expired reset token. Please request a new password reset.'
+        });
+      }
+
+      // Hash new password
+      const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
+      // Update password and clear reset token
+      user.password_hash = newPasswordHash;
+      user.reset_token = undefined;
+      user.reset_token_expires = undefined;
+      await userRepo.save(user);
+
+      // Send confirmation email
+      try {
+        await emailService.sendPasswordResetConfirmation(user.email, user.name);
+        console.log(`✅ Password reset confirmation sent to ${user.email}`);
+      } catch (emailError: any) {
+        console.error('Failed to send confirmation email:', emailError);
+        // Don't fail the reset if email fails
+      }
+
+      res.json({
+        message: 'Password reset successful. You can now log in with your new password.',
+        success: true,
+      });
+    } catch (error: any) {
+      console.error('Password reset error:', error);
+      res.status(500).json({ error: 'Password reset failed' });
+    }
+  }
+);
+
+/**
+ * POST /api/auth/verify-reset-token
+ * Verify if reset token is valid
+ */
+router.post(
+  '/verify-reset-token',
+  [body('token').notEmpty().withMessage('Reset token is required')],
+  async (req: Request, res: Response) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { token } = req.body;
+      const userRepo = AppDataSource.getRepository(User);
+
+      // Hash the token
+      const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+      // Check if token exists and is not expired
+      const user = await userRepo
+        .createQueryBuilder('user')
+        .where('user.reset_token = :token', { token: hashedToken })
+        .andWhere('user.reset_token_expires > :now', { now: new Date() })
+        .getOne();
+
+      if (!user) {
+        return res.status(400).json({
+          valid: false,
+          error: 'Invalid or expired reset token'
+        });
+      }
+
+      res.json({
+        valid: true,
+        email: user.email,
+      });
+    } catch (error: any) {
+      console.error('Token verification error:', error);
+      res.status(500).json({ error: 'Token verification failed' });
     }
   }
 );

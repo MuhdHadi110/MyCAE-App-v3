@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { Project } from '../entities/Project';
 import { Timesheet } from '../entities/Timesheet';
+import { UserRole } from '../entities/User';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { body, validationResult } from 'express-validator';
 
@@ -10,30 +11,69 @@ const router = Router();
 // All timesheet routes require authentication
 router.use(authenticate);
 
+// Helper to validate and sanitize pagination params
+const validatePagination = (limit: unknown, offset: unknown) => ({
+  limit: Math.min(Math.max(parseInt(String(limit)) || 100, 1), 500), // Max 500 records
+  offset: Math.max(parseInt(String(offset)) || 0, 0)
+});
+
 /**
  * GET /api/timesheets
  * Get all timesheets with optional filters
+ * Authorization: Managers/Admins see all, others see only timesheets for their assigned projects
  */
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
-    const { projectId, date, limit = 100, offset = 0 } = req.query;
+    const { projectId, date, engineerId, startDate, endDate, limit = 100, offset = 0 } = req.query;
+    const pagination = validatePagination(limit, offset);
     const timesheetRepo = AppDataSource.getRepository(Timesheet);
+
+    // Authorization: Check user roles
+    const userId = req.user?.id;
+    const userRoles = req.user?.roles || [];
+    const isPrivileged = userRoles.some((r: string) =>
+      ['admin', 'managing_director', 'manager'].includes(r)
+    );
 
     let query = timesheetRepo.createQueryBuilder('timesheet')
       .leftJoinAndSelect('timesheet.engineer', 'engineer')
       .leftJoinAndSelect('timesheet.project', 'project');
 
-    if (projectId) {
-      query = query.where('timesheet.project_id = :projectId', { projectId });
+    // Non-privileged users can only see timesheets for projects they're assigned to
+    if (!isPrivileged && userId) {
+      query = query.where(
+        '(project.manager_id = :userId OR project.lead_engineer_id = :userId OR timesheet.engineer_id = :userId)',
+        { userId }
+      );
     }
 
+    if (projectId) {
+      query = isPrivileged || !userId
+        ? query.where('timesheet.project_id = :projectId', { projectId })
+        : query.andWhere('timesheet.project_id = :projectId', { projectId });
+    }
+
+    // Filter by engineer
+    if (engineerId) {
+      query = query.andWhere('timesheet.engineer_id = :engineerId', { engineerId });
+    }
+
+    // Filter by specific date
     if (date) {
       query = query.andWhere('DATE(timesheet.date) = :date', { date });
     }
 
+    // Filter by date range (startDate and endDate)
+    if (startDate) {
+      query = query.andWhere('DATE(timesheet.date) >= :startDate', { startDate });
+    }
+    if (endDate) {
+      query = query.andWhere('DATE(timesheet.date) <= :endDate', { endDate });
+    }
+
     const [timesheets, total] = await query
-      .take(parseInt(limit as string))
-      .skip(parseInt(offset as string))
+      .take(pagination.limit)
+      .skip(pagination.offset)
       .getManyAndCount();
 
     // Format the response to include engineer name and email
@@ -56,8 +96,8 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     res.json({
       data: formattedTimesheets,
       total,
-      limit: parseInt(limit as string),
-      offset: parseInt(offset as string),
+      limit: pagination.limit,
+      offset: pagination.offset,
     });
   } catch (error: any) {
     console.error('Error fetching timesheets:', error);
@@ -90,6 +130,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 /**
  * POST /api/timesheets
  * Create new timesheet
+ * Uses transaction to ensure atomicity of timesheet creation and project hours update
  */
 router.post(
   '/',
@@ -106,31 +147,32 @@ router.post(
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const timesheetRepo = AppDataSource.getRepository(Timesheet);
-      const projectRepo = AppDataSource.getRepository(Project);
-
       const { projectId, date, hours, workCategory, description } = req.body;
 
-      // Create and save the new timesheet
-      const newTimesheet = timesheetRepo.create({
-        project_id: projectId,
-        engineer_id: req.user!.id,
-        date,
-        hours,
-        work_category: workCategory,
-        description,
+      // Use transaction to ensure atomicity
+      const result = await AppDataSource.transaction(async (manager) => {
+        // Create and save the new timesheet
+        const newTimesheet = manager.create(Timesheet, {
+          project_id: projectId,
+          engineer_id: req.user!.id,
+          date,
+          hours,
+          work_category: workCategory,
+          description,
+        });
+        await manager.save(newTimesheet);
+
+        // Find and update the associated project
+        const project = await manager.findOne(Project, { where: { id: projectId } });
+        if (project) {
+          project.actual_hours = (project.actual_hours || 0) + hours;
+          await manager.save(project);
+        }
+
+        return newTimesheet;
       });
-      await timesheetRepo.save(newTimesheet);
 
-      // Find the associated project
-      const project = await projectRepo.findOne({ where: { id: projectId } });
-      if (project) {
-        // Update the actual_hours of the project
-        project.actual_hours = (project.actual_hours || 0) + hours;
-        await projectRepo.save(project);
-      }
-
-      res.status(201).json(newTimesheet);
+      res.status(201).json(result);
     } catch (error: any) {
       console.error('Error creating timesheet:', error);
       res.status(500).json({ error: 'Failed to create timesheet' });
@@ -141,6 +183,7 @@ router.post(
 /**
  * PUT /api/timesheets/:id
  * Update timesheet - Only the assigned Project Manager or Lead Engineer can update timesheets for their project
+ * Uses transaction to ensure atomicity of timesheet and project hours update
  */
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
@@ -170,48 +213,42 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
     const isProjectManager = project.manager_id === userId;
     const isLeadEngineer = project.lead_engineer_id === userId;
 
-    console.log('=== TIMESHEET UPDATE AUTHORIZATION CHECK ===');
-    console.log('User ID:', userId);
-    console.log('Project Manager ID:', project.manager_id);
-    console.log('Lead Engineer ID:', project.lead_engineer_id);
-    console.log('Is Project Manager:', isProjectManager);
-    console.log('Is Lead Engineer:', isLeadEngineer);
-
     if (!isProjectManager && !isLeadEngineer) {
-      console.log('AUTHORIZATION FAILED - User not assigned to project');
       return res.status(403).json({
         error: 'You do not have permission to update timesheets for this project. Only the assigned Project Manager or Lead Engineer can update timesheets.'
       });
     }
 
-    // Update the timesheet with allowed fields
+    // Update the timesheet with allowed fields using transaction
     const { hours, workCategory, description, date } = req.body;
 
-    if (hours !== undefined) {
-      // If hours changed, update the project's actual_hours
-      const hoursDifference = hours - timesheet.hours;
-      project.actual_hours = (project.actual_hours || 0) + hoursDifference;
-      await projectRepo.save(project);
+    const result = await AppDataSource.transaction(async (manager) => {
+      if (hours !== undefined) {
+        // If hours changed, update the project's actual_hours
+        const hoursDifference = hours - timesheet.hours;
+        project.actual_hours = (project.actual_hours || 0) + hoursDifference;
+        await manager.save(project);
 
-      timesheet.hours = hours;
-    }
+        timesheet.hours = hours;
+      }
 
-    if (workCategory !== undefined) {
-      timesheet.work_category = workCategory;
-    }
+      if (workCategory !== undefined) {
+        timesheet.work_category = workCategory;
+      }
 
-    if (description !== undefined) {
-      timesheet.description = description;
-    }
+      if (description !== undefined) {
+        timesheet.description = description;
+      }
 
-    if (date !== undefined) {
-      timesheet.date = date;
-    }
+      if (date !== undefined) {
+        timesheet.date = date;
+      }
 
-    await timesheetRepo.save(timesheet);
+      await manager.save(timesheet);
+      return timesheet;
+    });
 
-    console.log('Timesheet updated successfully');
-    res.json(timesheet);
+    res.json(result);
   } catch (error: any) {
     console.error('Error updating timesheet:', error);
     res.status(500).json({ error: 'Failed to update timesheet' });
@@ -221,6 +258,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 /**
  * DELETE /api/timesheets/:id
  * Delete timesheet - Only the assigned Project Manager or Lead Engineer can delete timesheets for their project
+ * Uses transaction to ensure atomicity of timesheet deletion and project hours update
  */
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
@@ -245,35 +283,32 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: 'Project not found' });
     }
 
-    // Authorization check: Only Project Manager or Lead Engineer can delete timesheets
+    // Authorization check: Admin, Managing Director, Project Manager or Lead Engineer can delete timesheets
     const userId = req.user?.id;
+    const userRoles = req.user?.roles || [req.user?.role];
+    const isAdmin = userRoles.includes(UserRole.ADMIN);
+    const isManagingDirector = userRoles.includes(UserRole.MANAGING_DIRECTOR);
     const isProjectManager = project.manager_id === userId;
     const isLeadEngineer = project.lead_engineer_id === userId;
 
-    console.log('=== TIMESHEET DELETE AUTHORIZATION CHECK ===');
-    console.log('User ID:', userId);
-    console.log('Project Manager ID:', project.manager_id);
-    console.log('Lead Engineer ID:', project.lead_engineer_id);
-    console.log('Is Project Manager:', isProjectManager);
-    console.log('Is Lead Engineer:', isLeadEngineer);
-
-    if (!isProjectManager && !isLeadEngineer) {
-      console.log('AUTHORIZATION FAILED - User not assigned to project');
+    if (!isAdmin && !isManagingDirector && !isProjectManager && !isLeadEngineer) {
       return res.status(403).json({
-        error: 'You do not have permission to delete timesheets for this project. Only the assigned Project Manager or Lead Engineer can delete timesheets.'
+        error: 'You do not have permission to delete timesheets for this project. Only Admin, Managing Director, Project Manager or Lead Engineer can delete timesheets.'
       });
     }
 
-    // Update the project's actual_hours
-    if (timesheet.hours) {
-      project.actual_hours = Math.max(0, (project.actual_hours || 0) - timesheet.hours);
-      await projectRepo.save(project);
-    }
+    // Delete timesheet and update project hours in a transaction
+    await AppDataSource.transaction(async (manager) => {
+      // Update the project's actual_hours
+      if (timesheet.hours) {
+        project.actual_hours = Math.max(0, (project.actual_hours || 0) - timesheet.hours);
+        await manager.save(project);
+      }
 
-    // Delete the timesheet
-    await timesheetRepo.remove(timesheet);
+      // Delete the timesheet
+      await manager.remove(timesheet);
+    });
 
-    console.log('Timesheet deleted successfully');
     res.json({ message: 'Timesheet deleted successfully' });
   } catch (error: any) {
     console.error('Error deleting timesheet:', error);

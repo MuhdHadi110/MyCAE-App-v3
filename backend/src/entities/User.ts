@@ -35,23 +35,50 @@ export class User {
     name: 'roles',
     type: 'varchar',
     length: 255,
-    default: 'engineer',
+    default: '["engineer"]',
     nullable: false,
   })
   roleValue: string;
 
   /**
-   * Get the primary role
+   * Get all roles as an array
    */
-  get role(): UserRole {
-    return (this.roleValue as UserRole) || UserRole.ENGINEER;
+  get roles(): UserRole[] {
+    try {
+      // If roleValue is a JSON array string
+      if (this.roleValue && this.roleValue.startsWith('[')) {
+        return JSON.parse(this.roleValue) as UserRole[];
+      }
+      // Fallback: if it's a single role string (legacy data)
+      if (this.roleValue) {
+        return [this.roleValue as UserRole];
+      }
+      return [UserRole.ENGINEER];
+    } catch {
+      return [UserRole.ENGINEER];
+    }
   }
 
   /**
-   * Set the primary role
+   * Set roles as an array
+   */
+  set roles(value: UserRole[]) {
+    this.roleValue = JSON.stringify(value);
+  }
+
+  /**
+   * Get the primary role (first role in the array for backward compatibility)
+   */
+  get role(): UserRole {
+    const rolesArray = this.roles;
+    return rolesArray[0] || UserRole.ENGINEER;
+  }
+
+  /**
+   * Set the primary role (converts to single-element array)
    */
   set role(value: UserRole) {
-    this.roleValue = value;
+    this.roles = [value];
   }
 
   @Column({ type: 'varchar', length: 255, nullable: true })
@@ -62,6 +89,12 @@ export class User {
 
   @Column({ type: 'varchar', length: 500, nullable: true })
   avatar?: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  reset_token?: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  reset_token_expires?: Date;
 
   @CreateDateColumn()
   created_at: Date;
@@ -80,29 +113,31 @@ export class User {
    * Check if user has a specific role
    */
   hasRole(roleToCheck: UserRole): boolean {
-    return this.role === roleToCheck;
+    return this.roles.includes(roleToCheck);
   }
 
   /**
    * Check if user has any of the specified roles
    */
   hasAnyRole(rolesToCheck: UserRole[]): boolean {
-    return rolesToCheck.includes(this.role);
+    return this.roles.some(role => rolesToCheck.includes(role));
   }
 
   /**
-   * Get the hierarchy level of the current role
-   * Hierarchy: Engineer(1) < Senior Engineer(2) = Principal Engineer(2) = Manager(2) < Managing Director(3) < Admin(4)
+   * Get the hierarchy level of the highest role
+   * Hierarchy: Engineer(1) < Senior Engineer(2) < Principal Engineer(2.5) < Manager(3) < Managing Director(4) < Admin(5)
    */
   getRoleLevel(): number {
     const roleHierarchy: Record<UserRole, number> = {
-      [UserRole.ADMIN]: 4,
-      [UserRole.MANAGING_DIRECTOR]: 3,
-      [UserRole.MANAGER]: 2,
-      [UserRole.PRINCIPAL_ENGINEER]: 2,
+      [UserRole.ADMIN]: 5,
+      [UserRole.MANAGING_DIRECTOR]: 4,
+      [UserRole.MANAGER]: 3,
+      [UserRole.PRINCIPAL_ENGINEER]: 2.5,
       [UserRole.SENIOR_ENGINEER]: 2,
       [UserRole.ENGINEER]: 1,
     };
-    return roleHierarchy[this.role] || 1;
+
+    // Return the highest level among all roles
+    return Math.max(...this.roles.map(role => roleHierarchy[role] || 1));
   }
 }

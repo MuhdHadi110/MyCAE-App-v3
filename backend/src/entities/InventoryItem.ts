@@ -12,7 +12,15 @@ export enum InventoryStatus {
   AVAILABLE = 'available',
   LOW_STOCK = 'low-stock',
   OUT_OF_STOCK = 'out-of-stock',
+  IN_MAINTENANCE = 'in-maintenance',
   DISCONTINUED = 'discontinued',
+}
+
+export enum InventoryLastAction {
+  ADDED = 'added',
+  RETURNED = 'returned',
+  CHECKED_OUT = 'checked-out',
+  UPDATED = 'updated',
 }
 
 @Entity('inventory')
@@ -65,6 +73,25 @@ export class InventoryItem {
 
   @Column({ type: 'varchar', length: 500, nullable: true })
   imageURL?: string;
+
+  @Column({ type: 'date', nullable: true })
+  next_maintenance_date?: Date;
+
+  @Column({ type: 'int', default: 0 })
+  in_maintenance_quantity: number;
+
+  @Column({
+    type: 'enum',
+    enum: InventoryLastAction,
+    default: InventoryLastAction.ADDED,
+  })
+  last_action: InventoryLastAction;
+
+  @Column({ type: 'timestamp', nullable: true })
+  last_action_date: Date;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  last_action_by?: string;
 
   @CreateDateColumn()
   created_at: Date;

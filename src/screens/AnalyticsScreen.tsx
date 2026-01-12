@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '../components/ui/Card';
+import { PageHeader } from '../components/ui/PageHeader';
 import { ProjectTimeline } from '../components/charts/ProjectTimeline';
 import { ProjectGantt } from '../components/charts/ProjectGantt';
 import { TeamWorkloadHeatmap } from '../components/charts/TeamWorkloadHeatmap';
@@ -29,15 +30,11 @@ export const AnalyticsScreen: React.FC = () => {
     <div className="min-h-full bg-gray-50">
       <div className="p-4 md:p-6 space-y-6">
       {/* Header */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Advanced Analytics</h1>
-            <p className="text-gray-600 mt-1">Project tracking, team capacity, and performance insights</p>
-          </div>
-          <BarChart3 className="w-12 h-12 text-blue-600 opacity-20" />
-        </div>
-      </div>
+      <PageHeader
+        title="Advanced Analytics"
+        description="Project tracking, team capacity, and performance insights"
+        icon={<BarChart3 className="w-6 h-6" />}
+      />
 
       {/* Tab Navigation */}
       <div className="flex gap-2 border-b border-gray-200 bg-white rounded-t-lg">

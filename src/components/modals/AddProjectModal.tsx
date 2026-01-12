@@ -1,12 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Calendar, User, Clock, FileText } from 'lucide-react'; // User icon kept for Client/Manager/Lead Engineer fields
 import { useClientStore } from '../../store/clientStore';
+import { useCompanyStore } from '../../store/companyStore';
 import { useTeamStore } from '../../store/teamStore';
 import { useProjectStore } from '../../store/projectStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import { Button } from '../ui/Button';
 import { toast } from 'react-hot-toast';
 import { useModalFocus } from '../../hooks/useModalFocus';
+import { logger } from '../../lib/logger';
 
 interface AddProjectModalProps {
   isOpen: boolean;
@@ -15,22 +17,25 @@ interface AddProjectModalProps {
 
 export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClose }) => {
   const { clients, fetchClients, loading: clientsLoading } = useClientStore();
+  const { companies, fetchCompanies, loading: companiesLoading } = useCompanyStore();
   const { teamMembers, fetchTeamMembers, loading: teamLoading } = useTeamStore();
   const { addProject } = useProjectStore();
   const { firstInputRef, closeButtonRef } = useModalFocus(isOpen);
 
-  // Fetch clients and team members when modal opens
+  // Fetch companies and team members when modal opens
   useEffect(() => {
     if (isOpen) {
-      fetchClients();
+      fetchClients(); // Keep for backward compatibility
+      fetchCompanies();
       fetchTeamMembers();
     }
-  }, [isOpen, fetchClients, fetchTeamMembers]);
+  }, [isOpen, fetchClients, fetchCompanies, fetchTeamMembers]);
 
   const [formData, setFormData] = useState({
     projectCode: '',
     title: '',
-    clientId: '',
+    clientId: '', // Keep for backward compatibility
+    contactId: '', // New field for contact selection
     leadEngineerId: '',
     managerId: '',
     plannedHours: '',
@@ -90,9 +95,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
         engineerId: formData.leadEngineerId,
         plannedHours: parseFloat(formData.plannedHours) || 0,
       };
-      console.log('Creating project with payload:', projectPayload);
       const result = await addProject(projectPayload);
-      console.log('Project creation result:', result);
 
       // Create in-app notifications for assigned team members
       const addNotification = useNotificationStore.getState().addNotification;
@@ -148,7 +151,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
       });
       onClose();
     } catch (error) {
-      console.error('Failed to create project:', error);
+      logger.error('Failed to create project:', error);
       toast.error('Failed to create project: ' + (error instanceof Error ? error.message : String(error)));
     } finally {
       setIsLoading(false);
@@ -160,17 +163,17 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" onClick={onClose} />
+      <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 transition-opacity" onClick={onClose} />
 
       {/* Modal */}
       <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+        <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-primary-50 to-primary-100">
-            <h2 className="text-2xl font-bold text-gray-900">Create New Project</h2>
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-primary-50 to-primary-100 dark:from-gray-800 dark:to-gray-700">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Create New Project</h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
             >
               <X className="w-6 h-6" />
             </button>
@@ -181,7 +184,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
             <div className="space-y-6">
               {/* Project Code */}
               <div>
-                <label htmlFor="projectCode" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="projectCode" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Project Code <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -192,16 +195,16 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
                   onChange={(e) => setFormData({ ...formData, projectCode: e.target.value.toUpperCase() })}
                   placeholder="e.g., J25001"
                   pattern="^J\d{5}$"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
                   required
                   aria-describedby="projectCodeHint"
                 />
-                <p id="projectCodeHint" className="text-xs text-gray-500 mt-1">Format: J followed by 5 digits (e.g., J25001)</p>
+                <p id="projectCodeHint" className="text-xs text-gray-500 dark:text-gray-400 mt-1">Format: J followed by 5 digits (e.g., J25001)</p>
               </div>
 
               {/* Title */}
               <div>
-                <label htmlFor="projectTitle" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="projectTitle" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Project Title <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -210,7 +213,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   placeholder="e.g., Equipment Vibration Analysis"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
                   required
                   autoComplete="off"
                 />
@@ -219,31 +222,35 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
               {/* Client, Manager, Lead Engineer */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label htmlFor="client" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="contact" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     <User className="w-4 h-4 inline mr-1" />
-                    Client <span className="text-red-500">*</span>
+                    Contact <span className="text-red-500">*</span>
                   </label>
                   <select
-                    id="client"
-                    value={formData.clientId}
-                    onChange={(e) => setFormData({ ...formData, clientId: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    disabled={clientsLoading}
+                    id="contact"
+                    value={formData.contactId || formData.clientId}
+                    onChange={(e) => setFormData({ ...formData, contactId: e.target.value, clientId: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white grouped-select"
+                    disabled={companiesLoading}
                     required
                   >
                     <option value="">
-                      {clientsLoading ? 'Loading clients...' : clients.length === 0 ? 'No clients available' : 'Select Client'}
+                      {companiesLoading ? 'Loading contacts...' : companies.length === 0 ? 'No contacts available' : 'Select Contact'}
                     </option>
-                    {clients.map((client) => (
-                      <option key={client.id} value={client.id}>
-                        {client.name}
-                      </option>
+                    {companies.map((company) => (
+                      <optgroup key={company.id} label={company.name}>
+                        {company.contacts.map((contact) => (
+                          <option key={contact.id} value={contact.id}>
+                            {contact.name} {contact.position ? `(${contact.position})` : ''}
+                          </option>
+                        ))}
+                      </optgroup>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label htmlFor="manager" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="manager" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     <User className="w-4 h-4 inline mr-1" />
                     Project Manager <span className="text-red-500">*</span>
                   </label>
@@ -251,7 +258,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
                     id="manager"
                     value={formData.managerId}
                     onChange={(e) => setFormData({ ...formData, managerId: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     disabled={teamLoading}
                     required
                     aria-describedby="managerHint"
@@ -265,13 +272,13 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
                       </option>
                     ))}
                   </select>
-                  <p id="managerHint" className="text-xs text-gray-500 mt-1">
+                  <p id="managerHint" className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Only Senior Engineers and above can be Project Managers
                   </p>
                 </div>
 
                 <div>
-                  <label htmlFor="leadEngineer" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="leadEngineer" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     <User className="w-4 h-4 inline mr-1" />
                     Lead Engineer
                   </label>
@@ -279,7 +286,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
                     id="leadEngineer"
                     value={formData.leadEngineerId}
                     onChange={(e) => setFormData({ ...formData, leadEngineerId: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     disabled={teamLoading}
                   >
                     <option value="">
@@ -296,7 +303,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
 
               {/* Field of Work Checkboxes */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Field of Work
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -306,9 +313,9 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
                         type="checkbox"
                         checked={formData.workTypes.includes(type)}
                         onChange={() => handleWorkTypeChange(type)}
-                        className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 bg-white dark:bg-gray-700"
                       />
-                      <span className="text-sm text-gray-700">{type}</span>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">{type}</span>
                     </label>
                   ))}
                 </div>
@@ -316,7 +323,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
 
               {/* Planned Hours */}
               <div>
-                <label htmlFor="plannedHours" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="plannedHours" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   <Clock className="w-4 h-4 inline mr-1" />
                   Planned Hours
                 </label>
@@ -327,13 +334,13 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
                   onChange={(e) => setFormData({ ...formData, plannedHours: e.target.value })}
                   placeholder="e.g., 120"
                   min="0"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
                 />
               </div>
 
               {/* Description */}
               <div>
-                <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   <FileText className="w-4 h-4 inline mr-1" />
                   Description
                 </label>
@@ -343,13 +350,13 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Describe the project scope and objectives..."
                   rows={4}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
                 />
               </div>
             </div>
 
             {/* Footer */}
-            <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-200">
+            <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
               <Button
                 type="button"
                 variant="outline"

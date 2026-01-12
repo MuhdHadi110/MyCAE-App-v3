@@ -27,6 +27,15 @@ export class IssuedPO {
   @Column({ type: 'decimal', precision: 15, scale: 2 })
   amount: number;
 
+  @Column({ type: 'varchar', length: 3, default: 'MYR' })
+  currency: string; // Original currency (SGD, USD, MYR, etc.)
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, nullable: true })
+  amount_myr: number; // Converted amount in MYR (auto-calculated)
+
+  @Column({ type: 'decimal', precision: 10, scale: 6, nullable: true })
+  exchange_rate: number; // Exchange rate used for conversion (snapshot)
+
   @Column({ type: 'datetime' })
   issue_date: Date;
 

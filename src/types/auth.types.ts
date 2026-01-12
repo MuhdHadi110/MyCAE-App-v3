@@ -4,7 +4,8 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: UserRole;
+  role: UserRole; // Primary role (first role in roles array, for backward compatibility)
+  roles: UserRole[]; // All roles assigned to the user
   department: string;
   avatar?: string;
   position?: string;

@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
-import { Upload, X, File, Image as ImageIcon, FileText, Sheet } from 'lucide-react';
+import { Upload, X, File, Image as ImageIcon, FileText, Sheet, Eye, Download } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import type { FileAttachment } from '../types/fileAttachment.types';
-import { DEFAULT_FILE_CONFIG, formatFileSize, getFileExtension, FILE_TYPE_ICONS } from '../types/fileAttachment.types';
+import { DEFAULT_FILE_CONFIG, formatFileSize, getFileExtension } from '../types/fileAttachment.types';
 import { getCurrentUser } from '../lib/auth';
+import { SmartPDFViewerModal } from './modals/SmartPDFViewerModal';
 
 interface FileUploadZoneProps {
   attachments: FileAttachment[];
@@ -23,6 +24,8 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
   allowMultiple = true,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
+  const [showPDFViewer, setShowPDFViewer] = useState(false);
+  const [selectedPDF, setSelectedPDF] = useState<FileAttachment | null>(null);
   const currentUser = getCurrentUser();
 
   const handleDrag = useCallback((e: React.DragEvent) => {
@@ -78,8 +81,8 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
           fileSize: file.size,
           fileExtension: getFileExtension(file.name),
           uploadedDate: new Date().toISOString(),
-          uploadedBy: currentUser.id,
-          uploadedByName: currentUser.name,
+          uploadedBy: currentUser?.id || '',
+          uploadedByName: currentUser?.name || '',
           fileData: reader.result as string,
         };
 
@@ -198,10 +201,28 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  {attachment.fileType === 'application/pdf' && (
+                    <button
+                      onClick={() => {
+                        // Validate file data before opening viewer
+                        if (!attachment.fileData || attachment.fileData.trim().length === 0) {
+                          toast.error('PDF data is missing or corrupted');
+                          return;
+                        }
+                        setSelectedPDF(attachment);
+                        setShowPDFViewer(true);
+                      }}
+                      className="px-3 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded transition-colors flex items-center gap-1"
+                    >
+                      <Eye className="w-3 h-3" />
+                      Preview
+                    </button>
+                  )}
                   <button
                     onClick={() => handleDownload(attachment)}
-                    className="px-3 py-1 text-xs font-medium text-primary-600 hover:bg-indigo-50 rounded transition-colors"
+                    className="px-3 py-1 text-xs font-medium text-primary-600 hover:bg-indigo-50 rounded transition-colors flex items-center gap-1"
                   >
+                    <Download className="w-3 h-3" />
                     Download
                   </button>
                   <button
@@ -216,6 +237,20 @@ export const FileUploadZone: React.FC<FileUploadZoneProps> = ({
             ))}
           </div>
         </div>
+      )}
+
+      {/* PDF Viewer Modal */}
+      {showPDFViewer && selectedPDF && (
+        <SmartPDFViewerModal
+          isOpen={showPDFViewer}
+          onClose={() => {
+            setShowPDFViewer(false);
+            setSelectedPDF(null);
+          }}
+          pdfSource={`data:application/pdf;base64,${selectedPDF.fileData}`}
+          fileName={selectedPDF.fileName}
+          title={`Preview: ${selectedPDF.fileName}`}
+        />
       )}
     </div>
   );

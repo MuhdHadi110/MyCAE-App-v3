@@ -9,6 +9,7 @@ import { formatCurrency } from '../lib/utils';
 import { Badge } from '../components/ui/Badge';
 import toast from 'react-hot-toast';
 import { Html5QrcodeScanner } from 'html5-qrcode';
+import { logger } from '../lib/logger';
 
 export const ScanScreen: React.FC = () => {
   const [manualBarcode, setManualBarcode] = useState('');
@@ -28,7 +29,7 @@ export const ScanScreen: React.FC = () => {
       try {
         setRecentScans(JSON.parse(saved));
       } catch (error) {
-        console.error('Error loading recent scans:', error);
+        logger.error('Error loading recent scans:', error);
       }
     }
   }, []);
@@ -65,7 +66,7 @@ export const ScanScreen: React.FC = () => {
       if (scannerRef.current) {
         scannerRef.current
           .clear()
-          .catch((error) => console.error('Error stopping scanner:', error));
+          .catch((error) => logger.error('Error stopping scanner:', error));
         scannerRef.current = null;
       }
     } else {
@@ -125,7 +126,7 @@ export const ScanScreen: React.FC = () => {
       if (scannerRef.current) {
         scannerRef.current
           .clear()
-          .catch((error) => console.error('Error cleaning up scanner:', error));
+          .catch((error) => logger.error('Error cleaning up scanner:', error));
       }
     };
   }, []);

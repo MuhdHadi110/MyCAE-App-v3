@@ -1,4 +1,4 @@
-export type ResearchStatus = 'planning' | 'active' | 'completed' | 'on-hold' | 'cancelled';
+export type ResearchStatus = 'planning' | 'in-progress' | 'on-hold' | 'completed' | 'archived';
 
 export interface ResearchProject {
   id: string;
@@ -6,17 +6,26 @@ export interface ResearchProject {
   description?: string;
   status: ResearchStatus;
   startDate: string;
-  endDate?: string;
+  plannedEndDate?: string;
+  actualEndDate?: string;
   leadResearcherId: string;
   leadResearcherName?: string;
-  budget?: number;
-  actualSpend?: number;
+  budget?: number | string;
+  fundingSource?: string;
+  category?: string;
+  objectives?: string;
+  methodology?: string;
+  findings?: string;
+  publications?: string;
+  teamMembers?: string;
+  collaborators?: string;
+  equipmentUsed?: string;
+  notes?: string;
   plannedHours?: number;
   totalHoursLogged?: number;
-  findings?: string;
   researchCode?: string;
-  createdDate?: string;
-  lastUpdated?: string;
+  createdAt?: string;
+  updatedAt?: string;
   timesheetEntries?: TimesheetEntry[];
 }
 

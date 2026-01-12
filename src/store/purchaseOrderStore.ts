@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import apiService from '../services/api.service';
+import financeService from '../services/api.service';
 
 export interface PurchaseOrder {
   id: string;
@@ -40,7 +40,7 @@ export const usePurchaseOrderStore = create<PurchaseOrderStore>((set, get) => ({
   fetchPurchaseOrders: async (filters?: any) => {
     try {
       set({ loading: true, error: null });
-      const response = await apiService.getAllPurchaseOrders(filters);
+      const response = await financeService.getAllPurchaseOrders(filters);
       const data = response.data || response;
       const purchaseOrders = Array.isArray(data) ? data : [];
       set({ purchaseOrders, loading: false });
@@ -54,7 +54,7 @@ export const usePurchaseOrderStore = create<PurchaseOrderStore>((set, get) => ({
   createPurchaseOrder: async (data) => {
     try {
       set({ loading: true, error: null });
-      const response = await apiService.createPurchaseOrder(data);
+      const response = await financeService.createPurchaseOrder(data);
       const newPO = response.data || response;
       set((state) => ({
         purchaseOrders: [...state.purchaseOrders, newPO],
@@ -71,7 +71,7 @@ export const usePurchaseOrderStore = create<PurchaseOrderStore>((set, get) => ({
   updatePurchaseOrder: async (id, updates) => {
     try {
       set({ loading: true, error: null });
-      const response = await apiService.updatePurchaseOrder(id, updates);
+      const response = await financeService.updatePurchaseOrder(id, updates);
       const updatedPO = response.data || response;
       set((state) => ({
         purchaseOrders: state.purchaseOrders.map((po) =>
@@ -90,7 +90,7 @@ export const usePurchaseOrderStore = create<PurchaseOrderStore>((set, get) => ({
   deletePurchaseOrder: async (id) => {
     try {
       set({ loading: true, error: null });
-      await apiService.deletePurchaseOrder(id);
+      await financeService.deletePurchaseOrder(id);
       set((state) => ({
         purchaseOrders: state.purchaseOrders.filter((po) => po.id !== id),
         loading: false,

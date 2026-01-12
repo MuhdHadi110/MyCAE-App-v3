@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Search, Plus, Filter, Package, Upload, QrCode, LogIn, ChevronDown, Box, Edit2, Trash2 } from 'lucide-react';
 import { Badge } from '../components/ui/Badge';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { BulkUploadModal } from '../components/modals/BulkUploadModal';
 import { BulkCheckoutModal } from '../components/modals/BulkCheckoutModal';
 import { BulkCheckInModal, type BulkCheckInData } from '../components/modals/BulkCheckInModal';
@@ -13,11 +14,12 @@ import { checkPermission, getPermissionMessage } from '../lib/permissions';
 import { formatCurrency, formatDate } from '../lib/utils';
 import { useResponsive } from '../hooks/useResponsive';
 import { toast } from 'react-hot-toast';
-import apiService from '../services/api.service';
+import inventoryService from '../services/inventory.service';
 import type { BulkCheckout, InventoryItem } from '../types/inventory.types';
 
 export const InventoryScreen: React.FC = () => {
-  const { filteredItems, filters, setFilters, fetchInventory, loading } = useInventoryStore();
+  const { filteredItems: storeFilteredItems, filters, setFilters, fetchInventory, loading } = useInventoryStore();
+  const filteredItems = Array.isArray(storeFilteredItems) ? storeFilteredItems : [];
   const { isMobile } = useResponsive();
 
   const currentUser = getCurrentUser();
@@ -33,9 +35,20 @@ export const InventoryScreen: React.FC = () => {
   const [showCheckInMenu, setShowCheckInMenu] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    itemId?: string;
+    itemTitle?: string;
+  }>({ isOpen: false });
 
   useEffect(() => {
     fetchInventory();
+  }, []);
+
+  const handleCloseAddItemModal = useCallback(() => {
+    setShowAddItem(false);
+    setSelectedItem(null);
+    setIsEditMode(false);
   }, []);
 
   const handleSearch = (value: string) => {
@@ -56,6 +69,23 @@ export const InventoryScreen: React.FC = () => {
     if (quantity === 0) return <Badge variant="danger">Out of Stock</Badge>;
     if (quantity <= minStock) return <Badge variant="warning">Low Stock</Badge>;
     return <Badge variant="success">In Stock</Badge>;
+  };
+
+  const getLastActionBadge = (lastAction?: string) => {
+    if (!lastAction) return null;
+    const variants: Record<string, 'success' | 'info' | 'warning' | 'default'> = {
+      added: 'success',
+      returned: 'info',
+      'checked-out': 'warning',
+      updated: 'default',
+    };
+    const labels: Record<string, string> = {
+      added: 'ADDED',
+      returned: 'RETURNED',
+      'checked-out': 'CHECKED OUT',
+      updated: 'UPDATED',
+    };
+    return <Badge variant={variants[lastAction] || 'default'} size="sm">{labels[lastAction] || lastAction}</Badge>;
   };
 
   const handleBulkImport = async (file: File) => {
@@ -131,7 +161,7 @@ export const InventoryScreen: React.FC = () => {
           }
 
           // Send to API
-          const response = await apiService.bulkCreateInventoryItems(itemsToImport);
+          const response = await inventoryService.bulkCreateInventoryItems(itemsToImport);
           toast.success(
             `Successfully imported ${itemsToImport.length} items${
               errorCount > 0 ? ` (${errorCount} rows skipped due to errors)` : ''
@@ -158,7 +188,7 @@ export const InventoryScreen: React.FC = () => {
 
   const handleBulkCheckout = async (checkout: BulkCheckout) => {
     try {
-      const result = await apiService.createBulkCheckout(checkout);
+      const result = await inventoryService.createBulkCheckout(checkout);
       toast.success(result.message || 'Bulk checkout completed successfully!');
       await fetchInventory(); // Refresh inventory to show updated quantities
       setShowBulkCheckout(false);
@@ -169,7 +199,7 @@ export const InventoryScreen: React.FC = () => {
 
   const handleBulkCheckIn = async (checkInData: BulkCheckInData) => {
     try {
-      const result = await apiService.checkInBulk({
+      const result = await inventoryService.checkInBulk({
         masterBarcode: checkInData.masterBarcode,
         returnType: checkInData.returnType,
         items: checkInData.items,
@@ -190,7 +220,7 @@ export const InventoryScreen: React.FC = () => {
     }
     try {
       const dataToSend: any = itemData;
-      await apiService.createInventoryItem(dataToSend);
+      await inventoryService.createInventoryItem(dataToSend);
       toast.success(`Item "${itemData.title}" added successfully!`);
       await fetchInventory();
     } catch (error: any) {
@@ -201,7 +231,7 @@ export const InventoryScreen: React.FC = () => {
 
   const handleSingleCheckout = async (checkout: SingleCheckoutData) => {
     try {
-      const result = await apiService.createSingleCheckout(checkout);
+      const result = await inventoryService.createSingleCheckout(checkout);
       toast.success(result.message || 'Item checked out successfully!');
       await fetchInventory(); // Refresh inventory to show updated quantities
       setShowSingleCheckout(false);
@@ -212,7 +242,7 @@ export const InventoryScreen: React.FC = () => {
 
   const handleSingleCheckIn = async (checkIn: SingleCheckInData) => {
     try {
-      const result = await apiService.checkInSingle(checkIn);
+      const result = await inventoryService.checkInSingle(checkIn);
       toast.success(result.message || 'Item checked in successfully!');
       await fetchInventory(); // Refresh inventory to show updated quantities
       setShowSingleCheckIn(false);
@@ -228,11 +258,22 @@ export const InventoryScreen: React.FC = () => {
   };
 
   const handleDeleteItem = async (itemId: string) => {
-    if (!confirm('Are you sure you want to delete this item?')) return;
+    const item = filteredItems.find(i => i.id === itemId);
+    setConfirmDialog({
+      isOpen: true,
+      itemId,
+      itemTitle: item?.title,
+    });
+  };
+
+  const confirmDeleteItem = async () => {
+    if (!confirmDialog.itemId) return;
+
     try {
-      await apiService.deleteInventoryItem(itemId);
+      await inventoryService.deleteInventoryItem(confirmDialog.itemId);
       toast.success('Item deleted successfully!');
       await fetchInventory();
+      setConfirmDialog({ isOpen: false });
     } catch (error: any) {
       toast.error(error?.response?.data?.error || 'Failed to delete item');
     }
@@ -245,7 +286,7 @@ export const InventoryScreen: React.FC = () => {
     }
     try {
       if (isEditMode && selectedItem) {
-        await apiService.updateInventoryItem(selectedItem.id, itemData);
+        await inventoryService.updateInventoryItem(selectedItem.id, itemData);
         toast.success('Item updated successfully!');
       } else {
         await handleAddItem(itemData);
@@ -440,7 +481,10 @@ export const InventoryScreen: React.FC = () => {
                 </div>
               </div>
               <div className="flex items-center justify-between pt-3 border-t border-gray-100 mb-3">
-                {getStockStatus(item.quantity, item.minimumStock)}
+                <div className="flex items-center gap-2">
+                  {getStockStatus(item.quantity, item.minimumStock)}
+                  {getLastActionBadge(item.lastAction)}
+                </div>
                 <p className="text-xs text-gray-500">Updated {formatDate(item.lastUpdated)}</p>
               </div>
               {canAdd && (
@@ -508,7 +552,12 @@ export const InventoryScreen: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">{formatCurrency(item.price)}</td>
                     <td className="px-6 py-4 text-sm text-gray-900">{item.location}</td>
-                    <td className="px-6 py-4">{getStatusBadge(item.status)}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        {getStatusBadge(item.status)}
+                        {getLastActionBadge(item.lastAction)}
+                      </div>
+                    </td>
                     {canAdd && (
                       <td className="px-6 py-4">
                         <div className="flex gap-2">
@@ -576,14 +625,22 @@ export const InventoryScreen: React.FC = () => {
         />
         <AddItemModal
           isOpen={showAddItem}
-          onClose={() => {
-            setShowAddItem(false);
-            setSelectedItem(null);
-            setIsEditMode(false);
-          }}
+          onClose={handleCloseAddItemModal}
           onSubmit={handleAddItemSubmit}
           initialData={isEditMode ? selectedItem || undefined : undefined}
           isEditMode={isEditMode}
+        />
+
+        {/* Delete Confirmation Dialog */}
+        <ConfirmDialog
+          isOpen={confirmDialog.isOpen}
+          onClose={() => setConfirmDialog({ isOpen: false })}
+          onConfirm={confirmDeleteItem}
+          title="Delete Inventory Item"
+          message={`Are you sure you want to delete "${confirmDialog.itemTitle}"? This action cannot be undone.`}
+          variant="danger"
+          confirmText="Delete Item"
+          cancelText="Cancel"
         />
       </div>
     </div>

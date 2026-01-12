@@ -19,13 +19,32 @@ router.use(authenticate);
 /**
  * GET /api/projects
  * Get all projects
+ * Authorization: Managers/Admins see all, others see only their assigned projects
  */
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const projectRepo = AppDataSource.getRepository(Project);
-    const projects = await projectRepo.find({
-      relations: ['lead_engineer', 'manager'],
-    });
+
+    // Authorization: Check user roles
+    const userId = req.user?.id;
+    const userRoles = req.user?.roles || [];
+    const isPrivileged = userRoles.some((r: string) =>
+      ['admin', 'managing_director', 'manager'].includes(r)
+    );
+
+    let query = projectRepo.createQueryBuilder('project')
+      .leftJoinAndSelect('project.lead_engineer', 'lead_engineer')
+      .leftJoinAndSelect('project.manager', 'manager');
+
+    // Non-privileged users can only see projects they're assigned to
+    if (!isPrivileged && userId) {
+      query = query.where(
+        '(project.manager_id = :userId OR project.lead_engineer_id = :userId)',
+        { userId }
+      );
+    }
+
+    const projects = await query.getMany();
     res.json(projects);
   } catch (error: any) {
     console.error('Error fetching projects:', error);

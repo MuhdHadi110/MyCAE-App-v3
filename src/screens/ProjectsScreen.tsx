@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Plus, Search, Filter, Edit, Trash2, Eye, FolderOpen } from 'lucide-react';
 import { useProjectStore } from '../store/projectStore';
 import { useClientStore } from '../store/clientStore';
@@ -6,18 +6,19 @@ import { useTeamStore } from '../store/teamStore';
 import { AddProjectModal } from '../components/modals/AddProjectModal';
 import { EditProjectModal } from '../components/modals/EditProjectModal';
 import { ProjectDetailModal } from '../components/modals/ProjectDetailModal';
-import { getCurrentUser } from '../lib/auth';
-import { checkPermission, getPermissionMessage } from '../lib/permissions';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import { getPermissionMessage } from '../lib/permissions';
 import { toast } from 'react-hot-toast';
 import type { ProjectStatus, Project } from '../types/project.types';
+import { logger } from '../lib/logger';
+import { usePermissions } from '../hooks/usePermissions';
 
 export const ProjectsScreen: React.FC = () => {
   const { projects, loading, fetchProjects } = useProjectStore();
   const { clients, fetchClients } = useClientStore();
   const { teamMembers, fetchTeamMembers } = useTeamStore();
 
-  const currentUser = getCurrentUser();
-  const canAdd = currentUser && checkPermission((currentUser.role || 'engineer') as any, 'canAddProject');
+  const { canAddProject: canAdd } = usePermissions();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | 'all'>('all');
@@ -25,6 +26,11 @@ export const ProjectsScreen: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    projectId?: string;
+    projectCode?: string;
+  }>({ isOpen: false });
 
   useEffect(() => {
     fetchProjects();
@@ -32,23 +38,23 @@ export const ProjectsScreen: React.FC = () => {
     fetchTeamMembers();
   }, []);
 
-  const handleAddProject = () => {
+  const handleAddProject = useCallback(() => {
     if (!canAdd) {
       toast.error(getPermissionMessage('add project', 'senior-engineer'));
       return;
     }
     setShowAddModal(true);
-  };
+  }, [canAdd]);
 
-  const handleViewProject = (projectId: string, projectCode: string) => {
+  const handleViewProject = useCallback((projectId: string) => {
     const project = projects.find(p => p.id === projectId);
     if (project) {
       setSelectedProject(project);
       setShowDetailModal(true);
     }
-  };
+  }, [projects]);
 
-  const handleEditProject = (projectId: string, projectCode: string) => {
+  const handleEditProject = useCallback((projectId: string) => {
     if (!canAdd) {
       toast.error(getPermissionMessage('edit project', 'senior-engineer'));
       return;
@@ -58,7 +64,7 @@ export const ProjectsScreen: React.FC = () => {
       setSelectedProject(project);
       setShowEditModal(true);
     }
-  };
+  }, [canAdd, projects]);
 
   const handleSaveProject = async (updatedProject: Partial<Project>) => {
     if (!selectedProject) return;
@@ -95,38 +101,59 @@ export const ProjectsScreen: React.FC = () => {
       setShowEditModal(false);
       setSelectedProject(null);
     } catch (error: any) {
-      console.error('Failed to update project:', error);
+      logger.error('Failed to update project:', error);
       toast.error(error?.message || 'Failed to update project');
     }
   };
 
-  const handleDeleteProject = async (projectId: string, projectCode: string) => {
+  const handleDeleteProject = useCallback((projectId: string, projectCode: string) => {
     if (!canAdd) {
       toast.error(getPermissionMessage('delete project', 'senior-engineer'));
       return;
     }
-    if (confirm(`Are you sure you want to delete Project ${projectCode}?`)) {
-      try {
-        await useProjectStore.getState().deleteProject(projectId);
-        toast.success(`Project ${projectCode} deleted successfully`);
-        fetchProjects();
-      } catch (error) {
-        console.error('Failed to delete project:', error);
-        toast.error('Failed to delete project: ' + (error instanceof Error ? error.message : String(error)));
-      }
+    // Show confirmation dialog
+    setConfirmDialog({
+      isOpen: true,
+      projectId,
+      projectCode,
+    });
+  }, [canAdd]);
+
+  const confirmDeleteProject = useCallback(async () => {
+    if (!confirmDialog.projectId || !confirmDialog.projectCode) return;
+
+    try {
+      await useProjectStore.getState().deleteProject(confirmDialog.projectId);
+      toast.success(`Project ${confirmDialog.projectCode} deleted successfully`);
+      fetchProjects();
+      setConfirmDialog({ isOpen: false });
+    } catch (error) {
+      logger.error('Failed to delete project:', error);
+      toast.error('Failed to delete project: ' + (error instanceof Error ? error.message : String(error)));
     }
-  };
+  }, [confirmDialog.projectId, confirmDialog.projectCode, fetchProjects]);
 
-  const filteredProjects = projects.filter((project) => {
-    const matchesSearch =
-      searchTerm === '' ||
-      project.projectCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      project.title.toLowerCase().includes(searchTerm.toLowerCase());
+  // Memoize filtered projects to avoid recalculating on every render
+  const filteredProjects = useMemo(() => {
+    return projects.filter((project) => {
+      const matchesSearch =
+        searchTerm === '' ||
+        project.projectCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        project.title.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesStatus = statusFilter === 'all' || project.status === statusFilter;
+      const matchesStatus = statusFilter === 'all' || project.status === statusFilter;
 
-    return matchesSearch && matchesStatus;
-  });
+      return matchesSearch && matchesStatus;
+    });
+  }, [projects, searchTerm, statusFilter]);
+
+  // Memoize status counts to avoid recalculating on every render
+  const statusCounts = useMemo(() => ({
+    total: projects.length,
+    preLim: projects.filter((p) => p.status === 'pre-lim').length,
+    ongoing: projects.filter((p) => p.status === 'ongoing').length,
+    completed: projects.filter((p) => p.status === 'completed').length,
+  }), [projects]);
 
   return (
     <div className="min-h-full bg-gray-50">
@@ -197,7 +224,7 @@ export const ProjectsScreen: React.FC = () => {
           }`}
         >
           <div className="text-sm font-medium text-gray-600 mb-2">Total Projects</div>
-          <div className="text-3xl font-bold text-gray-900">{projects.length}</div>
+          <div className="text-3xl font-bold text-gray-900">{statusCounts.total}</div>
         </button>
         <button
           onClick={() => setStatusFilter('pre-lim')}
@@ -207,7 +234,7 @@ export const ProjectsScreen: React.FC = () => {
         >
           <div className="text-sm font-medium text-gray-600 mb-2">Preliminary</div>
           <div className="text-3xl font-bold text-yellow-600">
-            {projects.filter((p) => p.status === 'pre-lim').length}
+            {statusCounts.preLim}
           </div>
         </button>
         <button
@@ -218,7 +245,7 @@ export const ProjectsScreen: React.FC = () => {
         >
           <div className="text-sm font-medium text-gray-600 mb-2">Ongoing</div>
           <div className="text-3xl font-bold text-green-600">
-            {projects.filter((p) => p.status === 'ongoing').length}
+            {statusCounts.ongoing}
           </div>
         </button>
         <button
@@ -229,7 +256,7 @@ export const ProjectsScreen: React.FC = () => {
         >
           <div className="text-sm font-medium text-gray-600 mb-2">Completed</div>
           <div className="text-3xl font-bold text-gray-600">
-            {projects.filter((p) => p.status === 'completed').length}
+            {statusCounts.completed}
           </div>
         </button>
       </div>
@@ -312,15 +339,8 @@ export const ProjectsScreen: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredProjects.map((project, idx) => {
+                {filteredProjects.map((project) => {
                 const client = clients.find((c) => c.id === project.clientId);
-
-                // DEBUG: Check team members userId field
-                if (idx === 0) {
-                  console.log('[RENDER] project.leadEngineerId:', project.leadEngineerId);
-                  console.log('[RENDER] First teamMember:', teamMembers[0]);
-                  console.log('[RENDER] Match by userId:', teamMembers.find(tm => tm.userId === project.leadEngineerId));
-                }
 
                 return (
                   <tr key={project.id} className="hover:bg-gray-50 transition-colors">
@@ -364,7 +384,7 @@ export const ProjectsScreen: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
-                          onClick={() => handleViewProject(project.id, project.projectCode)}
+                          onClick={() => handleViewProject(project.id)}
                           className="p-2 text-gray-400 hover:text-primary-600 transition-colors"
                           title="View Details"
                           aria-label={`View details for project ${project.projectCode}`}
@@ -373,7 +393,7 @@ export const ProjectsScreen: React.FC = () => {
                         </button>
                         {canAdd && (
                           <button
-                            onClick={() => handleEditProject(project.id, project.projectCode)}
+                            onClick={() => handleEditProject(project.id)}
                             className="p-2 text-gray-400 hover:text-primary-600 transition-colors"
                             title="Edit Project"
                             aria-label={`Edit project ${project.projectCode}`}
@@ -430,6 +450,18 @@ export const ProjectsScreen: React.FC = () => {
           setSelectedProject(null);
         }}
         project={selectedProject}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ isOpen: false })}
+        onConfirm={confirmDeleteProject}
+        title="Delete Project"
+        message={`Are you sure you want to delete Project ${confirmDialog.projectCode}? This action cannot be undone.`}
+        variant="danger"
+        confirmText="Delete Project"
+        cancelText="Cancel"
       />
       </div>
     </div>

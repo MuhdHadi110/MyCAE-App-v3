@@ -74,7 +74,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({ isOpen, onClose,
       return;
     }
 
-    console.log('Client Data to Save:', formData);
+    
 
     // Call the onSubmit callback to save to database
     if (onSubmit) {

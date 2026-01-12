@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import apiService from '../services/api.service';
+import inventoryService from '../services/api.service';
 import { Category } from '../types/inventory.types';
 
 interface CategoryStore {
@@ -31,7 +31,7 @@ export const useCategoryStore = create<CategoryStore>((set) => ({
   fetchCategories: async () => {
     try {
       set({ loading: true, error: null });
-      const response: any = await apiService.getAllCategories();
+      const response: any = await inventoryService.getAllCategories();
       const categories = Array.isArray(response) ? response : (response?.data || DEFAULT_CATEGORIES);
       set({ categories, loading: false });
     } catch (error: any) {
@@ -45,7 +45,7 @@ export const useCategoryStore = create<CategoryStore>((set) => ({
   createCategory: async (categoryData) => {
     try {
       set({ loading: true, error: null });
-      const newCategory = await apiService.createCategory(categoryData);
+      const newCategory = await inventoryService.createCategory(categoryData);
       set(state => ({
         categories: [...state.categories, newCategory],
         loading: false,
@@ -61,7 +61,7 @@ export const useCategoryStore = create<CategoryStore>((set) => ({
   deleteCategory: async (id) => {
     try {
       set({ loading: true, error: null });
-      await apiService.deleteCategory(id);
+      await inventoryService.deleteCategory(id);
       set(state => ({
         categories: state.categories.filter(cat => cat.id !== id),
         loading: false,
@@ -77,7 +77,7 @@ export const useCategoryStore = create<CategoryStore>((set) => ({
   updateCategory: async (id, updates) => {
     try {
       set({ loading: true, error: null });
-      const updatedCategory = await apiService.updateCategory(id, updates);
+      const updatedCategory = await inventoryService.updateCategory(id, updates);
       set(state => ({
         categories: state.categories.map(cat => cat.id === id ? updatedCategory : cat),
         loading: false,

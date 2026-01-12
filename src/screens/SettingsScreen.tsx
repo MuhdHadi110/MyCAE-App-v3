@@ -1,11 +1,11 @@
 import { useRef, useState } from 'react';
-import { User, Database, Info, ChevronRight, Download, Upload, Lock, Settings as SettingsIcon, Camera } from 'lucide-react';
+import { User, Database, Info, ChevronRight, Download, Upload, Lock, Settings as SettingsIcon, Building2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import toast from 'react-hot-toast';
-import { AvatarUploadModal } from '../components/modals/AvatarUploadModal';
 import { ChangePasswordModal } from '../components/modals/ChangePasswordModal';
 import { UserPreferencesModal } from '../components/modals/UserPreferencesModal';
+import { CompanySettingsForm } from '../components/settings/CompanySettingsForm';
 import { useTeamStore } from '../store/teamStore';
 import { useProjectStore } from '../store/projectStore';
 import { useClientStore } from '../store/clientStore';
@@ -14,14 +14,21 @@ import { useCheckoutStore } from '../store/checkoutStore';
 import { usePCStore } from '../store/pcStore';
 import { useResearchStore } from '../store/researchStore';
 import { useMaintenanceStore } from '../store/maintenanceStore';
+import { logger } from '../lib/logger';
 import { useAuth } from '../contexts/AuthContext';
 
 export const SettingsScreen: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isPreferencesModalOpen, setIsPreferencesModalOpen] = useState(false);
-  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+  const [isCompanySettingsExpanded, setIsCompanySettingsExpanded] = useState(false);
   const { user } = useAuth();
+
+  // Check if user has admin role (company settings are admin-only)
+  const canManageCompanySettings = user && (
+    user.role === 'admin' ||
+    (Array.isArray(user.roles) && user.roles.includes('admin'))
+  );
 
   // Get state from all stores
   const teamMembers = useTeamStore((state) => state.teamMembers);
@@ -74,7 +81,7 @@ export const SettingsScreen: React.FC = () => {
       toast.success(`✅ Data exported successfully! (${Object.keys(allData.summary).length} entities)`);
     } catch (error) {
       toast.error('❌ Failed to export data');
-      console.error('Export error:', error);
+      logger.error('Export error:', error);
     }
   };
 
@@ -105,10 +112,10 @@ export const SettingsScreen: React.FC = () => {
           `Inventory: ${data.summary.totalInventoryItems}`
         );
 
-        console.log('Imported data:', data);
+        logger.debug('Imported data:', data);
       } catch (error) {
         toast.error('❌ Failed to parse import file');
-        console.error('Import error:', error);
+        logger.error('Import error:', error);
       }
     };
     reader.readAsText(file);
@@ -146,18 +153,7 @@ export const SettingsScreen: React.FC = () => {
               </div>
 
               {/* Action Buttons */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                <button
-                  onClick={() => setIsAvatarModalOpen(true)}
-                  className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors border border-gray-200"
-                >
-                  <div className="flex items-center gap-3">
-                    <Camera className="w-5 h-5 text-primary-600" />
-                    <span className="text-sm font-medium text-gray-700">Edit Avatar</span>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-gray-400" />
-                </button>
-
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 <button
                   onClick={() => setIsPasswordModalOpen(true)}
                   className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors border border-gray-200"
@@ -183,6 +179,44 @@ export const SettingsScreen: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Company Settings Section - Admin Only */}
+        {canManageCompanySettings && (
+          <Card variant="bordered" className="mb-4">
+            <CardHeader>
+              <CardTitle>Company Settings</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                  <p className="text-sm text-amber-800">
+                    <strong>Admin Only:</strong> Configure company branding, logo, and PDF document settings.
+                    These settings will be applied to all generated invoices and purchase orders.
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => setIsCompanySettingsExpanded(!isCompanySettingsExpanded)}
+                  className="w-full flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors border border-gray-200"
+                >
+                  <div className="flex items-center gap-3">
+                    <Building2 className="w-5 h-5 text-primary-600" />
+                    <span className="text-sm font-medium text-gray-700">
+                      {isCompanySettingsExpanded ? 'Hide Company Settings' : 'Edit Company Settings'}
+                    </span>
+                  </div>
+                  <ChevronRight className={`w-5 h-5 text-gray-400 transition-transform ${isCompanySettingsExpanded ? 'rotate-90' : ''}`} />
+                </button>
+
+                {isCompanySettingsExpanded && (
+                  <div className="mt-4 border-t border-gray-200 pt-4">
+                    <CompanySettingsForm />
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Data Management Section */}
         <Card variant="bordered" className="mb-4">
@@ -273,18 +307,6 @@ export const SettingsScreen: React.FC = () => {
         </CardContent>
         </Card>
       </div>
-
-      {/* Avatar Upload Modal */}
-      <AvatarUploadModal
-        isOpen={isAvatarModalOpen}
-        onClose={() => setIsAvatarModalOpen(false)}
-        currentAvatar={user?.avatar}
-        userName={user?.name}
-        onSuccess={() => {
-          setIsAvatarModalOpen(false);
-          // Optionally refresh user data here
-        }}
-      />
 
       {/* Change Password Modal */}
       <ChangePasswordModal

@@ -4,6 +4,7 @@ import { useProjectStore } from '../../store/projectStore';
 import { useResearchStore } from '../../store/researchStore';
 import { getCurrentUser } from '../../lib/auth';
 import { toast } from 'react-hot-toast';
+import { logger } from '../../lib/logger';
 
 interface AddTimesheetModalProps {
   isOpen: boolean;
@@ -27,7 +28,9 @@ export const AddTimesheetModal: React.FC<AddTimesheetModalProps> = ({ isOpen, on
 
   // Filter projects/research based on entry type
   const availableProjects = projects; // No filter - show all projects
-  const availableResearch = researchProjects.filter(r => r.status === 'active' || r.status === 'planning');
+  // Ensure researchProjects is an array before filtering
+  const projectsArray = Array.isArray(researchProjects) ? researchProjects : [];
+  const availableResearch = projectsArray.filter(r => r.status === 'planning' || r.status === 'in-progress');
 
   const workCategories = [
     { value: 'engineering', label: 'Engineering' },
@@ -78,9 +81,9 @@ export const AddTimesheetModal: React.FC<AddTimesheetModalProps> = ({ isOpen, on
     if (entryType === 'project') {
       const timesheetData = {
         date: formData.date,
-        engineerId: currentUser.userId,
+        engineerId: currentUser?.userId || '',
         projectId: formData.projectId,
-        workCategory: formData.workCategory as any,
+        workCategory: formData.workCategory as 'engineering' | 'project-management' | 'measurement-site' | 'measurement-office',
         description: formData.description,
         hours: formData.hours,
       };
@@ -111,36 +114,42 @@ export const AddTimesheetModal: React.FC<AddTimesheetModalProps> = ({ isOpen, on
         onClose();
       } catch (error) {
         toast.error('Failed to create timesheet entry');
-        console.error('Error creating timesheet:', error);
+        logger.error('Error creating timesheet:', error);
       }
     } else {
-      // Research timesheet (demo mode for now)
-      console.log('Research Timesheet Entry:', {
+      // Research timesheet - ACTUAL IMPLEMENTATION
+      const researchData = {
+        projectId: formData.researchId,
+        teamMemberId: currentUser?.userId || '',
+        teamMemberName: currentUser?.displayName || '',
         date: formData.date,
-        engineerId: currentUser.userId,
-        researchId: formData.researchId,
-        workCategory: formData.workCategory,
+        hoursLogged: formData.hours,
         description: formData.description,
-        hours: formData.hours,
-      });
+        researchCategory: formData.workCategory || 'General',
+        status: 'approved' as const,
+      };
 
-      toast.success(
-        `✅ Research Timesheet Entry Created!\n` +
-        `Research: ${itemCode}\n` +
-        `Hours: ${formData.hours} hrs\n` +
-        `(Demo mode - research tracking coming soon)`
-      );
-
-      // Reset form
-      setFormData({
-        date: new Date().toISOString().split('T')[0],
-        projectId: '',
-        researchId: '',
-        workCategory: '',
-        description: '',
-        hours: 0,
-      });
-      onClose();
+      try {
+        await useResearchStore.getState().logTimesheetHours(formData.researchId, researchData);
+        toast.success(
+          `✅ Research Timesheet Entry Created!\n` +
+          `Research: ${itemCode}\n` +
+          `Hours: ${formData.hours} hrs`
+        );
+        // Reset form and close
+        setFormData({
+          date: new Date().toISOString().split('T')[0],
+          projectId: '',
+          researchId: '',
+          workCategory: '',
+          description: '',
+          hours: 0,
+        });
+        onClose();
+      } catch (error) {
+        toast.error('Failed to create research timesheet entry');
+        logger.error('Error:', error);
+      }
     }
   };
 

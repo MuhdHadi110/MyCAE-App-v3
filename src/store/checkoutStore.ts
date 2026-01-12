@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { ExtendedCheckout, CheckoutFilters, CheckoutStats } from '../types/checkout.types';
 import { getCurrentUser } from '../lib/auth';
-import apiService from '../services/api.service';
+import checkoutService from '../services/api.service';
 
 interface CheckoutStore {
   checkouts: ExtendedCheckout[];
@@ -36,7 +36,7 @@ export const useCheckoutStore = create<CheckoutStore>((set, get) => ({
 
     try {
       // Fetch from backend API
-      const checkouts = await apiService.getAllCheckouts();
+      const checkouts = await checkoutService.getAllCheckouts();
       const currentUser = getCurrentUser();
 
       // Sort: current user's checkouts first

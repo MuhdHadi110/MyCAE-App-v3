@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, Mail, AlertCircle, CheckCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import apiService from '../../services/api.service';
+import { httpClient } from '../../services/http-client';
 
 interface ForgotPasswordModalProps {
   isOpen: boolean;
@@ -13,10 +13,8 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
   onClose,
 }) => {
   const [email, setEmail] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState<'email' | 'password'>('email');
+  const [emailSent, setEmailSent] = useState(false);
 
   if (!isOpen) return null;
 
@@ -35,69 +33,12 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
 
     setLoading(true);
     try {
-      // Check if user exists (you can add a backend endpoint for this)
-      // For now, we'll just move to the next step
-      setStep('password');
-      toast.success('Please set your new password');
+      await httpClient.api.post('/auth/forgot-password', { email });
+      toast.success('Password reset link sent! Please check your email.');
+      setEmailSent(true);
     } catch (error: any) {
-      toast.error('User not found with this email');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePasswordReset = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!newPassword || !confirmPassword) {
-      toast.error('Please fill in all password fields');
-      return;
-    }
-
-    if (newPassword.length < 8) {
-      toast.error('Password must be at least 8 characters long');
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      toast.error('Passwords do not match');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Call backend API to reset password (without current password verification)
-      console.log('Attempting password reset for email:', email);
-      const result = await apiService.changePassword(email, '', newPassword);
-      console.log('Password reset result:', result);
-
-      toast.success('Password reset successfully! You can now login with your new password.');
-
-      // Reset form
-      setEmail('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setStep('email');
-      onClose();
-    } catch (error: any) {
-      console.error('Password reset error:', error);
-      console.error('Error response:', error.response?.data);
-      console.error('Error status:', error.response?.status);
-
-      let errorMessage = 'Password reset failed';
-
-      if (error.response?.data?.error) {
-        errorMessage = error.response.data.error;
-      } else if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
-        // Handle validation errors array
-        errorMessage = error.response.data.errors.map((e: any) => e.msg).join(', ');
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-
-      toast.error(errorMessage);
+      console.error('Forgot password error:', error);
+      toast.error(error.response?.data?.error || 'Failed to send reset link');
     } finally {
       setLoading(false);
     }
@@ -105,9 +46,7 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
 
   const handleClose = () => {
     setEmail('');
-    setNewPassword('');
-    setConfirmPassword('');
-    setStep('email');
+    setEmailSent(false);
     onClose();
   };
 
@@ -118,10 +57,14 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-              <Mail className="w-5 h-5 text-blue-600" />
+              {emailSent ? (
+                <CheckCircle className="w-5 h-5 text-blue-600" />
+              ) : (
+                <Mail className="w-5 h-5 text-blue-600" />
+              )}
             </div>
             <h2 className="text-xl font-semibold text-gray-900">
-              {step === 'email' ? 'Forgot Password' : 'Reset Password'}
+              {emailSent ? 'Check Your Email' : 'Forgot Password'}
             </h2>
           </div>
           <button
@@ -134,13 +77,13 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
 
         {/* Body */}
         <div className="p-6">
-          {step === 'email' ? (
+          {!emailSent ? (
             <form onSubmit={handleEmailSubmit} className="space-y-4">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                 <div className="flex gap-3">
                   <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                   <p className="text-sm text-blue-800">
-                    Enter your email address and you'll be able to reset your password immediately.
+                    Enter your email address and we'll send you a link to reset your password.
                   </p>
                 </div>
               </div>
@@ -166,72 +109,44 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
                 disabled={loading}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-xl transition-all duration-200 disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
-                {loading ? 'Processing...' : 'Continue'}
+                {loading ? 'Sending...' : 'Send Reset Link'}
               </button>
             </form>
           ) : (
-            <form onSubmit={handlePasswordReset} className="space-y-4">
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+            <div className="space-y-4">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <div className="flex gap-3">
                   <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium text-green-800">Account verified!</p>
+                    <p className="text-sm font-medium text-green-800">Email sent successfully!</p>
                     <p className="text-sm text-green-700 mt-1">
-                      Email: <span className="font-medium">{email}</span>
+                      We've sent a password reset link to <span className="font-medium">{email}</span>
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div>
-                <label htmlFor="new-password" className="block text-sm font-medium text-gray-700 mb-1.5">
-                  New Password
-                </label>
-                <input
-                  id="new-password"
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Enter new password (min 8 characters)"
-                  disabled={loading}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-50"
-                  autoFocus
-                />
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex gap-3">
+                  <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-yellow-800">
+                    <p className="font-medium">Important:</p>
+                    <ul className="mt-1 list-disc list-inside space-y-1">
+                      <li>The reset link will expire in 1 hour</li>
+                      <li>Check your spam folder if you don't see it</li>
+                      <li>Never share the reset link with anyone</li>
+                    </ul>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Confirm Password
-                </label>
-                <input
-                  id="confirm-password"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Confirm new password"
-                  disabled={loading}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-50"
-                />
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setStep('email')}
-                  disabled={loading}
-                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-6 rounded-xl transition-all duration-200 disabled:bg-gray-50 disabled:cursor-not-allowed"
-                >
-                  Back
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-xl transition-all duration-200 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                >
-                  {loading ? 'Resetting...' : 'Reset Password'}
-                </button>
-              </div>
-            </form>
+              <button
+                onClick={handleClose}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-xl transition-all duration-200"
+              >
+                Close
+              </button>
+            </div>
           )}
         </div>
       </div>

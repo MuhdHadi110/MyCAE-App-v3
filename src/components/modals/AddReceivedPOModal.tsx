@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { X, Upload } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import apiService from '../../services/api.service';
+import financeService from '../../services/api.service';
 import { useProjectStore } from '../../store/projectStore';
 import { useClientStore } from '../../store/clientStore';
+import { CurrencySelector } from '../ui/CurrencySelector';
+import { logger } from '../../lib/logger';
 
 interface AddReceivedPOModalProps {
   isOpen: boolean;
@@ -18,13 +20,16 @@ export const AddReceivedPOModal: React.FC<AddReceivedPOModalProps> = ({ isOpen, 
     projectId: '',
     projectCode: '',
     amount: '',
+    currency: 'MYR',
     receivedDate: new Date().toISOString().split('T')[0],
     dueDate: '',
     description: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [exchangeRate, setExchangeRate] = useState<number>(1.0);
+  const [convertedAmount, setConvertedAmount] = useState<number>(0);
   const { projects, fetchProjects } = useProjectStore();
-  const { clients, fetchClients } = useClientStore();
+  const { clients, fetchClients} = useClientStore();
 
   useEffect(() => {
     if (isOpen) {
@@ -32,6 +37,50 @@ export const AddReceivedPOModal: React.FC<AddReceivedPOModalProps> = ({ isOpen, 
       fetchProjects();
     }
   }, [isOpen, fetchClients, fetchProjects]);
+
+  // Fetch exchange rate when currency or amount changes
+  useEffect(() => {
+    const fetchRate = async () => {
+      if (formData.currency !== 'MYR' && formData.amount) {
+        try {
+          const result = await financeService.convertCurrency(
+            parseFloat(formData.amount),
+            formData.currency
+          );
+          setExchangeRate(result.rate);
+          setConvertedAmount(result.amountMYR);
+        } catch (error) {
+          logger.error('Failed to fetch exchange rate:', error);
+          setExchangeRate(1.0);
+          setConvertedAmount(parseFloat(formData.amount) || 0);
+        }
+      } else {
+        setExchangeRate(1.0);
+        setConvertedAmount(parseFloat(formData.amount) || 0);
+      }
+    };
+    fetchRate();
+  }, [formData.currency, formData.amount]);
+
+  // Auto-populate client when project is selected
+  useEffect(() => {
+    if (formData.projectId && projects.length > 0 && clients.length > 0) {
+      const selectedProject = projects.find(p => p.id === formData.projectId);
+      if (selectedProject && selectedProject.clientId) {
+        // Find the matching client
+        const matchingClient = clients.find(c => c.id === selectedProject.clientId);
+
+        // Only auto-populate if client isn't already set or is different
+        if (matchingClient && formData.clientId !== selectedProject.clientId) {
+          setFormData(prev => ({
+            ...prev,
+            clientId: selectedProject.clientId,
+            clientName: matchingClient.name || ''
+          }));
+        }
+      }
+    }
+  }, [formData.projectId, projects, clients]);
 
   if (!isOpen) return null;
 
@@ -46,19 +95,18 @@ export const AddReceivedPOModal: React.FC<AddReceivedPOModalProps> = ({ isOpen, 
     setIsSubmitting(true);
 
     try {
-      const response = await apiService.createPurchaseOrder({
+      const response = await financeService.createPurchaseOrder({
         poNumber: formData.poNumber,
-        clientId: formData.clientId,
         clientName: formData.clientName,
-        projectId: formData.projectId || undefined,
-        projectCode: formData.projectCode || undefined,
+        projectCode: formData.projectCode || '',
         amount: parseFloat(formData.amount),
+        currency: formData.currency,
         receivedDate: formData.receivedDate,
         dueDate: formData.dueDate || undefined,
         description: formData.description || undefined,
       });
 
-      console.log('PO created successfully:', response);
+      logger.debug('PO created successfully:', response);
 
       // Show appropriate success message
       if (response.projectStatusUpdated) {
@@ -83,12 +131,13 @@ export const AddReceivedPOModal: React.FC<AddReceivedPOModalProps> = ({ isOpen, 
         projectId: '',
         projectCode: '',
         amount: '',
+        currency: 'MYR',
         receivedDate: new Date().toISOString().split('T')[0],
         dueDate: '',
         description: '',
       });
     } catch (error: any) {
-      console.error('Failed to create PO:', error);
+      logger.error('Failed to create PO:', error);
       const errorMessage = error?.response?.data?.error || 'Failed to create purchase order';
       toast.error(errorMessage);
     } finally {
@@ -141,27 +190,19 @@ export const AddReceivedPOModal: React.FC<AddReceivedPOModalProps> = ({ isOpen, 
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Client Name <span className="text-red-500">*</span>
               </label>
-              <select
-                name="clientId"
-                value={formData.clientId}
-                onChange={(e) => {
-                  const selectedClient = clients.find(c => c.id === e.target.value);
-                  setFormData({
-                    ...formData,
-                    clientId: e.target.value,
-                    clientName: selectedClient?.name || ''
-                  });
-                }}
+              <input
+                type="text"
+                name="clientName"
+                value={formData.clientName}
+                readOnly
+                disabled
                 required
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              >
-                <option value="">Select a client</option>
-                {clients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.name}
-                  </option>
-                ))}
-              </select>
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed"
+                placeholder="Auto-filled from project"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Client is automatically selected based on the project
+              </p>
             </div>
 
             {/* Project Code */}
@@ -175,11 +216,24 @@ export const AddReceivedPOModal: React.FC<AddReceivedPOModalProps> = ({ isOpen, 
                 value={formData.projectId}
                 onChange={(e) => {
                   const selectedProject = projects.find(p => p.id === e.target.value);
-                  setFormData({
-                    ...formData,
-                    projectId: e.target.value,
-                    projectCode: selectedProject?.projectCode || ''
-                  });
+
+                  if (e.target.value === '') {
+                    // If clearing project, also clear client
+                    setFormData({
+                      ...formData,
+                      projectId: '',
+                      projectCode: '',
+                      clientId: '',
+                      clientName: ''
+                    });
+                  } else {
+                    setFormData({
+                      ...formData,
+                      projectId: e.target.value,
+                      projectCode: selectedProject?.projectCode || ''
+                      // Client will be auto-populated by useEffect
+                    });
+                  }
                 }}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
               >
@@ -194,22 +248,33 @@ export const AddReceivedPOModal: React.FC<AddReceivedPOModalProps> = ({ isOpen, 
               </select>
             </div>
 
-            {/* Amount */}
+            {/* Amount and Currency */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Amount (RM) <span className="text-red-500">*</span>
+                Amount <span className="text-red-500">*</span>
               </label>
-              <input
-                type="number"
-                name="amount"
-                value={formData.amount}
-                onChange={handleChange}
-                required
-                min="0"
-                step="0.01"
-                placeholder="0.00"
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  name="amount"
+                  value={formData.amount}
+                  onChange={handleChange}
+                  required
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                />
+                <CurrencySelector
+                  value={formData.currency}
+                  onChange={(currency) => setFormData({ ...formData, currency })}
+                />
+              </div>
+              {formData.currency !== 'MYR' && formData.amount && (
+                <p className="text-xs text-gray-600 mt-1">
+                  ≈ RM {convertedAmount.toFixed(2)} (Rate: {exchangeRate.toFixed(6)})
+                </p>
+              )}
             </div>
 
             {/* Received Date */}

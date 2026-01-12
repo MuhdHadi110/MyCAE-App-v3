@@ -2,12 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { Plus, Search, Filter, Trash2, FlaskConical, Eye, Edit } from 'lucide-react';
 import { useResearchStore } from '../store/researchStore';
 import { useTeamStore } from '../store/teamStore';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { AddResearchModal } from '../components/modals/AddResearchModal';
 import { EditResearchModal } from '../components/modals/EditResearchModal';
 import { getCurrentUser } from '../lib/auth';
 import { checkPermission, getPermissionMessage } from '../lib/permissions';
 import { toast } from 'react-hot-toast';
 import type { ResearchStatus, ResearchProject } from '../types/research.types';
+import { logger } from '../lib/logger';
 
 export const ResearchScreen: React.FC = () => {
   const { researchProjects, loading, fetchResearchProjects, deleteResearchProject, updateResearchProject } = useResearchStore();
@@ -22,6 +24,11 @@ export const ResearchScreen: React.FC = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ResearchProject | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    projectId?: string;
+    title?: string;
+  }>({ isOpen: false });
 
   useEffect(() => {
     fetchResearchProjects();
@@ -51,15 +58,24 @@ export const ResearchScreen: React.FC = () => {
       toast.error(getPermissionMessage('delete research project', 'senior-engineer'));
       return;
     }
-    if (confirm(`Are you sure you want to delete "${title}"?`)) {
-      try {
-        await deleteResearchProject(projectId);
-        toast.success(`Research project deleted successfully`);
-        fetchResearchProjects();
-      } catch (error) {
-        console.error('Failed to delete research project:', error);
-        toast.error('Failed to delete research project: ' + (error instanceof Error ? error.message : String(error)));
-      }
+    setConfirmDialog({
+      isOpen: true,
+      projectId,
+      title,
+    });
+  };
+
+  const confirmDeleteResearch = async () => {
+    if (!confirmDialog.projectId) return;
+
+    try {
+      await deleteResearchProject(confirmDialog.projectId);
+      toast.success('Research project deleted successfully');
+      fetchResearchProjects();
+      setConfirmDialog({ isOpen: false });
+    } catch (error) {
+      logger.error('Failed to delete research project:', error);
+      toast.error('Failed to delete research project');
     }
   };
 
@@ -78,14 +94,14 @@ export const ResearchScreen: React.FC = () => {
     switch (status) {
       case 'planning':
         return 'bg-blue-100 text-blue-800';
-      case 'active':
+      case 'in-progress':
         return 'bg-green-100 text-green-800';
-      case 'completed':
-        return 'bg-gray-100 text-gray-800';
       case 'on-hold':
         return 'bg-yellow-100 text-yellow-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
+      case 'completed':
+        return 'bg-gray-100 text-gray-800';
+      case 'archived':
+        return 'bg-purple-100 text-purple-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -93,16 +109,16 @@ export const ResearchScreen: React.FC = () => {
 
   const getStatusLabel = (status: ResearchStatus): string => {
     switch (status) {
-      case 'on-hold':
-        return 'On Hold';
       case 'planning':
         return 'Planning';
-      case 'active':
-        return 'Active';
+      case 'in-progress':
+        return 'In Progress';
+      case 'on-hold':
+        return 'On Hold';
       case 'completed':
         return 'Completed';
-      case 'cancelled':
-        return 'Cancelled';
+      case 'archived':
+        return 'Archived';
       default:
         return status;
     }
@@ -161,10 +177,10 @@ export const ResearchScreen: React.FC = () => {
                 >
                   <option value="all">All Status</option>
                   <option value="planning">Planning</option>
-                  <option value="active">Active</option>
-                  <option value="completed">Completed</option>
+                  <option value="in-progress">In Progress</option>
                   <option value="on-hold">On Hold</option>
-                  <option value="cancelled">Cancelled</option>
+                  <option value="completed">Completed</option>
+                  <option value="archived">Archived</option>
                 </select>
               </div>
             </div>
@@ -194,14 +210,14 @@ export const ResearchScreen: React.FC = () => {
             </div>
           </button>
           <button
-            onClick={() => setStatusFilter('active')}
+            onClick={() => setStatusFilter('in-progress')}
             className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-left transition-all hover:shadow-md hover:scale-105 ${
-              statusFilter === 'active' ? 'ring-2 ring-green-500 ring-offset-2' : ''
+              statusFilter === 'in-progress' ? 'ring-2 ring-green-500 ring-offset-2' : ''
             }`}
           >
-            <div className="text-sm font-medium text-gray-600 mb-2">Active</div>
+            <div className="text-sm font-medium text-gray-600 mb-2">In Progress</div>
             <div className="text-3xl font-bold text-green-600">
-              {researchProjects.filter((p) => p.status === 'active').length}
+              {researchProjects.filter((p) => p.status === 'in-progress').length}
             </div>
           </button>
           <button
@@ -411,11 +427,23 @@ export const ResearchScreen: React.FC = () => {
               fetchResearchProjects();
             } catch (error) {
               toast.error('Failed to update research project');
-              console.error('Update error:', error);
+              logger.error('Update error:', error);
             }
           }}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ isOpen: false })}
+        onConfirm={confirmDeleteResearch}
+        title="Delete Research Project"
+        message={`Are you sure you want to delete "${confirmDialog.title}"? This action cannot be undone.`}
+        variant="danger"
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
     </div>
   );
 };

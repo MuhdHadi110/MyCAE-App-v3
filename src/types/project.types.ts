@@ -2,6 +2,8 @@
  * Project Management Types
  */
 
+import { Contact } from './company.types';
+
 export type ProjectStatus = 'pre-lim' | 'ongoing' | 'on-hold' | 'open' | 'closed' | 'completed';
 export type WorkCategory = 'engineering' | 'project-management' | 'measurement-site' | 'measurement-office';
 
@@ -11,6 +13,8 @@ export interface Project {
   title: string;
   clientId: string;
   clientName?: string;
+  contactId?: string;
+  contact?: Contact; // populated with company data
   status: ProjectStatus;
   inquiryDate?: string;
   poReceivedDate?: string;
@@ -32,6 +36,7 @@ export interface Project {
   lastUpdated: string;
   leadEngineerId?: string;
   workTypes?: string[];
+  categories?: string[];
   teamMembers?: Array<{ memberId: string; hourlyRate: string; }>;
   type?: 'engineering' | 'research';
   researchCode?: string;

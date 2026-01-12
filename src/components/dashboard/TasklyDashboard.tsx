@@ -1,11 +1,8 @@
 import React, { useEffect, useMemo } from 'react';
 import {
-  TrendingUp,
-  TrendingDown,
   Clock,
   Target,
   CheckCircle2,
-  Activity,
   FolderOpen,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -25,6 +22,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
+import type { UserRole } from '../../types/auth.types';
 
 export const TasklyDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -32,7 +30,7 @@ export const TasklyDashboard: React.FC = () => {
   const { clients, fetchClients } = useClientStore();
   const [timeFilter, setTimeFilter] = React.useState<'daily' | 'weekly' | 'monthly'>('monthly');
   const [projectStatusFilter, setProjectStatusFilter] = React.useState<string>('all');
-  const roleInfo = getRoleInfo(user.role);
+  const roleInfo = getRoleInfo((user?.role || 'engineer') as UserRole);
 
   useEffect(() => {
     fetchProjects();
@@ -42,6 +40,7 @@ export const TasklyDashboard: React.FC = () => {
 
   // Calculate personal KPIs
   const kpis = useMemo(() => {
+    if (!user) return { myActiveProjects: 0, myTotalProjects: 0, prelimProjects: 0, completedProjects: 0, thisMonthHours: 0, completionRate: 0 };
     const myProjects = projects.filter((p) => p.engineerId === user.id);
     const myTimesheets = (Array.isArray(timesheets) ? timesheets : []).filter((ts) => ts.engineerId === user.id);
 
@@ -60,7 +59,7 @@ export const TasklyDashboard: React.FC = () => {
       thisMonthHours,
       completionRate,
     };
-  }, [projects, timesheets, user.id]);
+  }, [projects, timesheets, user?.id]);
 
   // Project color mapping for stacked bar chart
   const projectColors = useMemo(() => {
@@ -87,7 +86,8 @@ export const TasklyDashboard: React.FC = () => {
 
   // Activity data for personal chart - broken down by project
   const activityData = useMemo(() => {
-    const dataMap: Record<string, { label: string; [projectId: string]: number }> = {};
+    if (!user) return [];
+    const dataMap: Record<string, Record<string, string | number>> = {};
 
     const myTimesheets = (Array.isArray(timesheets) ? timesheets : []).filter((ts) => ts.engineerId === user.id);
 
@@ -117,14 +117,15 @@ export const TasklyDashboard: React.FC = () => {
       if (!dataMap[key][projectId]) {
         dataMap[key][projectId] = 0;
       }
-      dataMap[key][projectId] += parseFloat(ts.hours.toString() || '0');
+      dataMap[key][projectId] = (Number(dataMap[key][projectId]) || 0) + parseFloat(ts.hours.toString() || '0');
     });
 
-    return Object.values(dataMap).sort((a, b) => a.label.localeCompare(b.label));
-  }, [timesheets, user.id, timeFilter]);
+    return Object.values(dataMap).sort((a, b) => String(a.label).localeCompare(String(b.label)));
+  }, [timesheets, user?.id, timeFilter]);
 
   // Get unique projects from the data for creating Bar elements
   const uniqueProjects = useMemo(() => {
+    if (!user) return [];
     const projectIds = new Set<string>();
     const myTimesheets = (Array.isArray(timesheets) ? timesheets : []).filter((ts) => ts.engineerId === user.id);
 
@@ -138,11 +139,12 @@ export const TasklyDashboard: React.FC = () => {
         title: project?.title || 'Unknown Project'
       };
     });
-  }, [timesheets, projects, user.id]);
+  }, [timesheets, projects, user?.id]);
 
   // Work category distribution
   const workCategoryData = useMemo(() => {
-    const categoryTotals = {
+    if (!user) return [];
+    const categoryTotals: Record<string, number> = {
       engineering: 0,
       'project-management': 0,
       'measurement-site': 0,
@@ -183,25 +185,26 @@ export const TasklyDashboard: React.FC = () => {
         color: '#ea4335',
       },
     ].filter((item) => item.value > 0);
-  }, [timesheets, user.id]);
+  }, [timesheets, user?.id]);
 
   // Filter projects for this engineer
   const filteredProjects = useMemo(() => {
+    if (!user) return [];
     const myProjects = projects.filter((p) => p.engineerId === user.id);
     if (projectStatusFilter === 'all') {
       return myProjects;
     }
     return myProjects.filter((p) => p.status === projectStatusFilter);
-  }, [projects, user.id, projectStatusFilter]);
+  }, [projects, user?.id, projectStatusFilter]);
 
   return (
     <div className="min-h-full bg-gray-50 p-4 md:p-6 lg:p-8">
-      <div className="space-y-6">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header Container */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Welcome back, {user.name}!</h1>
+              <h1 className="text-3xl font-bold text-gray-900">Welcome back, {user?.name}!</h1>
               <p className="text-gray-600 text-sm mt-1">Your project assignments and progress overview.</p>
             </div>
             <span className="px-4 py-2 bg-cyan-50 text-primary-600 rounded-lg text-xs font-semibold border border-cyan-200">
@@ -211,9 +214,10 @@ export const TasklyDashboard: React.FC = () => {
         </div>
 
         {/* KPI Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* My Active Projects */}
-          <div className="bg-white rounded-lg p-5 border border-gray-200 hover:border-cyan-200 hover:shadow-sm transition-all">
+          <div className="bg-gray-50 rounded-lg p-5 border border-gray-100 hover:border-cyan-200 hover:shadow-sm transition-all">
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <p className="text-gray-600 text-sm font-medium">My Active Projects</p>
@@ -227,7 +231,7 @@ export const TasklyDashboard: React.FC = () => {
           </div>
 
           {/* Hours This Month */}
-          <div className="bg-white rounded-lg p-5 border border-gray-200 hover:border-cyan-200 hover:shadow-sm transition-all">
+          <div className="bg-gray-50 rounded-lg p-5 border border-gray-100 hover:border-cyan-200 hover:shadow-sm transition-all">
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <p className="text-gray-600 text-sm font-medium">Hours This Month</p>
@@ -241,7 +245,7 @@ export const TasklyDashboard: React.FC = () => {
           </div>
 
           {/* Completed Projects */}
-          <div className="bg-white rounded-lg p-5 border border-gray-200 hover:border-cyan-200 hover:shadow-sm transition-all">
+          <div className="bg-gray-50 rounded-lg p-5 border border-gray-100 hover:border-cyan-200 hover:shadow-sm transition-all">
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <p className="text-gray-600 text-sm font-medium">Completed</p>
@@ -255,7 +259,7 @@ export const TasklyDashboard: React.FC = () => {
           </div>
 
           {/* Completion Rate */}
-          <div className="bg-white rounded-lg p-5 border border-gray-200 hover:border-cyan-200 hover:shadow-sm transition-all">
+          <div className="bg-gray-50 rounded-lg p-5 border border-gray-100 hover:border-cyan-200 hover:shadow-sm transition-all">
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <p className="text-gray-600 text-sm font-medium">Completion Rate</p>
@@ -266,6 +270,7 @@ export const TasklyDashboard: React.FC = () => {
                 <Target className="w-6 h-6 text-purple-600" />
               </div>
             </div>
+          </div>
           </div>
         </div>
 
@@ -432,7 +437,7 @@ export const TasklyDashboard: React.FC = () => {
                 <tbody className="divide-y divide-gray-200">
                   {filteredProjects.map((project) => {
                     const client = clients.find((c) => c.id === project.clientId);
-                    const progress = project.plannedHours > 0 ? (project.actualHours / project.plannedHours) * 100 : 0;
+                    const progress = project.plannedHours > 0 ? ((project.actualHours || 0) / project.plannedHours) * 100 : 0;
 
                     return (
                       <tr key={project.id} className="hover:bg-gray-50 transition-colors">

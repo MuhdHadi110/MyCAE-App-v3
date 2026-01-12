@@ -1,0 +1,111 @@
+☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐
+MYCAETRACKER DEPLOYMENT CHECKLIST
+☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐☐
+
+BEFORE YOU START:
+☐ Have cPanel login ready (https://mycaetech.com:2083)
+☐ Have this deployment-package folder ready
+☐ Close any running XAMPP services
+
+═══════════════════════════════════════
+
+STEP 1: DATABASE (7 min)
+☐ Login to cPanel
+☐ Go to MySQL® Databases
+☐ Create database: mycae_tracker
+☐ Create user: mycae_user (save password!)
+☐ Add user to database (ALL PRIVILEGES)
+☐ Write down credentials below:
+
+   DB Name: _____________________
+   DB User: _____________________
+   DB Pass: _____________________
+
+☐ Go to phpMyAdmin
+☐ Select your database
+☐ Import → Choose mycae_tracker_backup.sql
+☐ Wait for success message
+
+═══════════════════════════════════════
+
+STEP 2: BACKEND (12 min)
+☐ File Manager → /home/username/
+☐ Create folder: mycaetracker-backend
+☐ Upload from backend/:
+  ☐ package.json
+  ☐ package-lock.json
+  ☐ dist/ (entire folder)
+
+☐ Create new file: .env
+☐ Edit .env with database credentials
+☐ Save .env file
+
+☐ Go to: Setup Node.js App
+☐ Create Application:
+  ☐ Node version: 18 or 20
+  ☐ Mode: Production
+  ☐ Root: mycaetracker-backend
+  ☐ Startup: dist/server.js
+☐ Click "Create"
+☐ Wait for app creation
+☐ Click "Run NPM Install"
+☐ Wait for install to complete (2-3 min)
+☐ Click "Restart"
+☐ Check status = "Running"
+
+═══════════════════════════════════════
+
+STEP 3: FRONTEND (7 min)
+☐ File Manager → /public_html/
+☐ Delete old files (keep cgi-bin/)
+☐ Upload ALL files from frontend/:
+  ☐ index.html
+  ☐ .htaccess
+  ☐ assets/ folder
+  ☐ favicon.svg
+  ☐ logo files
+  ☐ templates/ folder
+  ☐ vite.svg
+
+☐ Verify all files uploaded correctly
+
+═══════════════════════════════════════
+
+STEP 4: SSL & TEST (5 min)
+☐ Go to: SSL/TLS Status
+☐ Run AutoSSL
+☐ Wait for completion
+
+☐ Open: https://mycaetech.com
+☐ See login page?
+☐ Can login?
+☐ Pages load correctly?
+☐ Can view data?
+
+═══════════════════════════════════════
+
+✓ DEPLOYMENT COMPLETE!
+
+Time taken: _____ minutes
+
+═══════════════════════════════════════
+
+PROBLEMS?
+☐ Backend won't start
+  → Check Node.js App logs
+  → Verify .env credentials
+  → Click "Run NPM Install" again
+
+☐ CORS errors
+  → Node.js App → Restart
+  → Check .env CORS_ORIGINS
+
+☐ 404 errors
+  → Check .htaccess in /public_html/
+  → Check index.html is there
+
+☐ Database errors
+  → Double-check .env credentials
+  → Verify user has ALL PRIVILEGES
+
+═══════════════════════════════════════

@@ -1,15 +1,23 @@
+import type { InventoryAction } from './scheduledMaintenance.types';
+
 export interface MaintenanceTicket {
   id: string;
   title: string;
   itemId?: string;
   itemName?: string;
   description: string;
-  status: 'Pending' | 'In Progress' | 'Completed' | 'Cancelled';
-  priority: 'Low' | 'Medium' | 'High' | 'Urgent';
+  status: 'open' | 'in-progress' | 'resolved' | 'closed';
+  priority: 'low' | 'medium' | 'high' | 'critical';
   assignedTo?: string;
   createdDate: string;
   completedDate?: string;
   category: string;
+  // Inventory tracking fields
+  scheduledMaintenanceId?: string;
+  inventoryAction?: InventoryAction;
+  quantityAffected?: number;
+  quantityDeducted?: number;
+  inventoryRestored?: boolean;
 }
 
 export interface MaintenanceFilters {

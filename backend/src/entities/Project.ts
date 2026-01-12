@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { User } from './User';
+import { Contact } from './Contact';
 
 export enum ProjectStatus {
   PRE_LIM = 'pre-lim',
@@ -30,6 +31,13 @@ export class Project {
 
   @Column({ type: 'varchar', length: 36 })
   client_id: string;
+
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  contact_id?: string;
+
+  @ManyToOne(() => Contact)
+  @JoinColumn({ name: 'contact_id' })
+  contact?: Contact;
 
   @Column({
     type: 'enum',

@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Search, Mail, Phone, Award, Briefcase, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Search, Mail, Phone, Award, Briefcase, Edit2, Trash2, RefreshCw } from 'lucide-react';
 import { useTeamStore } from '../store/teamStore';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { getCurrentUser } from '../lib/auth';
 import { getPermissions } from '../lib/permissions';
 import { AddTeamMemberModal } from '../components/modals/AddTeamMemberModal';
 import { EditTeamMemberModal } from '../components/modals/EditTeamMemberModal';
 import { toast } from 'react-hot-toast';
-import type { UserRole, Department } from '../types/team.types';
+import type { UserRole } from '../types/team.types';
+import { getAvatarPath } from '../constants/avatars';
 
 const formatRole = (role: UserRole): string => {
   const roleMap: Record<UserRole, string> = {
@@ -21,20 +23,28 @@ const formatRole = (role: UserRole): string => {
 };
 
 export const TeamScreen: React.FC = () => {
-  const { teamMembers, fetchTeamMembers, deleteTeamMember } = useTeamStore();
+  const { teamMembers, fetchTeamMembers, deleteTeamMember, reactivateTeamMember } = useTeamStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState<any | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    action?: 'deactivate' | 'reactivate';
+    memberName?: string;
+    memberId?: string;
+  }>({ isOpen: false });
 
   const currentUser = getCurrentUser();
   const userRole = (currentUser?.role || 'engineer') as UserRole;
-  const permissions = getPermissions(userRole);
+  const userRoles = (currentUser?.roles || [userRole]) as UserRole[];
+  const permissions = getPermissions(userRoles);
 
   useEffect(() => {
-    fetchTeamMembers();
-  }, [fetchTeamMembers]);
+    fetchTeamMembers({ status: statusFilter === 'all' ? undefined : statusFilter });
+  }, [fetchTeamMembers, statusFilter]);
 
   const handleAddTeamMember = () => {
     if (!permissions.canAddTeamMember) {
@@ -72,19 +82,44 @@ export const TeamScreen: React.FC = () => {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Are you sure you want to deactivate ${member?.name || 'this team member'}? This will mark them as inactive.`
-    );
+    setConfirmDialog({
+      isOpen: true,
+      action: 'deactivate',
+      memberName: member?.name,
+      memberId: member.id,
+    });
+  };
 
-    if (!confirmed) return;
+  const confirmAction = async () => {
+    if (!confirmDialog.memberId || !confirmDialog.action) return;
 
     try {
-      await deleteTeamMember(member.id);
-      toast.success(`${member?.name || 'Team member'} has been deactivated successfully`);
-      fetchTeamMembers();
+      if (confirmDialog.action === 'deactivate') {
+        await deleteTeamMember(confirmDialog.memberId);
+        toast.success(`${confirmDialog.memberName || 'Team member'} has been deactivated successfully`);
+      } else if (confirmDialog.action === 'reactivate') {
+        await reactivateTeamMember(confirmDialog.memberId);
+        toast.success(`${confirmDialog.memberName || 'Team member'} has been reactivated successfully`);
+      }
+      fetchTeamMembers({ status: statusFilter === 'all' ? undefined : statusFilter });
+      setConfirmDialog({ isOpen: false });
     } catch (error) {
-      toast.error('Failed to deactivate team member');
+      toast.error(`Failed to ${confirmDialog.action} team member`);
     }
+  };
+
+  const handleReactivateTeamMember = async (member: any) => {
+    if (!permissions.canDeleteTeamMember) {
+      toast.error('You do not have permission to reactivate team members');
+      return;
+    }
+
+    setConfirmDialog({
+      isOpen: true,
+      action: 'reactivate',
+      memberName: member?.name,
+      memberId: member.id,
+    });
   };
 
   const filteredMembers = teamMembers.filter((member) => {
@@ -141,7 +176,7 @@ export const TeamScreen: React.FC = () => {
 
       {/* Filters */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Search */}
           <div className="relative">
             <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -167,6 +202,19 @@ export const TeamScreen: React.FC = () => {
               <option value="principal-engineer">Principal Engineers</option>
               <option value="manager">Managers</option>
               <option value="managing-director">Managing Directors</option>
+            </select>
+          </div>
+
+          {/* Status Filter */}
+          <div>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as 'active' | 'inactive' | 'all')}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            >
+              <option value="active">Active Members</option>
+              <option value="inactive">Inactive Members</option>
+              <option value="all">All Members</option>
             </select>
           </div>
         </div>
@@ -217,20 +265,30 @@ export const TeamScreen: React.FC = () => {
             <div className="p-6">
               {/* Avatar and Role */}
               <div className="flex items-start gap-4 mb-4">
-                <img
-                  src={member.avatar}
-                  alt={member.name}
-                  className="w-16 h-16 rounded-full"
-                />
+                <div className="relative">
+                  <img
+                    src={getAvatarPath(member.avatar || 'male-01')}
+                    alt={member.name}
+                    className={`w-16 h-16 rounded-full ${member.status === 'inactive' ? 'opacity-50 grayscale' : ''}`}
+                  />
+                  {member.status === 'inactive' && (
+                    <div className="absolute -bottom-1 -right-1 bg-gray-500 text-white text-xs px-2 py-0.5 rounded-full">
+                      Inactive
+                    </div>
+                  )}
+                </div>
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-gray-900">{member.name}</h3>
-                  <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeColor(
-                      member.role
-                    )} mt-1`}
-                  >
-                    {formatRole(member.role)}
-                  </span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {(member.roles || [member.role]).map((role) => (
+                      <span
+                        key={role}
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeColor(role)}`}
+                      >
+                        {formatRole(role)}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -306,23 +364,39 @@ export const TeamScreen: React.FC = () => {
 
               {/* Action Buttons */}
               <div className="mt-4 flex gap-2">
-                {permissions.canEditTeamMember && (
-                  <button
-                    onClick={() => handleEditTeamMember(member)}
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                    Edit
-                  </button>
-                )}
-                {permissions.canDeleteTeamMember && (
-                  <button
-                    onClick={() => handleDeleteTeamMember(member)}
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Delete
-                  </button>
+                {member.status === 'active' ? (
+                  <>
+                    {permissions.canEditTeamMember && (
+                      <button
+                        onClick={() => handleEditTeamMember(member)}
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                        Edit
+                      </button>
+                    )}
+                    {permissions.canDeleteTeamMember && (
+                      <button
+                        onClick={() => handleDeleteTeamMember(member)}
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Deactivate
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {permissions.canDeleteTeamMember && (
+                      <button
+                        onClick={() => handleReactivateTeamMember(member)}
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors text-sm font-medium"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        Reactivate
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -366,6 +440,22 @@ export const TeamScreen: React.FC = () => {
           }}
         />
       )}
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ isOpen: false })}
+        onConfirm={confirmAction}
+        title={confirmDialog.action === 'deactivate' ? 'Deactivate Team Member' : 'Reactivate Team Member'}
+        message={
+          confirmDialog.action === 'deactivate'
+            ? `Are you sure you want to deactivate ${confirmDialog.memberName || 'this team member'}? This will mark them as inactive.`
+            : `Are you sure you want to reactivate ${confirmDialog.memberName || 'this team member'}?`
+        }
+        variant={confirmDialog.action === 'deactivate' ? 'warning' : 'info'}
+        confirmText={confirmDialog.action === 'deactivate' ? 'Deactivate' : 'Reactivate'}
+        cancelText="Cancel"
+      />
       </div>
     </div>
   );

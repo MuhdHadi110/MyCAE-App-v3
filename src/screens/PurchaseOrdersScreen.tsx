@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Plus, DollarSign, FileText, Trash2, Edit2, X, Download, Upload } from 'lucide-react';
 import { getCurrentUser } from '../lib/auth';
 import { checkPermission, getRoleInfo } from '../lib/permissions';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import toast from 'react-hot-toast';
 import { usePurchaseOrderStore, PurchaseOrder } from '../store/purchaseOrderStore';
 import { useProjectStore } from '../store/projectStore';
 import { useClientStore } from '../store/clientStore';
-import apiService from '../services/api.service';
+import financeService from '../services/api.service';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import type { PurchaseOrder as IPurchaseOrder } from '../store/purchaseOrderStore';
@@ -23,6 +24,11 @@ export const PurchaseOrdersScreen: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedPO, setSelectedPO] = useState<IPurchaseOrder | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    poId?: string;
+    poNumber?: string;
+  }>({ isOpen: false });
 
   useEffect(() => {
     fetchPurchaseOrders();
@@ -81,10 +87,22 @@ export const PurchaseOrdersScreen: React.FC = () => {
       toast.error('You do not have permission to delete purchase orders');
       return;
     }
-    if (confirm(`Are you sure you want to delete PO ${poNumber}?`)) {
-      deletePurchaseOrder(id)
-        .then(() => toast.success('Purchase order deleted successfully'))
-        .catch(() => toast.error('Failed to delete purchase order'));
+    setConfirmDialog({
+      isOpen: true,
+      poId: id,
+      poNumber,
+    });
+  };
+
+  const confirmDeletePO = async () => {
+    if (!confirmDialog.poId) return;
+
+    try {
+      await deletePurchaseOrder(confirmDialog.poId);
+      toast.success('Purchase order deleted successfully');
+      setConfirmDialog({ isOpen: false });
+    } catch {
+      toast.error('Failed to delete purchase order');
     }
   };
 
@@ -306,6 +324,18 @@ export const PurchaseOrdersScreen: React.FC = () => {
           }}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ isOpen: false })}
+        onConfirm={confirmDeletePO}
+        title="Delete Purchase Order"
+        message={`Are you sure you want to delete PO ${confirmDialog.poNumber}? This action cannot be undone.`}
+        variant="danger"
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
     </div>
   );
 };
@@ -358,7 +388,7 @@ const CreateEditPOModal: React.FC<CreateEditPOModalProps> = ({ isOpen, po, onClo
         uploadFormData.append('file', selectedFile);
         uploadFormData.append('projectCode', formData.projectCode);
 
-        const uploadResponse = await apiService.uploadPurchaseOrderFile(uploadFormData);
+        const uploadResponse = await financeService.uploadPurchaseOrderFile(uploadFormData);
         fileUrl = uploadResponse.fileUrl;
       }
 

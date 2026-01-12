@@ -1,6 +1,6 @@
-import { Entity, PrimaryColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
-import { Project } from './Project';
+import { Entity, PrimaryColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, BeforeInsert } from 'typeorm';
 import { User } from './User';
+import { v4 as uuidv4 } from 'uuid';
 
 @Entity('research_projects')
 export class ResearchProject {
@@ -10,45 +10,78 @@ export class ResearchProject {
   @Column('varchar', { length: 255 })
   title: string;
 
-  @Column('text', { nullable: true })
-  description: string;
-
-  @Column('varchar', { length: 20 })
-  status: 'planning' | 'active' | 'completed' | 'on-hold' | 'cancelled';
-
-  @Column('datetime')
-  startDate: Date;
-
-  @Column('datetime', { nullable: true })
-  endDate: Date;
-
-  @Column('varchar', { length: 36 })
-  leadResearcherId: string;
-
-  @Column('simple-array', { nullable: true })
-  teamMembers: string[];
-
-  @Column('decimal', { precision: 10, scale: 2, nullable: true })
-  budget: number;
-
-  @Column('decimal', { precision: 10, scale: 2, nullable: true })
-  actualSpend: number;
+  @Column('varchar', { name: 'research_code', length: 100, nullable: true })
+  researchCode: string | null;
 
   @Column('text', { nullable: true })
-  findings: string;
+  description: string | null;
 
-  @Column('varchar', { length: 50, nullable: true })
-  researchCode: string;
+  @Column('varchar', { name: 'lead_researcher_id', length: 36, nullable: true })
+  leadResearcherId: string | null;
 
-  @Column('decimal', { precision: 10, scale: 2, default: 0 })
-  plannedHours: number;
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'lead_researcher_id' })
+  leadResearcher: User;
 
-  @Column('decimal', { precision: 10, scale: 2, default: 0 })
-  totalHoursLogged: number;
+  @Column({
+    type: 'enum',
+    enum: ['planning', 'in-progress', 'on-hold', 'completed', 'archived'],
+    default: 'planning'
+  })
+  status: 'planning' | 'in-progress' | 'on-hold' | 'completed' | 'archived';
 
-  @CreateDateColumn()
-  createdDate: Date;
+  @Column('datetime', { name: 'start_date', nullable: true })
+  startDate: Date | null;
 
-  @UpdateDateColumn()
-  lastUpdated: Date;
+  @Column('datetime', { name: 'planned_end_date', nullable: true })
+  plannedEndDate: Date | null;
+
+  @Column('datetime', { name: 'actual_end_date', nullable: true })
+  actualEndDate: Date | null;
+
+  @Column('varchar', { length: 255, nullable: true })
+  budget: string | null;
+
+  @Column('varchar', { name: 'funding_source', length: 255, nullable: true })
+  fundingSource: string | null;
+
+  @Column('varchar', { length: 255, nullable: true })
+  category: string | null;
+
+  @Column('text', { nullable: true })
+  objectives: string | null;
+
+  @Column('text', { nullable: true })
+  methodology: string | null;
+
+  @Column('text', { nullable: true })
+  findings: string | null;
+
+  @Column('text', { nullable: true })
+  publications: string | null;
+
+  @Column('text', { name: 'team_members', nullable: true })
+  teamMembers: string | null;
+
+  @Column('text', { nullable: true })
+  collaborators: string | null;
+
+  @Column('text', { name: 'equipment_used', nullable: true })
+  equipmentUsed: string | null;
+
+  @Column('text', { nullable: true })
+  notes: string | null;
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
+
+  @BeforeInsert()
+  generateId() {
+    if (!this.id) {
+      this.id = uuidv4();
+    }
+  }
 }

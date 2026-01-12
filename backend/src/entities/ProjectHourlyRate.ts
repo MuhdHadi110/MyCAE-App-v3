@@ -8,14 +8,14 @@ export class ProjectHourlyRate {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column('varchar')
   projectId: string;
 
   @ManyToOne(() => Project, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'projectId' })
   project: Project;
 
-  @Column()
+  @Column('varchar')
   teamMemberId: string;
 
   @ManyToOne(() => TeamMember, { onDelete: 'CASCADE' })

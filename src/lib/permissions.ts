@@ -26,8 +26,10 @@ export interface RolePermissions {
   canAccessFinance: boolean;
   canUploadPO: boolean;
   canApproveInvoices: boolean;
+  canEditInvoices: boolean;
   canViewManHourCost: boolean;
   canViewAnalytics: boolean;
+  canManageProjectRates: boolean;
 }
 
 /**
@@ -64,8 +66,10 @@ const getPermissionsForRole = (role: UserRole): RolePermissions => {
       canAccessFinance: true,
       canUploadPO: true,
       canApproveInvoices: true,
+      canEditInvoices: true,
       canViewManHourCost: true,
       canViewAnalytics: true,
+      canManageProjectRates: true,
     };
   }
 
@@ -79,10 +83,10 @@ const getPermissionsForRole = (role: UserRole): RolePermissions => {
     canAddTimesheet: level >= ROLE_HIERARCHY.engineer, // Level 1+
     canExportTimesheet: level >= ROLE_HIERARCHY['senior-engineer'], // Level 2+
 
-    // Team - Senior Engineer, Principal Engineer, Manager (all Level 2) can manage teams
-    canAddTeamMember: level >= ROLE_HIERARCHY['senior-engineer'], // Level 2+ (Senior Engineer, Principal Engineer, Manager)
-    canEditTeamMember: level >= ROLE_HIERARCHY['senior-engineer'], // Level 2+ (Senior Engineer, Principal Engineer, Manager)
-    canDeleteTeamMember: level >= ROLE_HIERARCHY['senior-engineer'], // Level 2+ (Senior Engineer, Principal Engineer, Manager)
+    // Team - Principal Engineer, Manager, and Managing Director can manage teams
+    canAddTeamMember: level >= ROLE_HIERARCHY['principal-engineer'], // Level 2.5+ (Principal Engineer, Manager, Managing Director)
+    canEditTeamMember: level >= ROLE_HIERARCHY['principal-engineer'], // Level 2.5+ (Principal Engineer, Manager, Managing Director)
+    canDeleteTeamMember: level >= ROLE_HIERARCHY['principal-engineer'], // Level 2.5+ (Principal Engineer, Manager, Managing Director)
 
     // Inventory & Equipment
     canAddOrRemoveInventory: level >= ROLE_HIERARCHY.engineer, // Level 1+
@@ -95,14 +99,40 @@ const getPermissionsForRole = (role: UserRole): RolePermissions => {
     canAccessFinance: level >= ROLE_HIERARCHY['senior-engineer'], // Level 2+
     canUploadPO: level >= ROLE_HIERARCHY['senior-engineer'], // Level 2+
     canApproveInvoices: level >= ROLE_HIERARCHY['managing-director'], // Level 3+ (Only Managing Director and Admin)
+    canEditInvoices: level >= ROLE_HIERARCHY['senior-engineer'], // Level 2+ (Senior Engineer and above)
     canViewManHourCost: level >= ROLE_HIERARCHY['senior-engineer'], // Level 2+
     canViewAnalytics: level >= ROLE_HIERARCHY['senior-engineer'], // Level 2+
+    canManageProjectRates: level >= ROLE_HIERARCHY['senior-engineer'], // Level 2+ (Senior Engineer, Principal Engineer, Manager, Managing Director, Admin)
   };
 };
 
 /**
+ * Get the highest role from a list of roles
+ */
+const getHighestRole = (roles: UserRole[]): UserRole => {
+  if (roles.length === 0) return 'engineer';
+
+  // If user has admin role, that's always the highest
+  if (roles.includes('admin')) return 'admin';
+
+  // Find the role with the highest level
+  let highestRole = roles[0];
+  let highestLevel = ROLE_HIERARCHY[highestRole] || 0;
+
+  for (const role of roles) {
+    const level = ROLE_HIERARCHY[role] || 0;
+    if (level > highestLevel) {
+      highestLevel = level;
+      highestRole = role;
+    }
+  }
+
+  return highestRole;
+};
+
+/**
  * Get permissions for a single or multiple roles
- * If multiple roles are provided, combines all permissions (OR logic)
+ * If multiple roles are provided, uses the highest role's permissions
  */
 export const getPermissions = (roles: UserRole | UserRole[]): RolePermissions => {
   const roleArray = Array.isArray(roles) ? roles : [roles];
@@ -111,36 +141,9 @@ export const getPermissions = (roles: UserRole | UserRole[]): RolePermissions =>
     return getPermissionsForRole('engineer');
   }
 
-  // If user has admin role, grant all permissions
-  if (roleArray.includes('admin')) {
-    return getPermissionsForRole('admin');
-  }
-
-  // Get permissions for each role and combine them with OR logic
-  const allPermissions = roleArray.map(role => getPermissionsForRole(role));
-
-  const combined: RolePermissions = {
-    canAddProject: allPermissions.some(p => p.canAddProject),
-    canAddResearch: allPermissions.some(p => p.canAddResearch),
-    canAddBusinessContact: allPermissions.some(p => p.canAddBusinessContact),
-    canAddTimesheet: allPermissions.some(p => p.canAddTimesheet),
-    canExportTimesheet: allPermissions.some(p => p.canExportTimesheet),
-    canAddTeamMember: allPermissions.some(p => p.canAddTeamMember),
-    canEditTeamMember: allPermissions.some(p => p.canEditTeamMember),
-    canDeleteTeamMember: allPermissions.some(p => p.canDeleteTeamMember),
-    canAddOrRemoveInventory: allPermissions.some(p => p.canAddOrRemoveInventory),
-    canAddMaintenanceDates: allPermissions.some(p => p.canAddMaintenanceDates),
-    canAddOrRemovePC: allPermissions.some(p => p.canAddOrRemovePC),
-    canCheckoutEquipment: allPermissions.some(p => p.canCheckoutEquipment),
-    canAssignPC: allPermissions.some(p => p.canAssignPC),
-    canAccessFinance: allPermissions.some(p => p.canAccessFinance),
-    canUploadPO: allPermissions.some(p => p.canUploadPO),
-    canApproveInvoices: allPermissions.some(p => p.canApproveInvoices),
-    canViewManHourCost: allPermissions.some(p => p.canViewManHourCost),
-    canViewAnalytics: allPermissions.some(p => p.canViewAnalytics),
-  };
-
-  return combined;
+  // Use the highest role's permissions
+  const highestRole = getHighestRole(roleArray);
+  return getPermissionsForRole(highestRole);
 };
 
 export const getRoleInfo = (role: UserRole) => {
@@ -186,7 +189,7 @@ export const getRoleInfo = (role: UserRole) => {
   return roleInfo[role];
 };
 
-export const getPermissionMessage = (action: string, requiredRole: UserRole): string => {
+export const getPermissionMessage = (_action: string, requiredRole: UserRole): string => {
   const roleInfo = getRoleInfo(requiredRole);
   return `This action requires ${roleInfo.label} level or higher. Please contact your manager if you need access.`;
 };

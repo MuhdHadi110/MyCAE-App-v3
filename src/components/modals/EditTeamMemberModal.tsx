@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import { X, User, Mail, Phone, Briefcase, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import apiService from '../../services/api.service';
+import teamService from '../../services/api.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTeamStore } from '../../store/teamStore';
 import { checkPermission } from '../../lib/permissions';
 import type { UserRole, Department } from '../../types/team.types';
+import { AvatarPicker } from '../ui/AvatarPicker';
+import { getAvatarPath } from '../../constants/avatars';
+import { logger } from '../../lib/logger';
 
 interface EditTeamMemberModalProps {
   isOpen: boolean;
@@ -21,6 +24,7 @@ interface EditTeamMemberModalProps {
     roles?: UserRole[];
     department: Department;
     user_id?: string;
+    avatar?: string;
   };
 }
 
@@ -37,8 +41,9 @@ export const EditTeamMemberModal: React.FC<EditTeamMemberModalProps> = ({
     name: initialData?.name || '',
     email: initialData?.email || '',
     phone: initialData?.phone || '',
-    role: (initialData?.role || 'engineer') as UserRole,
+    roles: (initialData?.roles || [initialData?.role || 'engineer']) as UserRole[],
     department: (initialData?.department || 'engineering') as Department,
+    avatar: initialData?.avatar || 'male-01',
   });
   const [loading, setLoading] = useState(false);
   const [canEdit, setCanEdit] = useState(true);
@@ -46,33 +51,40 @@ export const EditTeamMemberModal: React.FC<EditTeamMemberModalProps> = ({
 
   useEffect(() => {
     if (initialData && isOpen) {
-      console.log('=== EditTeamMemberModal initializing with data ===');
-      console.log('Initial Data:', initialData);
-      console.log('Team Member ID:', teamMemberId);
+      logger.debug('EditTeamMemberModal initializing with data');
+      logger.debug('Initial Data:', initialData);
+      logger.debug('Team Member ID:', teamMemberId);
 
       const newFormData = {
         name: initialData.name || '',
         email: initialData.email || '',
         phone: initialData.phone || '',
-        role: initialData.role || 'engineer',
+        roles: initialData.roles || [initialData.role || 'engineer'],
         department: initialData.department || 'engineering',
+        avatar: initialData.avatar || 'male-01',
       };
-      console.log('Setting form data to:', newFormData);
+      logger.debug('Setting form data to:', newFormData);
       setFormData(newFormData);
 
-      // Check if user has permission to edit this team member
-      const canEditTeamMember = checkPermission(user?.role || 'engineer', 'canEditTeamMember');
+      // Check if user is editing their own profile
+      const isEditingSelf = initialData.user_id === user?.id || initialData.email === user?.email;
 
-      if (!canEditTeamMember) {
-        setCanEdit(false);
-        setPermissionError('You do not have permission to edit team members');
-      } else if (user?.role === 'senior-engineer' && initialData.department !== user?.department) {
-        // Senior engineers can only edit members in their own department
-        setCanEdit(false);
-        setPermissionError('Senior Engineers can only edit team members in their own department');
-      } else {
+      // Everyone can edit their own profile
+      if (isEditingSelf) {
         setCanEdit(true);
         setPermissionError('');
+      } else {
+        // Check if user has permission to edit other team members
+        // Only Manager, Managing Director, and Admin can edit team members
+        const canEditTeamMember = checkPermission(user?.role || 'engineer', 'canEditTeamMember');
+
+        if (!canEditTeamMember) {
+          setCanEdit(false);
+          setPermissionError('Only Principal Engineers, Managers, Managing Directors, and Admins can edit team members');
+        } else {
+          setCanEdit(true);
+          setPermissionError('');
+        }
       }
     }
   }, [initialData, user, isOpen]);
@@ -93,15 +105,8 @@ export const EditTeamMemberModal: React.FC<EditTeamMemberModalProps> = ({
     setLoading(true);
 
     try {
-      console.log('=== EDIT TEAM MEMBER START ===');
-      console.log('Team Member ID:', teamMemberId);
-      console.log('Form Data being sent:', {
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        role: formData.role,
-        department: formData.department,
-      });
+      logger.debug('EDIT TEAM MEMBER START');
+      logger.debug('Team Member ID:', teamMemberId);
 
       if (!teamMemberId) {
         toast.error('Team member ID is missing');
@@ -109,38 +114,51 @@ export const EditTeamMemberModal: React.FC<EditTeamMemberModalProps> = ({
         return;
       }
 
-      // Call the store method instead of API directly
-      await updateTeamMember(teamMemberId, {
+      // Check if user is editing their own profile
+      const isEditingSelf = initialData?.user_id === user?.id || initialData?.email === user?.email;
+
+      // Build update payload - exclude roles if editing self
+      const updatePayload: any = {
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
-        role: formData.role,
         department: formData.department,
-      });
+        avatar: formData.avatar,
+      };
 
-      console.log('Team member updated successfully');
+      // Only include roles if NOT editing self
+      if (!isEditingSelf) {
+        updatePayload.roles = formData.roles;
+      }
+
+      logger.debug('Form Data being sent:', updatePayload);
+      logger.debug('Is editing self:', isEditingSelf);
+
+      // Call the store method instead of API directly
+      await updateTeamMember(teamMemberId, updatePayload);
+
+      logger.debug('Team member updated successfully');
 
       toast.success('Team member updated successfully!');
       onClose();
 
       // Call onSuccess callback to refresh the list
       if (onSuccess) {
-        console.log('Calling onSuccess callback');
+        logger.debug('Calling onSuccess callback');
         onSuccess();
       }
-      console.log('=== EDIT TEAM MEMBER END ===');
+      logger.debug('EDIT TEAM MEMBER END');
     } catch (error: any) {
-      console.log('=== ERROR IN EDIT TEAM MEMBER ===');
-      console.error('Full error object:', error);
-      console.error('Error response:', error?.response);
-      console.error('Error response data:', error?.response?.data);
+      logger.error('Error in edit team member:', error);
+      logger.error('Error response:', error?.response);
+      logger.error('Error response data:', error?.response?.data);
 
       const errorMessage = error?.response?.data?.error ||
                           (Array.isArray(error?.response?.data?.errors) ?
                             error.response.data.errors[0]?.msg : '') ||
                           error?.message ||
                           'Failed to update team member';
-      console.error('Error updating team member:', errorMessage);
+      logger.error('Error updating team member:', errorMessage);
       toast.error(errorMessage);
     } finally {
       setLoading(false);
@@ -168,9 +186,7 @@ export const EditTeamMemberModal: React.FC<EditTeamMemberModalProps> = ({
               <div>
                 <p className="text-sm font-medium text-red-800">{permissionError}</p>
                 <p className="text-xs text-red-700 mt-1">
-                  {user?.role === 'senior-engineer'
-                    ? 'Senior Engineers can only edit team members within their department'
-                    : 'Contact a Manager or Admin to make changes'}
+                  Contact a Principal Engineer, Manager, Managing Director, or Admin to make changes
                 </p>
               </div>
             </div>
@@ -191,6 +207,17 @@ export const EditTeamMemberModal: React.FC<EditTeamMemberModalProps> = ({
                   disabled={!canEdit || loading}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                   required
+                />
+              </div>
+
+              {/* Avatar Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Profile Avatar
+                </label>
+                <AvatarPicker
+                  selectedAvatar={formData.avatar}
+                  onSelect={(avatarId) => setFormData({ ...formData, avatar: avatarId })}
                 />
               </div>
 
@@ -229,21 +256,43 @@ export const EditTeamMemberModal: React.FC<EditTeamMemberModalProps> = ({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Role
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Roles <span className="text-gray-500 text-xs">(Select one or more)</span>
                   </label>
-                  <select
-                    value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
-                    disabled={!canEdit || loading}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  >
-                    <option value="engineer">Engineer</option>
-                    <option value="senior-engineer">Senior Engineer</option>
-                    <option value="principal-engineer">Principal Engineer</option>
-                    <option value="manager">Manager</option>
-                    <option value="managing-director">Managing Director</option>
-                  </select>
+                  <div className="space-y-2">
+                    {[
+                      { value: 'engineer', label: 'Engineer' },
+                      { value: 'senior-engineer', label: 'Senior Engineer' },
+                      { value: 'principal-engineer', label: 'Principal Engineer' },
+                      { value: 'manager', label: 'Manager' },
+                      { value: 'managing-director', label: 'Managing Director' },
+                      { value: 'admin', label: 'Admin' },
+                    ].map((roleOption) => (
+                      <label key={roleOption.value} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.roles.includes(roleOption.value as UserRole)}
+                          onChange={(e) => {
+                            const roleValue = roleOption.value as UserRole;
+                            if (e.target.checked) {
+                              setFormData({ ...formData, roles: [...formData.roles, roleValue] });
+                            } else {
+                              // Don't allow removing the last role
+                              if (formData.roles.length > 1) {
+                                setFormData({ ...formData, roles: formData.roles.filter(r => r !== roleValue) });
+                              }
+                            }
+                          }}
+                          disabled={!canEdit || loading || (formData.roles.length === 1 && formData.roles.includes(roleOption.value as UserRole))}
+                          className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        />
+                        <span className={`text-sm ${!canEdit || loading ? 'text-gray-400' : 'text-gray-700'}`}>
+                          {roleOption.label}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">At least one role must be selected</p>
                 </div>
 
                 <div>

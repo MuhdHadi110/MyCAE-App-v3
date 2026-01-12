@@ -229,3 +229,108 @@ export function getFieldError(errors: Record<string, string[]>, fieldName: strin
 export function hasErrors(errors: Record<string, string[]>): boolean {
   return Object.keys(errors).length > 0;
 }
+
+// ==================== Real-Time Validation Helpers ====================
+
+/**
+ * Real-time validation result type
+ */
+export interface ValidationResult {
+  isValid: boolean;
+  error?: string;
+  success?: string;
+}
+
+/**
+ * Email validator for real-time validation
+ */
+export const validateEmailRealtime = (email: string): ValidationResult => {
+  if (!email || email.trim() === '') {
+    return { isValid: false, error: 'Email is required' };
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return { isValid: false, error: 'Please enter a valid email address' };
+  }
+
+  return { isValid: true, success: 'Valid email' };
+};
+
+/**
+ * Password validator for real-time validation
+ */
+export const validatePasswordRealtime = (password: string): ValidationResult => {
+  if (!password || password.trim() === '') {
+    return { isValid: false, error: 'Password is required' };
+  }
+
+  if (password.length < 6) {
+    return { isValid: false, error: 'Password must be at least 6 characters' };
+  }
+
+  if (password.length < 8) {
+    return { isValid: true, error: 'Consider using 8+ characters for better security' };
+  }
+
+  return { isValid: true, success: 'Strong password' };
+};
+
+/**
+ * Project code validator (J2XXXX format)
+ */
+export const validateProjectCodeRealtime = (code: string): ValidationResult => {
+  if (!code || code.trim() === '') {
+    return { isValid: false, error: 'Project code is required' };
+  }
+
+  const projectCodeRegex = /^J\d{5}$/;
+  if (!projectCodeRegex.test(code)) {
+    return { isValid: false, error: 'Format: J2XXXX (e.g., J25001)' };
+  }
+
+  return { isValid: true, success: 'Valid project code' };
+};
+
+/**
+ * Required field validator
+ */
+export const validateRequiredRealtime = (value: string, fieldName: string = 'This field'): ValidationResult => {
+  if (!value || value.trim() === '') {
+    return { isValid: false, error: `${fieldName} is required` };
+  }
+
+  return { isValid: true };
+};
+
+/**
+ * Phone number validator for real-time validation
+ */
+export const validatePhoneRealtime = (phone: string): ValidationResult => {
+  if (!phone || phone.trim() === '') {
+    return { isValid: true }; // Optional field
+  }
+
+  const phoneRegex = /^[\d\s\-+()]+$/;
+  if (!phoneRegex.test(phone)) {
+    return { isValid: false, error: 'Invalid phone format' };
+  }
+
+  return { isValid: true, success: 'Valid phone' };
+};
+
+/**
+ * URL validator for real-time validation
+ */
+export const validateUrlRealtime = (url: string): ValidationResult => {
+  if (!url || url.trim() === '') {
+    return { isValid: true }; // Optional field
+  }
+
+  try {
+    new URL(url);
+    return { isValid: true, success: 'Valid URL' };
+  } catch {
+    return { isValid: false, error: 'Invalid URL (e.g., https://example.com)' };
+  }
+};

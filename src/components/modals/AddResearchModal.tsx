@@ -91,7 +91,7 @@ export const AddResearchModal: React.FC<AddResearchModalProps> = ({ isOpen, onCl
       description: formData.description,
       status: formData.status,
       startDate: formData.startDate,
-      endDate: formData.endDate || undefined,
+      plannedEndDate: formData.endDate || undefined,
       leadResearcherId: formData.leadResearcherId,
       leadResearcherName: formData.leadResearcherName,
       budget: formData.budget || undefined,
@@ -207,10 +207,10 @@ export const AddResearchModal: React.FC<AddResearchModalProps> = ({ isOpen, onCl
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 bg-white"
             >
               <option value="planning">Planning</option>
-              <option value="active">Active</option>
-              <option value="completed">Completed</option>
+              <option value="in-progress">In Progress</option>
               <option value="on-hold">On Hold</option>
-              <option value="cancelled">Cancelled</option>
+              <option value="completed">Completed</option>
+              <option value="archived">Archived</option>
             </select>
           </div>
 

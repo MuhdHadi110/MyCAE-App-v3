@@ -137,7 +137,7 @@ export const EquipmentManagementScreen: React.FC = () => {
     const totalEquipmentOut = locationSummaries.reduce((sum, s) => sum + s.totalItems, 0);
     const totalLocations = locationSummaries.length;
     const uniqueUsers = new Set(locationSummaries.map(s => s.checkedOutByEmail)).size;
-    const totalInventoryItems = items.reduce((sum, item) => sum + item.quantity, 0);
+    const totalInventoryItems = Array.isArray(items) ? items.reduce((sum, item) => sum + item.quantity, 0) : 0;
 
     return {
       totalEquipmentOut,

@@ -3,15 +3,20 @@ import { X, Upload } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useProjectStore } from '../../store/projectStore';
 import { useClientStore } from '../../store/clientStore';
+import financeService from '../../services/api.service';
 
 interface AddIssuedPOModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
-export const AddIssuedPOModal: React.FC<AddIssuedPOModalProps> = ({ isOpen, onClose }) => {
+export const AddIssuedPOModal: React.FC<AddIssuedPOModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const { projects, fetchProjects } = useProjectStore();
   const { clients, fetchClients } = useClientStore();
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     poNumber: '',
@@ -35,23 +40,48 @@ export const AddIssuedPOModal: React.FC<AddIssuedPOModalProps> = ({ isOpen, onCl
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Adding Issued PO (demo mode):', formData);
-    toast.success(`Issued PO ${formData.poNumber} created successfully! (demo mode)`);
-    onClose();
-    // Reset form
-    setFormData({
-      poNumber: '',
-      vendorId: '',
-      vendorName: '',
-      projectId: '',
-      projectCode: '',
-      amount: '',
-      issueDate: new Date().toISOString().split('T')[0],
-      deliveryDate: '',
-      description: '',
-    });
+    setLoading(true);
+    setError(null);
+
+    try {
+      const issuedPOData = {
+        poNumber: formData.poNumber,
+        vendor: formData.vendorName,
+        items: formData.description,
+        amount: parseFloat(formData.amount),
+        currency: 'MYR',
+        projectCode: formData.projectCode || null,
+        status: 'issued',
+      };
+
+      await financeService.createIssuedPO(issuedPOData);
+      toast.success(`Issued PO ${formData.poNumber} created successfully!`);
+
+      // Reset form
+      setFormData({
+        poNumber: '',
+        vendorId: '',
+        vendorName: '',
+        projectId: '',
+        projectCode: '',
+        amount: '',
+        issueDate: new Date().toISOString().split('T')[0],
+        deliveryDate: '',
+        description: '',
+      });
+
+      if (onSuccess) {
+        onSuccess();
+      }
+      onClose();
+    } catch (err: any) {
+      setError(err.response?.data?.error || err.message || 'Failed to create Issued PO');
+      toast.error('Failed to create Issued PO');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -125,10 +155,9 @@ export const AddIssuedPOModal: React.FC<AddIssuedPOModalProps> = ({ isOpen, onCl
             {/* Project Code */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Project Code <span className="text-red-500">*</span>
+                Project Code (Optional)
               </label>
               <select
-                required
                 name="projectId"
                 value={formData.projectId}
                 onChange={(e) => {
@@ -141,7 +170,7 @@ export const AddIssuedPOModal: React.FC<AddIssuedPOModalProps> = ({ isOpen, onCl
                 }}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               >
-                <option value="">Select a project</option>
+                <option value="">None (Non-project purchase)</option>
                 {projects
                   .filter(p => p.status === 'pre-lim')
                   .map((project) => (
@@ -150,6 +179,9 @@ export const AddIssuedPOModal: React.FC<AddIssuedPOModalProps> = ({ isOpen, onCl
                     </option>
                   ))}
               </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Leave blank for non-project purchases (e.g., stationery, appliances)
+              </p>
             </div>
 
             {/* Amount */}
@@ -215,6 +247,13 @@ export const AddIssuedPOModal: React.FC<AddIssuedPOModalProps> = ({ isOpen, onCl
             />
           </div>
 
+          {/* Error Display */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <p className="text-sm text-red-800">{error}</p>
+            </div>
+          )}
+
           {/* File Upload Note */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-start gap-2">
@@ -233,15 +272,17 @@ export const AddIssuedPOModal: React.FC<AddIssuedPOModalProps> = ({ isOpen, onCl
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+              disabled={loading}
+              className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium"
+              disabled={loading}
+              className="flex-1 px-4 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Issue PO
+              {loading ? 'Creating...' : 'Issue PO'}
             </button>
           </div>
         </form>

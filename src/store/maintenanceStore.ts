@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { MaintenanceTicket, MaintenanceFilters, MaintenanceStats } from '../types/maintenance.types';
-import apiService from '../services/api.service';
+import inventoryService from '../services/api.service';
 import toast from 'react-hot-toast';
 
 interface MaintenanceStore {
@@ -31,7 +31,7 @@ export const useMaintenanceStore = create<MaintenanceStore>((set, get) => ({
   fetchMaintenance: async () => {
     set({ loading: true });
     try {
-      const tickets = await apiService.getAllMaintenanceTickets();
+      const tickets = await inventoryService.getAllMaintenanceTickets();
       set({ tickets, filteredTickets: tickets });
       get().calculateStats();
     } catch (error) {
@@ -54,7 +54,7 @@ export const useMaintenanceStore = create<MaintenanceStore>((set, get) => ({
   createTicket: async (ticket: Omit<MaintenanceTicket, 'id'>) => {
     set({ loading: true });
     try {
-      const newTicket = await apiService.createMaintenanceTicket(ticket);
+      const newTicket = await inventoryService.createMaintenanceTicket(ticket);
       set(state => ({
         tickets: [...state.tickets, newTicket],
         filteredTickets: [...state.filteredTickets, newTicket],
@@ -71,7 +71,7 @@ export const useMaintenanceStore = create<MaintenanceStore>((set, get) => ({
   updateTicket: async (id: string, updates: Partial<MaintenanceTicket>) => {
     set({ loading: true });
     try {
-      await apiService.updateMaintenanceTicket(id, updates);
+      await inventoryService.updateMaintenanceTicket(id, updates);
       set(state => ({
         tickets: state.tickets.map(ticket => (ticket.id === id ? { ...ticket, ...updates } : ticket)),
         filteredTickets: state.filteredTickets.map(ticket => (ticket.id === id ? { ...ticket, ...updates } : ticket)),
@@ -88,7 +88,7 @@ export const useMaintenanceStore = create<MaintenanceStore>((set, get) => ({
   deleteTicket: async (id: string) => {
     set({ loading: true });
     try {
-      await apiService.deleteMaintenanceTicket(id);
+      await inventoryService.deleteMaintenanceTicket(id);
       set(state => ({
         tickets: state.tickets.filter(ticket => ticket.id !== id),
         filteredTickets: state.filteredTickets.filter(ticket => ticket.id !== id),
@@ -130,9 +130,9 @@ export const useMaintenanceStore = create<MaintenanceStore>((set, get) => ({
     const { tickets } = get();
     const stats: MaintenanceStats = {
       total: tickets.length,
-      pending: tickets.filter(t => t.status === 'Pending').length,
-      inProgress: tickets.filter(t => t.status === 'In Progress').length,
-      completed: tickets.filter(t => t.status === 'Completed').length,
+      pending: tickets.filter(t => t.status === 'open').length,
+      inProgress: tickets.filter(t => t.status === 'in-progress').length,
+      completed: tickets.filter(t => t.status === 'resolved' || t.status === 'closed').length,
       overdue: 0, // Would need date logic
     };
     set({ stats });

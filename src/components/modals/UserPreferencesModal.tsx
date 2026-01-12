@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Bell, Eye } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useTheme } from '../../context/ThemeContext';
+import { logger } from '../../lib/logger';
 
 interface UserPreferences {
   emailNotifications: boolean;
@@ -18,6 +19,7 @@ interface UserPreferencesModalProps {
   isOpen: boolean;
   onClose: () => void;
   userEmail?: string;
+  onSave?: (preferences: UserPreferences) => void;
 }
 
 const DEFAULT_PREFERENCES: UserPreferences = {
@@ -54,7 +56,7 @@ export const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
           darkMode: theme === 'dark',  // Always sync with theme context
         });
       } catch (error) {
-        console.error('Failed to load preferences:', error);
+        logger.error('Failed to load preferences:', error);
       }
     } else {
       setPreferences(prev => ({ ...prev, darkMode: theme === 'dark' }));

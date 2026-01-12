@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Upload, Info, CheckCircle2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import apiService from '../../services/api.service';
+import financeService from '../../services/finance.service';
+import { logger } from '../../lib/logger';
 import { useProjectStore } from '../../store/projectStore';
 import { useClientStore } from '../../store/clientStore';
 
@@ -30,6 +31,8 @@ export const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ isOpen, onClos
   });
 
   const [projectContext, setProjectContext] = useState<any>(null);
+  const [projectTotalValue, setProjectTotalValue] = useState<number>(0);
+  const [lastEditedField, setLastEditedField] = useState<'amount' | 'percentage' | null>(null);
   const [loadingContext, setLoadingContext] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -57,27 +60,77 @@ export const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ isOpen, onClos
     }
   }, [formData.projectCode]);
 
+  // Auto-populate client when project is selected
+  useEffect(() => {
+    if (formData.projectId && projects.length > 0 && clients.length > 0) {
+      const selectedProject = projects.find(p => p.id === formData.projectId);
+      if (selectedProject && selectedProject.clientId) {
+        // Find the matching client
+        const matchingClient = clients.find(c => c.id === selectedProject.clientId);
+
+        // Only auto-populate if client isn't already set or is different
+        if (matchingClient && formData.clientId !== selectedProject.clientId) {
+          setFormData(prev => ({
+            ...prev,
+            clientId: selectedProject.clientId,
+            clientName: matchingClient.name || ''
+          }));
+        }
+      }
+    }
+  }, [formData.projectId, projects, clients]);
+
   const loadNextInvoiceNumber = async () => {
     try {
-      const nextNumber = await apiService.getNextInvoiceNumber();
+      const nextNumber = await financeService.getNextInvoiceNumber();
       setFormData(prev => ({ ...prev, invoiceNumber: nextNumber }));
     } catch (error: any) {
-      console.error('Error loading next invoice number:', error);
+      logger.error('Error loading next invoice number:', error);
     }
   };
 
   const loadProjectContext = async (projectCode: string) => {
     setLoadingContext(true);
     try {
-      const context = await apiService.getInvoiceProjectContext(projectCode);
+      const context = await financeService.getInvoiceProjectContext(projectCode);
       setProjectContext(context);
+      setProjectTotalValue(context.projectTotalValue || 0);
     } catch (error: any) {
-      console.error('Error loading project context:', error);
+      logger.error('Error loading project context:', error);
       setProjectContext(null);
+      setProjectTotalValue(0);
     } finally {
       setLoadingContext(false);
     }
   };
+
+  // Auto-calculate amount from percentage
+  useEffect(() => {
+    if (lastEditedField === 'percentage' && projectTotalValue > 0) {
+      const percentage = parseFloat(formData.percentageOfTotal);
+      if (!isNaN(percentage)) {
+        const calculatedAmount = (projectTotalValue * percentage) / 100;
+        setFormData(prev => ({
+          ...prev,
+          amount: calculatedAmount.toFixed(2)
+        }));
+      }
+    }
+  }, [formData.percentageOfTotal, lastEditedField, projectTotalValue]);
+
+  // Auto-calculate percentage from amount
+  useEffect(() => {
+    if (lastEditedField === 'amount' && projectTotalValue > 0) {
+      const amount = parseFloat(formData.amount);
+      if (!isNaN(amount)) {
+        const calculatedPercentage = (amount / projectTotalValue) * 100;
+        setFormData(prev => ({
+          ...prev,
+          percentageOfTotal: calculatedPercentage.toFixed(2)
+        }));
+      }
+    }
+  }, [formData.amount, lastEditedField, projectTotalValue]);
 
   if (!isOpen) return null;
 
@@ -101,7 +154,7 @@ export const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ isOpen, onClos
         remark: formData.remark,
       };
 
-      await apiService.createInvoice(invoiceData);
+      await financeService.createInvoice(invoiceData);
       toast.success(`Invoice ${formData.invoiceNumber} created successfully!`);
 
       // Reset form
@@ -122,7 +175,7 @@ export const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ isOpen, onClos
       setProjectContext(null);
       onClose();
     } catch (error: any) {
-      console.error('Error creating invoice:', error);
+      logger.error('Error creating invoice:', error);
       toast.error(error.message || 'Failed to create invoice');
     } finally {
       setSubmitting(false);
@@ -134,6 +187,13 @@ export const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ isOpen, onClos
       ...formData,
       [e.target.name]: e.target.value,
     });
+
+    // Track which field was edited for auto-calculation
+    if (e.target.name === 'amount') {
+      setLastEditedField('amount');
+    } else if (e.target.name === 'percentageOfTotal') {
+      setLastEditedField('percentage');
+    }
   };
 
   return (
@@ -166,11 +226,11 @@ export const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ isOpen, onClos
                     </div>
                     <div>
                       <span className="text-blue-700">Total Invoiced:</span>
-                      <span className="font-semibold text-blue-900 ml-1">{projectContext.totalInvoiced || 0}%</span>
+                      <span className="font-semibold text-blue-900 ml-1">{projectContext.totalInvoiced ?? 0}%</span>
                     </div>
                     <div>
                       <span className="text-blue-700">Remaining:</span>
-                      <span className="font-semibold text-blue-900 ml-1">{projectContext.remainingPercentage || 100}%</span>
+                      <span className="font-semibold text-blue-900 ml-1">{projectContext.remainingPercentage ?? 100}%</span>
                     </div>
                     <div>
                       <span className="text-blue-700">This Invoice #:</span>
@@ -216,12 +276,26 @@ export const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ isOpen, onClos
                 value={formData.projectId}
                 onChange={(e) => {
                   const selectedProject = projects.find(p => p.id === e.target.value);
-                  setFormData({
-                    ...formData,
-                    projectId: e.target.value,
-                    projectCode: selectedProject?.projectCode || '',
-                    projectName: selectedProject?.title || ''
-                  });
+
+                  if (e.target.value === '') {
+                    // If clearing project, also clear client
+                    setFormData({
+                      ...formData,
+                      projectId: '',
+                      projectCode: '',
+                      projectName: '',
+                      clientId: '',
+                      clientName: ''
+                    });
+                  } else {
+                    setFormData({
+                      ...formData,
+                      projectId: e.target.value,
+                      projectCode: selectedProject?.projectCode || '',
+                      projectName: selectedProject?.title || ''
+                      // Client will be auto-populated by useEffect
+                    });
+                  }
                 }}
                 required
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
@@ -262,27 +336,19 @@ export const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ isOpen, onClos
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Client Name <span className="text-red-500">*</span>
               </label>
-              <select
-                name="clientId"
-                value={formData.clientId}
-                onChange={(e) => {
-                  const selectedClient = clients.find(c => c.id === e.target.value);
-                  setFormData({
-                    ...formData,
-                    clientId: e.target.value,
-                    clientName: selectedClient?.name || ''
-                  });
-                }}
+              <input
+                type="text"
+                name="clientName"
+                value={formData.clientName}
+                readOnly
+                disabled
                 required
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              >
-                <option value="">Select a client</option>
-                {clients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.name}
-                  </option>
-                ))}
-              </select>
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed"
+                placeholder="Auto-filled from project"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Client is automatically selected based on the project
+              </p>
             </div>
 
             {/* Amount */}
@@ -301,6 +367,11 @@ export const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ isOpen, onClos
                 placeholder="0.00"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
+              {projectTotalValue > 0 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Project Total: RM {projectTotalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              )}
             </div>
 
             {/* Percentage of Total */}

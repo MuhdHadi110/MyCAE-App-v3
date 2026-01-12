@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { X, Eye, EyeOff, Lock, CheckCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import apiService from '../../services/api.service';
+import authService from '../../services/api.service';
+import { logger } from '../../lib/logger';
 
 interface ChangePasswordModalProps {
   isOpen: boolean;
   onClose: () => void;
   userEmail?: string;
+  onSuccess?: () => void;
 }
 
 const PASSWORD_REQUIREMENTS = {
@@ -88,7 +90,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
     setIsLoading(true);
 
     try {
-      await apiService.changePassword(userEmail, currentPassword, newPassword);
+      await authService.changePassword(userEmail, currentPassword, newPassword);
 
       toast.success('Password changed successfully');
       setCurrentPassword('');
@@ -98,7 +100,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
     } catch (error: any) {
       const errorMessage = error.response?.data?.error || error.response?.data?.message || 'Failed to change password';
       toast.error(errorMessage);
-      console.error('Password change error:', error);
+      logger.error('Password change error:', error);
     } finally {
       setIsLoading(false);
     }

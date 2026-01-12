@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import apiService from '../services/api.service';
+import teamService from '../services/api.service';
 import type { TeamMember } from '../types/team.types';
 
 interface TeamStore {
@@ -11,6 +11,7 @@ interface TeamStore {
   addTeamMember: (member: Omit<TeamMember, 'id' | 'createdDate' | 'lastUpdated'>) => Promise<void>;
   updateTeamMember: (id: string, updates: Partial<TeamMember>) => Promise<void>;
   deleteTeamMember: (id: string) => Promise<void>;
+  reactivateTeamMember: (id: string) => Promise<void>;
   getTeamByDepartment: (department: string) => Promise<void>;
 }
 
@@ -33,9 +34,10 @@ const transformTeamMember = (backendMember: any): TeamMember => {
     name: user.name || backendMember.name || 'Unknown',
     email: user.email || backendMember.email || '',
     role: user.role || backendMember.role || 'engineer',
+    roles: user.roles || backendMember.roles || [user.role || backendMember.role || 'engineer'],
     department: backendMember.department || 'engineering',
     phone: backendMember.phone,
-    avatar: backendMember.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name || 'user'}`,
+    avatar: user.avatar || backendMember.avatar || 'male-01',
     activeProjects: parseInt(backendMember.activeProjects) || 0,
     totalHoursThisMonth: parseFloat(backendMember.totalHoursThisMonth) || 0,
     joinDate: backendMember.joinDate || new Date().toISOString(),
@@ -56,7 +58,7 @@ export const useTeamStore = create<TeamStore>((set) => ({
   fetchTeamMembers: async (filters?: any) => {
     try {
       set({ loading: true, error: null });
-      const response = await apiService.getAllTeamMembers(filters) as any;
+      const response = await teamService.getAllTeamMembers(filters) as any;
 
       // Handle both array and paginated responses
       let rawMembers: any[] = [];
@@ -81,7 +83,7 @@ export const useTeamStore = create<TeamStore>((set) => ({
   addTeamMember: async (memberData) => {
     try {
       set({ loading: true, error: null });
-      const newMember = await apiService.createTeamMember(memberData);
+      const newMember = await teamService.createTeamMember(memberData);
       const transformedMember = transformTeamMember(newMember);
       set((state) => ({
         teamMembers: [...state.teamMembers, transformedMember],
@@ -101,7 +103,7 @@ export const useTeamStore = create<TeamStore>((set) => ({
       set({ loading: true, error: null });
 
       // Update on backend
-      const updatedMember = await apiService.updateTeamMember(id, updates);
+      const updatedMember = await teamService.updateTeamMember(id, updates);
 
       // Update only the modified member in local state (avoid N+1 query)
       const transformedMember = transformTeamMember(updatedMember);
@@ -123,7 +125,7 @@ export const useTeamStore = create<TeamStore>((set) => ({
   deleteTeamMember: async (id) => {
     try {
       set({ loading: true, error: null });
-      await apiService.deleteTeamMember(id);
+      await teamService.deleteTeamMember(id);
       set((state) => ({
         teamMembers: state.teamMembers.filter((member) => member.id !== id),
         loading: false,
@@ -135,10 +137,29 @@ export const useTeamStore = create<TeamStore>((set) => ({
     }
   },
 
+  reactivateTeamMember: async (id) => {
+    try {
+      set({ loading: true, error: null });
+      const reactivatedMember = await teamService.reactivateTeamMember(id);
+      const transformedMember = transformTeamMember(reactivatedMember.data);
+      set((state) => ({
+        teamMembers: state.teamMembers.map((member) =>
+          member.id === id ? transformedMember : member
+        ),
+        loading: false,
+      }));
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to reactivate team member';
+      console.error('Error reactivating team member:', errorMessage);
+      set({ error: errorMessage, loading: false });
+      throw error;
+    }
+  },
+
   getTeamByDepartment: async (department: string) => {
     try {
       set({ loading: true, error: null });
-      const response = await apiService.getTeamByDepartment(department) as any;
+      const response = await teamService.getTeamByDepartment(department) as any;
 
       // Handle both array and paginated responses
       let rawMembers: any[] = [];

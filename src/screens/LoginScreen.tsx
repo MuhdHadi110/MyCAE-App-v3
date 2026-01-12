@@ -2,12 +2,11 @@ import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
-import { Input } from '../components/ui/Input';
-import { Button } from '../components/ui/Button';
 import { PasswordChangeModal } from '../components/modals/PasswordChangeModal';
 import { ForgotPasswordModal } from '../components/modals/ForgotPasswordModal';
 import ReCAPTCHA from 'react-google-recaptcha';
-import { Settings, Lock } from 'lucide-react';
+import { Lock } from 'lucide-react';
+import { logger } from '../lib/logger';
 
 export const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -92,8 +91,12 @@ export const LoginScreen: React.FC = () => {
       // Reset captcha after successful login
       recaptchaRef.current?.reset();
       setCaptchaToken(null);
-    } catch (error) {
-      toast.error('Invalid credentials');
+    } catch (error: any) {
+      // Show detailed error message from backend
+      const errorMessage = error?.response?.data?.error || error?.message || 'Invalid credentials. Please try again.';
+      toast.error(errorMessage);
+      logger.error('Login error:', error);
+
       // Reset captcha on failed login
       recaptchaRef.current?.reset();
       setCaptchaToken(null);
@@ -113,29 +116,111 @@ export const LoginScreen: React.FC = () => {
     }, 1000);
   };
   return (
-    <div className="relative flex items-center justify-center min-h-screen overflow-hidden bg-gradient-to-br from-blue-900 via-blue-800 to-blue-950">
-      {/* Animated Gears Background */}
+    <div className="relative flex items-center justify-center min-h-screen overflow-hidden bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900">
+      {/* CFD/FEA Style Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {/* Top Left Orange Gear */}
-        <div className="absolute top-16 left-16 w-32 h-32 text-orange-400 opacity-60 animate-spin-slow">
-          <Settings className="w-full h-full" />
+        {/* Mesh Grid Pattern */}
+        <svg className="absolute inset-0 w-full h-full opacity-20" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="mesh-grid" width="40" height="40" patternUnits="userSpaceOnUse">
+              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(59, 130, 246, 0.5)" strokeWidth="0.5"/>
+            </pattern>
+            <pattern id="mesh-dots" width="40" height="40" patternUnits="userSpaceOnUse">
+              <circle cx="0" cy="0" r="1" fill="rgba(96, 165, 250, 0.6)"/>
+              <circle cx="40" cy="0" r="1" fill="rgba(96, 165, 250, 0.6)"/>
+              <circle cx="0" cy="40" r="1" fill="rgba(96, 165, 250, 0.6)"/>
+              <circle cx="40" cy="40" r="1" fill="rgba(96, 165, 250, 0.6)"/>
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#mesh-grid)"/>
+          <rect width="100%" height="100%" fill="url(#mesh-dots)"/>
+        </svg>
+
+        {/* CFD Flow Streamlines */}
+        <svg className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="flow-gradient-1" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="rgba(239, 68, 68, 0)" />
+              <stop offset="30%" stopColor="rgba(239, 68, 68, 0.6)" />
+              <stop offset="50%" stopColor="rgba(251, 191, 36, 0.8)" />
+              <stop offset="70%" stopColor="rgba(34, 197, 94, 0.6)" />
+              <stop offset="100%" stopColor="rgba(59, 130, 246, 0)" />
+            </linearGradient>
+            <linearGradient id="flow-gradient-2" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="rgba(59, 130, 246, 0)" />
+              <stop offset="20%" stopColor="rgba(59, 130, 246, 0.5)" />
+              <stop offset="50%" stopColor="rgba(147, 51, 234, 0.7)" />
+              <stop offset="80%" stopColor="rgba(236, 72, 153, 0.5)" />
+              <stop offset="100%" stopColor="rgba(236, 72, 153, 0)" />
+            </linearGradient>
+          </defs>
+
+          {/* Animated Flow Lines */}
+          <path className="flow-line-1" d="M-100,150 Q200,100 400,180 T800,120 T1200,200 T1600,140"
+                fill="none" stroke="url(#flow-gradient-1)" strokeWidth="3" opacity="0.7"/>
+          <path className="flow-line-2" d="M-100,250 Q150,300 350,220 T700,280 T1100,200 T1500,260"
+                fill="none" stroke="url(#flow-gradient-2)" strokeWidth="2" opacity="0.5"/>
+          <path className="flow-line-3" d="M-100,450 Q250,400 450,480 T850,420 T1250,500 T1650,440"
+                fill="none" stroke="url(#flow-gradient-1)" strokeWidth="2.5" opacity="0.6"/>
+          <path className="flow-line-4" d="M-100,600 Q200,550 400,620 T800,560 T1200,640 T1600,580"
+                fill="none" stroke="url(#flow-gradient-2)" strokeWidth="2" opacity="0.4"/>
+        </svg>
+
+        {/* FEA Contour/Heat Map Areas */}
+        <div className="absolute top-0 left-0 w-96 h-96 rounded-full bg-gradient-radial from-red-500/20 via-orange-500/10 to-transparent blur-3xl animate-pulse-slow"></div>
+        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] rounded-full bg-gradient-radial from-blue-500/25 via-cyan-500/10 to-transparent blur-3xl animate-pulse-slow-delayed"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-gradient-radial from-purple-500/15 via-indigo-500/5 to-transparent blur-3xl"></div>
+
+        {/* Velocity Vectors / Arrows */}
+        <div className="absolute top-20 left-20 opacity-40">
+          <svg width="60" height="20" viewBox="0 0 60 20">
+            <defs>
+              <marker id="arrowhead1" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                <polygon points="0 0, 10 3.5, 0 7" fill="rgba(34, 197, 94, 0.8)" />
+              </marker>
+            </defs>
+            <line x1="0" y1="10" x2="50" y2="10" stroke="rgba(34, 197, 94, 0.8)" strokeWidth="2" markerEnd="url(#arrowhead1)" />
+          </svg>
+        </div>
+        <div className="absolute top-32 left-32 opacity-50">
+          <svg width="80" height="20" viewBox="0 0 80 20">
+            <line x1="0" y1="10" x2="70" y2="10" stroke="rgba(251, 191, 36, 0.8)" strokeWidth="2.5" markerEnd="url(#arrowhead1)" />
+          </svg>
+        </div>
+        <div className="absolute bottom-40 right-40 opacity-40 rotate-[-15deg]">
+          <svg width="70" height="20" viewBox="0 0 70 20">
+            <line x1="0" y1="10" x2="60" y2="10" stroke="rgba(239, 68, 68, 0.7)" strokeWidth="2" markerEnd="url(#arrowhead1)" />
+          </svg>
+        </div>
+        <div className="absolute bottom-60 right-60 opacity-50 rotate-[-10deg]">
+          <svg width="90" height="20" viewBox="0 0 90 20">
+            <line x1="0" y1="10" x2="80" y2="10" stroke="rgba(251, 191, 36, 0.8)" strokeWidth="2" markerEnd="url(#arrowhead1)" />
+          </svg>
         </div>
 
-        {/* Top Right Gray Gear */}
-        <div className="absolute top-8 right-20 w-40 h-40 text-blue-400 opacity-40 animate-spin-reverse-slow">
-          <Settings className="w-full h-full" />
-        </div>
+        {/* Pressure/Stress Points */}
+        <div className="absolute top-1/4 right-1/4 w-8 h-8 rounded-full bg-red-500/50 blur-sm animate-ping-slow"></div>
+        <div className="absolute bottom-1/3 left-1/5 w-6 h-6 rounded-full bg-orange-500/40 blur-sm animate-ping-slow-delayed"></div>
+        <div className="absolute top-2/3 right-1/3 w-10 h-10 rounded-full bg-yellow-500/30 blur-md animate-pulse-slow"></div>
 
-        {/* Bottom Right Purple Gear */}
-        <div className="absolute bottom-12 right-24 w-48 h-48 text-purple-400 opacity-50 animate-spin-slow">
-          <Settings className="w-full h-full" />
-        </div>
+        {/* Mesh Deformation Lines */}
+        <svg className="absolute bottom-0 left-0 w-full h-48 opacity-30" viewBox="0 0 1200 200" preserveAspectRatio="none">
+          <path d="M0,100 Q150,60 300,100 T600,80 T900,120 T1200,90" fill="none" stroke="rgba(96, 165, 250, 0.6)" strokeWidth="1"/>
+          <path d="M0,120 Q150,80 300,120 T600,100 T900,140 T1200,110" fill="none" stroke="rgba(96, 165, 250, 0.5)" strokeWidth="1"/>
+          <path d="M0,140 Q150,100 300,140 T600,120 T900,160 T1200,130" fill="none" stroke="rgba(96, 165, 250, 0.4)" strokeWidth="1"/>
+          <path d="M0,160 Q150,120 300,160 T600,140 T900,180 T1200,150" fill="none" stroke="rgba(96, 165, 250, 0.3)" strokeWidth="1"/>
+        </svg>
 
-        {/* Small decorative elements */}
-        <div className="absolute top-1/4 right-1/4 w-4 h-16 bg-orange-400 opacity-50 rounded-full rotate-45"></div>
-        <div className="absolute bottom-1/3 left-1/4 w-3 h-12 bg-purple-400 opacity-40 rounded-full -rotate-12"></div>
-        <div className="absolute top-1/2 left-1/3 w-6 h-6 bg-blue-300 opacity-30 rounded-full"></div>
-        <div className="absolute bottom-1/4 right-1/3 w-4 h-20 bg-purple-300 opacity-40 rounded-full rotate-12"></div>
+        {/* Color Scale Legend (decorative) */}
+        <div className="absolute bottom-8 left-8 flex flex-col gap-0.5 opacity-60">
+          <div className="w-4 h-3 bg-red-500 rounded-sm"></div>
+          <div className="w-4 h-3 bg-orange-500 rounded-sm"></div>
+          <div className="w-4 h-3 bg-yellow-500 rounded-sm"></div>
+          <div className="w-4 h-3 bg-green-500 rounded-sm"></div>
+          <div className="w-4 h-3 bg-cyan-500 rounded-sm"></div>
+          <div className="w-4 h-3 bg-blue-500 rounded-sm"></div>
+          <span className="text-[8px] text-blue-300 mt-1">Velocity</span>
+        </div>
       </div>
 
       {/* Login Card */}
@@ -248,32 +333,109 @@ export const LoginScreen: React.FC = () => {
         onClose={() => setIsForgotPasswordOpen(false)}
       />
 
-      {/* CSS for custom animations */}
+      {/* CSS for CFD/FEA animations */}
       <style>{`
-        @keyframes spin-slow {
-          from {
-            transform: rotate(0deg);
+        @keyframes flow-animate {
+          0% {
+            stroke-dashoffset: 1000;
           }
-          to {
-            transform: rotate(360deg);
-          }
-        }
-
-        @keyframes spin-reverse-slow {
-          from {
-            transform: rotate(360deg);
-          }
-          to {
-            transform: rotate(0deg);
+          100% {
+            stroke-dashoffset: 0;
           }
         }
 
-        .animate-spin-slow {
-          animation: spin-slow 20s linear infinite;
+        @keyframes pulse-slow {
+          0%, 100% {
+            opacity: 0.3;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.6;
+            transform: scale(1.05);
+          }
         }
 
-        .animate-spin-reverse-slow {
-          animation: spin-reverse-slow 25s linear infinite;
+        @keyframes pulse-slow-delayed {
+          0%, 100% {
+            opacity: 0.2;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.5;
+            transform: scale(1.08);
+          }
+        }
+
+        @keyframes ping-slow {
+          0% {
+            transform: scale(1);
+            opacity: 0.5;
+          }
+          50% {
+            transform: scale(1.5);
+            opacity: 0.2;
+          }
+          100% {
+            transform: scale(1);
+            opacity: 0.5;
+          }
+        }
+
+        @keyframes ping-slow-delayed {
+          0% {
+            transform: scale(1);
+            opacity: 0.4;
+          }
+          60% {
+            transform: scale(1.3);
+            opacity: 0.15;
+          }
+          100% {
+            transform: scale(1);
+            opacity: 0.4;
+          }
+        }
+
+        .flow-line-1, .flow-line-2, .flow-line-3, .flow-line-4 {
+          stroke-dasharray: 20 10;
+          animation: flow-animate 8s linear infinite;
+        }
+
+        .flow-line-2 {
+          animation-delay: -2s;
+          animation-duration: 10s;
+        }
+
+        .flow-line-3 {
+          animation-delay: -4s;
+          animation-duration: 12s;
+        }
+
+        .flow-line-4 {
+          animation-delay: -6s;
+          animation-duration: 9s;
+        }
+
+        .animate-pulse-slow {
+          animation: pulse-slow 6s ease-in-out infinite;
+        }
+
+        .animate-pulse-slow-delayed {
+          animation: pulse-slow-delayed 8s ease-in-out infinite;
+          animation-delay: -3s;
+        }
+
+        .animate-ping-slow {
+          animation: ping-slow 4s ease-in-out infinite;
+        }
+
+        .animate-ping-slow-delayed {
+          animation: ping-slow-delayed 5s ease-in-out infinite;
+          animation-delay: -2s;
+        }
+
+        .bg-gradient-radial {
+          background: radial-gradient(circle, var(--tw-gradient-stops));
         }
       `}</style>
     </div>

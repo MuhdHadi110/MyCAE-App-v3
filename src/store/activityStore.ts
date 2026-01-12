@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { ActivityLog } from '../types/activity.types';
-import apiService from '../services/api.service';
+import activityService from '../services/api.service';
 
 interface ActivityStore {
   activities: ActivityLog[];
@@ -23,7 +23,7 @@ export const useActivityStore = create<ActivityStore>((set) => ({
   fetchRecentActivity: async (limit = 50) => {
     try {
       set({ loading: true, error: null });
-      const response = await apiService.getRecentActivity(limit) as any;
+      const response = await activityService.getRecentActivity(limit) as any;
       const activities = Array.isArray(response) ? response : (response?.data as any) || [];
       set({ activities: Array.isArray(activities) ? activities : [], loading: false });
     } catch (error: any) {
@@ -36,7 +36,7 @@ export const useActivityStore = create<ActivityStore>((set) => ({
   fetchAllActivity: async (filters?: any) => {
     try {
       set({ loading: true, error: null });
-      const response = await apiService.getAllActivity(filters);
+      const response = await activityService.getAllActivity(filters);
       const activities = Array.isArray(response) ? response : response.data || [];
       set({ activities, loading: false });
     } catch (error: any) {
@@ -49,7 +49,7 @@ export const useActivityStore = create<ActivityStore>((set) => ({
   fetchActivityByUser: async (userId: string, filters?: any) => {
     try {
       set({ loading: true, error: null });
-      const response = await apiService.getActivityByUser(userId, filters);
+      const response = await activityService.getActivityByUser(userId, filters);
       const activities = Array.isArray(response) ? response : response.data || [];
       set({ activities, loading: false });
     } catch (error: any) {
@@ -62,7 +62,7 @@ export const useActivityStore = create<ActivityStore>((set) => ({
   fetchActivityByModule: async (module: string, filters?: any) => {
     try {
       set({ loading: true, error: null });
-      const response = await apiService.getActivityByModule(module, filters);
+      const response = await activityService.getActivityByModule(module, filters);
       const activities = Array.isArray(response) ? response : response.data || [];
       set({ activities, loading: false });
     } catch (error: any) {
@@ -75,7 +75,7 @@ export const useActivityStore = create<ActivityStore>((set) => ({
   logActivity: async (activity: Omit<ActivityLog, 'id'>) => {
     try {
       set({ error: null });
-      const newActivity = await apiService.createActivityLog(activity);
+      const newActivity = await activityService.createActivityLog(activity);
       set(state => ({
         activities: [newActivity, ...state.activities].slice(0, 50), // Keep last 50
       }));

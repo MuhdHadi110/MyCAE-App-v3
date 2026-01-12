@@ -1,6 +1,8 @@
 import express, { Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { AppDataSource } from '../config/database';
+import { ResearchProject } from '../entities/ResearchProject';
+import { User } from '../entities/User';
 import { authenticate, AuthRequest } from '../middleware/auth';
 
 const router = express.Router();
@@ -8,12 +10,39 @@ const router = express.Router();
 // Protect all research routes with authentication
 router.use(authenticate);
 
+// Helper to validate and sanitize pagination params
+const validatePagination = (limit: unknown, offset: unknown) => ({
+  limit: Math.min(Math.max(parseInt(String(limit)) || 100, 1), 500), // Max 500 records
+  offset: Math.max(parseInt(String(offset)) || 0, 0)
+});
+
 // Get all research projects
 router.get('/projects', async (req: AuthRequest, res: Response) => {
   try {
-    const query = `SELECT * FROM research_projects ORDER BY created_at DESC`;
-    const projects = await AppDataSource.query(query);
-    res.json(projects || []);
+    const { limit = 100, offset = 0 } = req.query;
+    const pagination = validatePagination(limit, offset);
+
+    const projectRepo = AppDataSource.getRepository(ResearchProject);
+    const [projects, total] = await projectRepo
+      .createQueryBuilder('project')
+      .leftJoinAndSelect('project.leadResearcher', 'leadResearcher')
+      .orderBy('project.createdAt', 'DESC')
+      .take(pagination.limit)
+      .skip(pagination.offset)
+      .getManyAndCount();
+
+    // Transform to include lead researcher name
+    const transformedProjects = projects.map(p => ({
+      ...p,
+      leadResearcherName: p.leadResearcher?.name || null,
+    }));
+
+    res.json({
+      data: transformedProjects,
+      total,
+      limit: pagination.limit,
+      offset: pagination.offset,
+    });
   } catch (error) {
     console.error('Error fetching research projects:', error);
     res.status(500).json({ error: 'Failed to fetch research projects' });
@@ -24,9 +53,25 @@ router.get('/projects', async (req: AuthRequest, res: Response) => {
 router.get('/projects/status/:status', async (req: AuthRequest, res: Response) => {
   try {
     const { status } = req.params;
-    const query = `SELECT * FROM research_projects WHERE status = ? ORDER BY created_at DESC`;
-    const projects = await AppDataSource.query(query, [status]);
-    res.json(projects || []);
+    const { limit = 100, offset = 0 } = req.query;
+    const pagination = validatePagination(limit, offset);
+
+    const projectRepo = AppDataSource.getRepository(ResearchProject);
+    const [projects, total] = await projectRepo
+      .createQueryBuilder('project')
+      .leftJoinAndSelect('project.leadResearcher', 'leadResearcher')
+      .where('project.status = :status', { status })
+      .orderBy('project.createdAt', 'DESC')
+      .take(pagination.limit)
+      .skip(pagination.offset)
+      .getManyAndCount();
+
+    res.json({
+      data: projects,
+      total,
+      limit: pagination.limit,
+      offset: pagination.offset,
+    });
   } catch (error) {
     console.error('Error fetching research projects by status:', error);
     res.status(500).json({ error: 'Failed to fetch research projects' });
@@ -103,31 +148,138 @@ router.get('/summary', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// Get all research timesheet entries
+router.get('/timesheets', async (req: AuthRequest, res: Response) => {
+  try {
+    const { projectId, teamMemberId, status, startDate, endDate } = req.query;
+
+    let query = `
+      SELECT
+        rt.id,
+        rt.research_project_id as projectId,
+        rt.engineer_id as teamMemberId,
+        u.name as teamMemberName,
+        rt.date,
+        rt.hours as hoursLogged,
+        rt.description,
+        rt.research_category as researchCategory,
+        rp.status as status,
+        rt.created_at as createdDate,
+        rt.updated_at as updatedAt,
+        rp.title as projectTitle,
+        rp.research_code as projectCode
+      FROM research_timesheets rt
+      LEFT JOIN research_projects rp ON rt.research_project_id = rp.id
+      LEFT JOIN users u ON rt.engineer_id = u.id
+      WHERE 1=1
+    `;
+
+    const params: any[] = [];
+    if (projectId) { query += ` AND rt.research_project_id = ?`; params.push(projectId); }
+    if (teamMemberId) { query += ` AND rt.engineer_id = ?`; params.push(teamMemberId); }
+    if (status) { query += ` AND rp.status = ?`; params.push(status); }
+    if (startDate) { query += ` AND rt.date >= ?`; params.push(startDate); }
+    if (endDate) { query += ` AND rt.date <= ?`; params.push(endDate); }
+
+    query += ` ORDER BY rt.date DESC, rt.created_at DESC`;
+
+    const timesheets = await AppDataSource.query(query, params);
+    res.json(timesheets || []);
+  } catch (error) {
+    console.error('Error fetching research timesheets:', error);
+    res.status(500).json({ error: 'Failed to fetch research timesheets' });
+  }
+});
+
+// Helper function to generate research code
+async function generateResearchCode(): Promise<string> {
+  const currentYear = new Date().getFullYear();
+  const yearSuffix = currentYear.toString().slice(-2); // Get last 2 digits (e.g., "25" for 2025)
+
+  // Get the highest research code number for current year
+  const result = await AppDataSource.query(`
+    SELECT research_code FROM research_projects
+    WHERE research_code LIKE 'R${yearSuffix}%'
+    ORDER BY research_code DESC
+    LIMIT 1
+  `);
+
+  let maxNumber = 0;
+  if (result && result.length > 0 && result[0].research_code) {
+    const match = result[0].research_code.match(/^R\d{2}(\d{3})$/);
+    if (match) {
+      maxNumber = parseInt(match[1], 10);
+    }
+  }
+
+  const nextNumber = maxNumber + 1;
+  const numberStr = nextNumber.toString().padStart(3, '0');
+  return `R${yearSuffix}${numberStr}`;
+}
+
+// Backfill research codes for existing projects without one
+router.post('/projects/backfill-codes', async (req: AuthRequest, res: Response) => {
+  try {
+    // Get all projects without a research code
+    const projectsWithoutCode = await AppDataSource.query(`
+      SELECT id, created_at FROM research_projects
+      WHERE research_code IS NULL OR research_code = ''
+      ORDER BY created_at ASC
+    `);
+
+    if (projectsWithoutCode.length === 0) {
+      return res.json({ message: 'All projects already have research codes', updated: 0 });
+    }
+
+    let updated = 0;
+    for (const project of projectsWithoutCode) {
+      const newCode = await generateResearchCode();
+      await AppDataSource.query(
+        `UPDATE research_projects SET research_code = ? WHERE id = ?`,
+        [newCode, project.id]
+      );
+      updated++;
+    }
+
+    res.json({ message: `Successfully backfilled ${updated} research codes`, updated });
+  } catch (error) {
+    console.error('Error backfilling research codes:', error);
+    res.status(500).json({ error: 'Failed to backfill research codes' });
+  }
+});
+
 // Create new research project
 router.post('/projects', async (req: AuthRequest, res: Response) => {
   try {
-    const { researchCode, title, description, status, startDate, endDate, leadResearcherId, budget } = req.body;
-    const id = uuidv4();
+    const {
+      researchCode, title, description, status,
+      startDate, plannedEndDate, leadResearcherId,
+      budget, fundingSource, category, objectives, methodology
+    } = req.body;
 
-    const query = `
-      INSERT INTO research_projects
-      (id, research_code, title, description, status, start_date, planned_end_date, lead_researcher_id, budget)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
+    // Auto-generate research code if not provided
+    const finalResearchCode = researchCode || await generateResearchCode();
 
-    await AppDataSource.query(query, [
-      id,
-      researchCode || null,
+    const projectRepo = AppDataSource.getRepository(ResearchProject);
+    const project = projectRepo.create({
+      id: uuidv4(),
+      researchCode: finalResearchCode,
       title,
-      description || null,
-      status || 'planning',
-      startDate,
-      endDate || null,
-      leadResearcherId,
-      budget || null,
-    ]);
+      description: description || null,
+      status: status || 'planning',
+      startDate: startDate ? new Date(startDate) : null,
+      plannedEndDate: plannedEndDate ? new Date(plannedEndDate) : null,
+      leadResearcherId: leadResearcherId || null,
+      budget: budget || null,
+      fundingSource: fundingSource || null,
+      category: category || null,
+      objectives: objectives || null,
+      methodology: methodology || null,
+    });
 
-    res.status(201).json({ id, researchCode, title, description, status, startDate, endDate, leadResearcherId, budget });
+    await projectRepo.save(project);
+
+    res.status(201).json(project);
   } catch (error) {
     console.error('Error creating research project:', error);
     res.status(500).json({ error: 'Failed to create research project' });
@@ -138,17 +290,43 @@ router.post('/projects', async (req: AuthRequest, res: Response) => {
 router.put('/projects/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { title, description, status, endDate, budget } = req.body;
+    const {
+      title, description, status, startDate, plannedEndDate, actualEndDate,
+      leadResearcherId, budget, fundingSource, category, objectives,
+      methodology, findings, publications, teamMembers, collaborators,
+      equipmentUsed, notes
+    } = req.body;
 
-    const query = `
-      UPDATE research_projects
-      SET title = ?, description = ?, status = ?, planned_end_date = ?, budget = ?
-      WHERE id = ?
-    `;
+    const projectRepo = AppDataSource.getRepository(ResearchProject);
+    const project = await projectRepo.findOne({ where: { id } });
 
-    await AppDataSource.query(query, [title, description || null, status, endDate || null, budget || null, id]);
+    if (!project) {
+      return res.status(404).json({ error: 'Research project not found' });
+    }
 
-    res.json({ id, title, description, status, endDate, budget });
+    // Update fields if provided
+    if (title !== undefined) project.title = title;
+    if (description !== undefined) project.description = description || null;
+    if (status !== undefined) project.status = status;
+    if (startDate !== undefined) project.startDate = startDate ? new Date(startDate) : null;
+    if (plannedEndDate !== undefined) project.plannedEndDate = plannedEndDate ? new Date(plannedEndDate) : null;
+    if (actualEndDate !== undefined) project.actualEndDate = actualEndDate ? new Date(actualEndDate) : null;
+    if (leadResearcherId !== undefined) project.leadResearcherId = leadResearcherId || null;
+    if (budget !== undefined) project.budget = budget || null;
+    if (fundingSource !== undefined) project.fundingSource = fundingSource || null;
+    if (category !== undefined) project.category = category || null;
+    if (objectives !== undefined) project.objectives = objectives || null;
+    if (methodology !== undefined) project.methodology = methodology || null;
+    if (findings !== undefined) project.findings = findings || null;
+    if (publications !== undefined) project.publications = publications || null;
+    if (teamMembers !== undefined) project.teamMembers = teamMembers || null;
+    if (collaborators !== undefined) project.collaborators = collaborators || null;
+    if (equipmentUsed !== undefined) project.equipmentUsed = equipmentUsed || null;
+    if (notes !== undefined) project.notes = notes || null;
+
+    await projectRepo.save(project);
+
+    res.json(project);
   } catch (error) {
     console.error('Error updating research project:', error);
     res.status(500).json({ error: 'Failed to update research project' });
@@ -160,11 +338,18 @@ router.delete('/projects/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
-    // Delete timesheets first
-    await AppDataSource.query(`DELETE FROM research_timesheets WHERE projectId = ?`, [id]);
+    const projectRepo = AppDataSource.getRepository(ResearchProject);
+    const project = await projectRepo.findOne({ where: { id } });
+
+    if (!project) {
+      return res.status(404).json({ error: 'Research project not found' });
+    }
+
+    // Delete timesheets first (no entity, use raw SQL)
+    await AppDataSource.query(`DELETE FROM research_timesheets WHERE research_project_id = ?`, [id]);
 
     // Then delete project
-    await AppDataSource.query(`DELETE FROM research_projects WHERE id = ?`, [id]);
+    await projectRepo.remove(project);
 
     res.json({ message: 'Research project deleted successfully' });
   } catch (error) {
@@ -176,26 +361,27 @@ router.delete('/projects/:id', async (req: AuthRequest, res: Response) => {
 // Log timesheet hours
 router.post('/timesheets', async (req: AuthRequest, res: Response) => {
   try {
-    const { projectId, teamMemberId, teamMemberName, date, hoursLogged, description, researchCategory } = req.body;
+    const { projectId, teamMemberId, date, hoursLogged, description, researchCategory } = req.body;
     const id = uuidv4();
+    const engineerId = teamMemberId || req.user!.id; // Use teamMemberId if provided, otherwise current user
 
     const query = `
       INSERT INTO research_timesheets
-      (id, project_id, team_member_id, date, hours_logged, description, category, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+      (id, research_project_id, engineer_id, date, hours, research_category, description)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
 
     await AppDataSource.query(query, [
       id,
       projectId,
-      teamMemberId,
+      engineerId,
       date,
       hoursLogged,
-      description,
       researchCategory || null,
+      description || null,
     ]);
 
-    res.status(201).json({ id, projectId, teamMemberId, teamMemberName, date, hoursLogged, description, researchCategory });
+    res.status(201).json({ id, projectId, engineerId, date, hoursLogged, description, researchCategory });
   } catch (error) {
     console.error('Error logging timesheet hours:', error);
     res.status(500).json({ error: 'Failed to log timesheet hours' });

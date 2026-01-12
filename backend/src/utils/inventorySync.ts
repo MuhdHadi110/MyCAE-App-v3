@@ -1,5 +1,5 @@
 import { AppDataSource } from '../config/database';
-import { InventoryItem, InventoryStatus } from '../entities/InventoryItem';
+import { InventoryItem, InventoryStatus, InventoryLastAction } from '../entities/InventoryItem';
 import n8nService from '../services/n8n.service';
 
 /**
@@ -20,7 +20,8 @@ interface InventoryUpdateResult {
  */
 export async function decreaseInventoryQuantity(
   itemIdentifier: string, // Can be ID, SKU, or barcode
-  quantityToDecrease: number
+  quantityToDecrease: number,
+  checkedOutBy?: string // Optional: who checked out the item
 ): Promise<InventoryUpdateResult> {
   const inventoryRepo = AppDataSource.getRepository(InventoryItem);
 
@@ -52,6 +53,13 @@ export async function decreaseInventoryQuantity(
     // Decrease quantity
     item.quantity -= quantityToDecrease;
 
+    // Update last_action to CHECKED_OUT
+    item.last_action = InventoryLastAction.CHECKED_OUT;
+    item.last_action_date = new Date();
+    if (checkedOutBy) {
+      item.last_action_by = checkedOutBy;
+    }
+
     // Update status based on new quantity
     await updateInventoryStatus(item);
 
@@ -78,7 +86,8 @@ export async function decreaseInventoryQuantity(
  */
 export async function increaseInventoryQuantity(
   itemIdentifier: string, // Can be ID, SKU, or barcode
-  quantityToIncrease: number
+  quantityToIncrease: number,
+  returnedBy?: string // Optional: who returned the item
 ): Promise<InventoryUpdateResult> {
   const inventoryRepo = AppDataSource.getRepository(InventoryItem);
 
@@ -101,6 +110,13 @@ export async function increaseInventoryQuantity(
 
     // Increase quantity
     item.quantity += quantityToIncrease;
+
+    // Update last_action to RETURNED
+    item.last_action = InventoryLastAction.RETURNED;
+    item.last_action_date = new Date();
+    if (returnedBy) {
+      item.last_action_by = returnedBy;
+    }
 
     // Update status based on new quantity
     await updateInventoryStatus(item);

@@ -1,153 +1,76 @@
-import axios, { AxiosInstance } from 'axios';
+/**
+ * API Service - Legacy Compatibility Layer
+ *
+ * This file maintains backward compatibility with existing code.
+ * All methods now delegate to domain-specific services.
+ *
+ * MIGRATION GUIDE:
+ * Instead of: import apiService from './services/api.service';
+ * Use: import authService from './services/auth.service';
+ *      import financeService from './services/finance.service';
+ *      ... etc.
+ */
+
+import { httpClient } from './http-client';
+import authService from './auth.service';
+import inventoryService from './inventory.service';
+import projectService from './project.service';
+import timesheetService from './timesheet.service';
+import teamService from './team.service';
+import computerService from './computer.service';
+import researchService from './research.service';
+import financeService from './finance.service';
+import activityService from './activity.service';
+
 import type { InventoryItem, BulkCheckout } from '../types/inventory.types';
 import type { ExtendedCheckout } from '../types/checkout.types';
 import type { MaintenanceTicket } from '../types/maintenance.types';
 
-/**
- * API Service for MySQL Backend
- *
- * This service replaces SharePoint API calls with RESTful API calls
- * to the Node.js/Express backend with MySQL database.
- */
-
-// Helper function to transform snake_case to camelCase
-const snakeToCamel = (str: string): string => {
-  return str.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
-};
-
-// Transform object keys from snake_case to camelCase
-const transformKeysToCAmelCase = (obj: any): any => {
-  try {
-    if (Array.isArray(obj)) {
-      return obj.map(item => transformKeysToCAmelCase(item));
-    } else if (obj !== null && typeof obj === 'object' && !(obj instanceof Date)) {
-      return Object.keys(obj).reduce((result, key) => {
-        const camelKey = snakeToCamel(key);
-        const value = obj[key];
-        result[camelKey] = (value !== null && typeof value === 'object' && !(value instanceof Date))
-          ? transformKeysToCAmelCase(value)
-          : value;
-        return result;
-      }, {} as any);
-    }
-    return obj;
-  } catch (error) {
-    console.error('Error in transformKeysToCAmelCase:', error);
-    return obj;
-  }
-};
-
 class ApiService {
-  private api: AxiosInstance;
-  private token: string | null = null;
-
-  constructor() {
-    // API base URL - hardcoded to use Vite proxy
-    const baseURL = '/api';
-    console.log('🔧 API Service initialized with baseURL:', baseURL);
-
-    this.api = axios.create({
-      baseURL,
-      timeout: 10000,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    // Load token from localStorage
-    this.token = localStorage.getItem('auth_token');
-    if (this.token) {
-      this.setAuthToken(this.token);
-    }
-
-    // Response interceptor for token refresh
-    this.api.interceptors.response.use(
-      (response) => response,
-      (error) => {
-        if (error.response?.status === 401) {
-          // Token expired or invalid
-          this.clearAuth();
-          window.location.href = '/login';
-        }
-        return Promise.reject(error);
-      }
-    );
-  }
-
-  /**
-   * Set authentication token
-   */
+  // Expose HTTP client methods
   setAuthToken(token: string) {
-    this.token = token;
-    this.api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    localStorage.setItem('auth_token', token);
+    httpClient.setAuthToken(token);
   }
 
-  /**
-   * Clear authentication
-   */
   clearAuth() {
-    this.token = null;
-    delete this.api.defaults.headers.common['Authorization'];
-    localStorage.removeItem('auth_token');
+    httpClient.clearAuth();
   }
 
-  // ==================== Authentication ====================
+  isProduction(): boolean {
+    return httpClient.isProduction();
+  }
 
-  async register(data: {
-    name: string;
-    email: string;
-    password: string;
-    role?: string;
-  }) {
-    const response = await this.api.post('/auth/register', data);
-    if (response.data.token) {
-      this.setAuthToken(response.data.token);
-    }
-    return response.data;
+  getEnvironmentInfo(): { isProduction: boolean; url: string } {
+    return httpClient.getEnvironmentInfo();
+  }
+
+  // ==================== Authentication (delegates to authService) ====================
+
+  async register(data: { name: string; email: string; password: string; role?: string }) {
+    return authService.register(data);
   }
 
   async login(email: string, password: string, captchaToken?: string) {
-    const response = await this.api.post('/auth/login', { email, password, captchaToken });
-    if (response.data.token) {
-      this.setAuthToken(response.data.token);
-    }
-    return response.data;
+    return authService.login(email, password, captchaToken);
   }
 
   async logout() {
-    this.clearAuth();
+    return authService.logout();
   }
 
   async changePassword(email: string, currentPassword: string, newPassword: string) {
-    const response = await this.api.post('/auth/change-password', {
-      email,
-      currentPassword,
-      newPassword,
-    });
-    return response.data;
+    return authService.changePassword(email, currentPassword, newPassword);
   }
 
-  // ==================== User Profile ====================
-
-  async uploadAvatar(file: File): Promise<{ success: boolean; avatarUrl: string; message: string }> {
-    const formData = new FormData();
-    formData.append('avatarFile', file);
-
-    const response = await this.api.post('/users/avatar', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return response.data;
+  async updateUserAvatar(avatarId: string) {
+    return authService.updateUserAvatar(avatarId);
   }
 
-  async getCurrentUserProfile(): Promise<any> {
-    const response = await this.api.get('/users/profile');
-    return response.data;
+  async getCurrentUserProfile() {
+    return authService.getCurrentUserProfile();
   }
 
-  // ==================== Inventory Items ====================
+  // ==================== Inventory (delegates to inventoryService) ====================
 
   async getInventoryItems(filters?: {
     category?: string;
@@ -155,424 +78,344 @@ class ApiService {
     lowStock?: boolean;
     search?: string;
   }): Promise<InventoryItem[]> {
-    const response = await this.api.get('/inventory', { params: filters });
-    return response.data;
+    return inventoryService.getInventoryItems(filters);
   }
 
   async getInventoryById(id: string): Promise<InventoryItem> {
-    const response = await this.api.get(`/inventory/${id}`);
-    return response.data;
+    return inventoryService.getInventoryById(id);
   }
 
   async createInventoryItem(item: Omit<InventoryItem, 'id'>): Promise<InventoryItem> {
-    const response = await this.api.post('/inventory', item);
-    return response.data;
+    return inventoryService.createInventoryItem(item);
   }
 
   async updateInventoryItem(id: string, updates: Partial<InventoryItem>): Promise<InventoryItem> {
-    const response = await this.api.put(`/inventory/${id}`, updates);
-    return response.data;
+    return inventoryService.updateInventoryItem(id, updates);
   }
 
   async deleteInventoryItem(id: string): Promise<void> {
-    await this.api.delete(`/inventory/${id}`);
+    return inventoryService.deleteInventoryItem(id);
   }
 
-  async bulkCreateInventoryItems(items: Array<Omit<InventoryItem, 'id'>>): Promise<{
-    success: boolean;
-    imported: number;
-    failed: number;
-    errors?: Array<{ row: number; error: string }>;
-  }> {
-    const response = await this.api.post('/inventory/bulk/create', { items });
-    return response.data;
+  async bulkCreateInventoryItems(items: Array<Omit<InventoryItem, 'id'>>) {
+    return inventoryService.bulkCreateInventoryItems(items);
   }
 
-  // ==================== Checkouts ====================
+  // ==================== Checkouts (delegates to inventoryService) ====================
 
-  async createSingleCheckout(checkout: any): Promise<{ success: boolean; checkoutId: string; masterBarcode: string; message: string }> {
-    const response = await this.api.post('/checkouts/single', checkout);
-    return response.data;
+  async createSingleCheckout(checkout: any) {
+    return inventoryService.createSingleCheckout(checkout);
   }
 
-  async createBulkCheckout(checkout: BulkCheckout): Promise<{ success: boolean; masterBarcode: string; checkoutsCreated: number; message: string }> {
-    const response = await this.api.post('/checkouts/bulk', checkout);
-    return response.data;
+  async createBulkCheckout(checkout: BulkCheckout) {
+    return inventoryService.createBulkCheckout(checkout);
   }
 
-  async checkInSingle(checkIn: any): Promise<{ success: boolean; message: string; checkoutStatus: string; remainingQuantity: number }> {
-    const response = await this.api.post('/checkouts/checkin/single', checkIn);
-    return response.data;
+  async checkInSingle(checkIn: any) {
+    return inventoryService.checkInSingle(checkIn);
   }
 
-  async checkInBulk(checkIn: any): Promise<{ success: boolean; message: string; returnType: string; masterBarcode: string }> {
-    const response = await this.api.post('/checkouts/checkin/bulk', checkIn);
-    return response.data;
+  async checkInBulk(checkIn: any) {
+    return inventoryService.checkInBulk(checkIn);
   }
 
   async getAllCheckouts(): Promise<ExtendedCheckout[]> {
-    const response = await this.api.get('/checkouts');
-    return response.data;
+    return inventoryService.getAllCheckouts();
   }
 
-  async getCheckoutByMasterBarcode(masterBarcode: string): Promise<any> {
-    const response = await this.api.get(`/checkouts/${masterBarcode}`);
-    return response.data;
+  async getCheckoutByMasterBarcode(masterBarcode: string) {
+    return inventoryService.getCheckoutByMasterBarcode(masterBarcode);
   }
 
-  // ==================== Maintenance Tickets ====================
+  // ==================== Maintenance (delegates to inventoryService) ====================
 
   async getAllMaintenanceTickets(): Promise<MaintenanceTicket[]> {
-    const response = await this.api.get('/maintenance');
-    return response.data;
+    return inventoryService.getAllMaintenanceTickets();
   }
 
   async createMaintenanceTicket(ticket: Omit<MaintenanceTicket, 'id'>): Promise<MaintenanceTicket> {
-    const response = await this.api.post('/maintenance', ticket);
-    return response.data;
+    return inventoryService.createMaintenanceTicket(ticket);
   }
 
   async updateMaintenanceTicket(id: string, updates: Partial<MaintenanceTicket>): Promise<MaintenanceTicket> {
-    const response = await this.api.put(`/maintenance/${id}`, updates);
-    return response.data;
+    return inventoryService.updateMaintenanceTicket(id, updates);
   }
 
   async deleteMaintenanceTicket(id: string): Promise<void> {
-    await this.api.delete(`/maintenance/${id}`);
+    return inventoryService.deleteMaintenanceTicket(id);
   }
 
   async getMaintenanceTicketById(id: string): Promise<MaintenanceTicket> {
-    const response = await this.api.get(`/maintenance/${id}`);
-    return response.data;
+    return inventoryService.getMaintenanceTicketById(id);
   }
 
-  // ==================== Activity Log ====================
+  // ==================== Activity (delegates to activityService) ====================
 
   async createActivityLog(activity: {
     action: string;
     description: string;
     user: string;
     timestamp: string;
-  }): Promise<any> {
-    const response = await this.api.post('/activity', activity);
-    return response.data;
+  }) {
+    return activityService.createActivityLog(activity);
   }
 
-  async getRecentActivity(limit: number = 10): Promise<any[]> {
-    const response = await this.api.get('/activity', { params: { limit } });
-    return response.data;
+  async getRecentActivity(limit: number = 10) {
+    return activityService.getRecentActivity(limit);
   }
 
-  // ==================== Projects ===================
-
-  async getProjects(filters?: any): Promise<any[]> {
-    const response = await this.api.get('/projects', { params: filters });
-    try {
-      const transformed = transformKeysToCAmelCase(response.data);
-      // Extract engineer and manager names from the joined user objects
-      const projects = Array.isArray(transformed) ? transformed : [transformed];
-
-      const enriched = projects.map((project: any) => ({
-        ...project,
-        // Add engineerId alias for compatibility with dashboards
-        engineerId: project.leadEngineerId || project.engineerId,
-        engineerName: project.leadEngineer?.name || project.engineerName,
-        managerName: project.manager?.name || project.managerName,
-      }));
-
-      return enriched;
-    } catch (error) {
-      console.error('Error transforming projects data:', error);
-      return response.data;
-    }
+  async getAllActivity(filters?: any) {
+    return activityService.getAllActivity(filters);
   }
 
-  async getProjectById(id: string): Promise<any> {
-    const response = await this.api.get(`/projects/${id}`);
-    return transformKeysToCAmelCase(response.data);
+  async getActivityById(id: string) {
+    return activityService.getActivityById(id);
   }
 
-  async createProject(project: any): Promise<any> {
-    const response = await this.api.post('/projects', project);
-    return transformKeysToCAmelCase(response.data);
+  async getActivityByUser(userId: string, filters?: any) {
+    return activityService.getActivityByUser(userId, filters);
   }
 
-  async updateProject(id: string, updates: any): Promise<any> {
-    const response = await this.api.put(`/projects/${id}`, updates);
-    return transformKeysToCAmelCase(response.data);
+  async getActivityByModule(module: string, filters?: any) {
+    return activityService.getActivityByModule(module, filters);
   }
 
-  async deleteProject(id: string): Promise<void> {
-    await this.api.delete(`/projects/${id}`);
+  // ==================== Projects (delegates to projectService) ====================
+
+  async getProjects(filters?: any) {
+    return projectService.getProjects(filters);
   }
 
-  async updateProjectStatus(id: string, status: string, dateField?: { field: string; value: string }): Promise<any> {
-    const response = await this.api.patch(`/projects/${id}/status`, { status, dateField });
-    return transformKeysToCAmelCase(response.data);
+  async getProjectById(id: string) {
+    return projectService.getProjectById(id);
   }
 
-  async uploadProjectPO(id: string, file: File): Promise<{ success: boolean; fileUrl: string; message: string }> {
-    const formData = new FormData();
-    formData.append('poFile', file);
-
-    const response = await this.api.post(`/projects/${id}/upload-po`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return response.data;
+  async createProject(project: any) {
+    return projectService.createProject(project);
   }
 
-  async deleteProjectPO(id: string): Promise<{ success: boolean; message: string }> {
-    const response = await this.api.delete(`/projects/${id}/po-file`);
-    return response.data;
+  async updateProject(id: string, updates: any) {
+    return projectService.updateProject(id, updates);
   }
 
-  async downloadProjectPO(fileUrl: string): Promise<Blob> {
-    const response = await this.api.get(fileUrl, {
-      responseType: 'blob',
-    });
-    return response.data;
+  async deleteProject(id: string) {
+    return projectService.deleteProject(id);
   }
 
-  // ==================== Timesheets ====================
-
-  async getTimesheets(filters?: any): Promise<any[]> {
-    const response = await this.api.get('/timesheets', { params: filters });
-    // Backend returns { data: [...], total, limit, offset }
-    const data = Array.isArray(response.data) ? response.data : (response.data.data || []);
-    return transformKeysToCAmelCase(data);
+  async updateProjectStatus(id: string, status: string, dateField?: { field: string; value: string }) {
+    return projectService.updateProjectStatus(id, status, dateField);
   }
 
-  async createTimesheet(timesheet: any): Promise<any> {
-    const response = await this.api.post('/timesheets', timesheet);
-    return transformKeysToCAmelCase(response.data);
+  async uploadProjectPO(id: string, file: File) {
+    return projectService.uploadProjectPO(id, file);
   }
 
-  async updateTimesheet(id: string, updates: any): Promise<any> {
-    const response = await this.api.put(`/timesheets/${id}`, updates);
-    return transformKeysToCAmelCase(response.data);
+  async deleteProjectPO(id: string) {
+    return projectService.deleteProjectPO(id);
   }
 
-  async deleteTimesheet(id: string): Promise<void> {
-    await this.api.delete(`/timesheets/${id}`);
+  async downloadProjectPO(fileUrl: string) {
+    return projectService.downloadProjectPO(fileUrl);
   }
 
-  // ==================== Clients ====================
-
-  async getAllClients(filters?: any): Promise<any[]> {
-    const response = await this.api.get('/clients', { params: filters });
-    // The backend returns { data: [...], total, limit, offset }
-    const data = Array.isArray(response.data) ? response.data : (response.data.data || []);
-    return transformKeysToCAmelCase(data);
+  async getProjectHourlyRates(projectId: string) {
+    return projectService.getProjectHourlyRates(projectId);
   }
 
-  async getClientById(id: string): Promise<any> {
-    const response = await this.api.get(`/clients/${id}`);
-    return transformKeysToCAmelCase(response.data);
+  async saveProjectHourlyRates(projectId: string, rates: Record<string, number>) {
+    return projectService.saveProjectHourlyRates(projectId, rates);
   }
 
-  async createClient(client: any): Promise<any> {
-    const response = await this.api.post('/clients', client);
-    return transformKeysToCAmelCase(response.data);
+  async deleteProjectHourlyRate(projectId: string, teamMemberId: string) {
+    return projectService.deleteProjectHourlyRate(projectId, teamMemberId);
   }
 
-  async updateClient(id: string, updates: any): Promise<any> {
-    const response = await this.api.put(`/clients/${id}`, updates);
-    return transformKeysToCAmelCase(response.data);
+  async uploadMigrationFile(file: File) {
+    return projectService.uploadMigrationFile(file);
   }
 
-  async deleteClient(id: string): Promise<void> {
-    await this.api.delete(`/clients/${id}`);
+  async executeMigration(projects: any[]) {
+    return projectService.executeMigration(projects);
   }
 
-  // ==================== Team Members ====================
-
-  async getAllTeamMembers(filters?: any): Promise<any[]> {
-    const response = await this.api.get('/team', { params: filters });
-    // The backend returns { data: [...], total, limit, offset }
-    const data = Array.isArray(response.data) ? response.data : (response.data.data || []);
-    return transformKeysToCAmelCase(data);
+  async getMigrationTemplate() {
+    return projectService.getMigrationTemplate();
   }
 
-  async getTeamMemberById(id: string): Promise<any> {
-    const response = await this.api.get(`/team/${id}`);
-    return transformKeysToCAmelCase(response.data);
+  // ==================== Timesheets (delegates to timesheetService) ====================
+
+  async getTimesheets(filters?: any) {
+    return timesheetService.getTimesheets(filters);
   }
 
-  async createTeamMember(member: any): Promise<any> {
-    const response = await this.api.post('/team', member);
-    return transformKeysToCAmelCase(response.data);
+  async createTimesheet(timesheet: any) {
+    return timesheetService.createTimesheet(timesheet);
   }
 
-  async updateTeamMember(id: string, updates: any): Promise<any> {
-    const response = await this.api.put(`/team/${id}`, updates);
-    return transformKeysToCAmelCase(response.data);
+  async updateTimesheet(id: string, updates: any) {
+    return timesheetService.updateTimesheet(id, updates);
   }
 
-  async deleteTeamMember(id: string): Promise<void> {
-    await this.api.delete(`/team/${id}`);
+  async deleteTimesheet(id: string) {
+    return timesheetService.deleteTimesheet(id);
   }
 
-  async getTeamByDepartment(department: string, filters?: any): Promise<any[]> {
-    const response = await this.api.get(`/team/department/${department}`, { params: filters });
-    return response.data;
+  // ==================== Clients (delegates to timesheetService) ====================
+
+  async getAllClients(filters?: any) {
+    return timesheetService.getAllClients(filters);
   }
 
-  // ==================== Computers/PC ====================
-
-  async getAllComputers(filters?: any): Promise<any[]> {
-    const response = await this.api.get('/computers', { params: filters });
-    return response.data;
+  async getClientById(id: string) {
+    return timesheetService.getClientById(id);
   }
 
-  async getComputerById(id: string): Promise<any> {
-    const response = await this.api.get(`/computers/${id}`);
-    return response.data;
+  async createClient(client: any) {
+    return timesheetService.createClient(client);
   }
 
-  async createComputer(computer: any): Promise<any> {
-    const response = await this.api.post('/computers', computer);
-    return response.data;
+  async updateClient(id: string, updates: any) {
+    return timesheetService.updateClient(id, updates);
   }
 
-  async updateComputer(id: string, updates: any): Promise<any> {
-    const response = await this.api.put(`/computers/${id}`, updates);
-    return response.data;
+  async deleteClient(id: string) {
+    return timesheetService.deleteClient(id);
   }
 
-  async deleteComputer(id: string): Promise<void> {
-    await this.api.delete(`/computers/${id}`);
+  // ==================== Team (delegates to teamService) ====================
+
+  async getAllTeamMembers(filters?: any) {
+    return teamService.getAllTeamMembers(filters);
   }
 
-  async getComputersAssignedTo(userId: string, filters?: any): Promise<any[]> {
-    const response = await this.api.get(`/computers/assigned/${userId}`, { params: filters });
-    return response.data;
+  async getTeamMemberById(id: string) {
+    return teamService.getTeamMemberById(id);
   }
 
-  async assignComputerToUser(computerId: string, userId: string): Promise<any> {
-    const response = await this.api.post(`/computers/${computerId}/assign`, { userId });
-    return response.data;
+  async createTeamMember(member: any) {
+    return teamService.createTeamMember(member);
   }
 
-  async unassignComputer(computerId: string): Promise<any> {
-    const response = await this.api.post(`/computers/${computerId}/unassign`, {});
-    return response.data;
+  async updateTeamMember(id: string, updates: any) {
+    return teamService.updateTeamMember(id, updates);
   }
 
-  // ==================== Research Projects ====================
-
-  async getAllResearchProjects(filters?: any): Promise<any[]> {
-    const response = await this.api.get('/research/projects', { params: filters });
-    return transformKeysToCAmelCase(response.data);
+  async deleteTeamMember(id: string) {
+    return teamService.deleteTeamMember(id);
   }
 
-  async getResearchProjectById(id: string): Promise<any> {
-    const response = await this.api.get(`/research/projects/${id}`);
-    return transformKeysToCAmelCase(response.data);
+  async reactivateTeamMember(id: string) {
+    return teamService.reactivateTeamMember(id);
   }
 
-  async createResearchProject(project: any): Promise<any> {
-    const response = await this.api.post('/research/projects', project);
-    return transformKeysToCAmelCase(response.data);
+  async updateTeamMemberAvatar(teamMemberId: string, avatarId: string) {
+    return teamService.updateTeamMemberAvatar(teamMemberId, avatarId);
   }
 
-  async updateResearchProject(id: string, updates: any): Promise<any> {
-    const response = await this.api.put(`/research/projects/${id}`, updates);
-    return transformKeysToCAmelCase(response.data);
+  async getTeamByDepartment(department: string, filters?: any) {
+    return teamService.getTeamByDepartment(department, filters);
   }
 
-  async deleteResearchProject(id: string): Promise<void> {
-    await this.api.delete(`/research/projects/${id}`);
+  // ==================== Computers (delegates to computerService) ====================
+
+  async getAllComputers(filters?: any) {
+    return computerService.getAllComputers(filters);
   }
 
-  async getResearchProjectsByStatus(status: string, filters?: any): Promise<any[]> {
-    const response = await this.api.get(`/research/projects/status/${status}`, { params: filters });
-    return transformKeysToCAmelCase(response.data);
+  async getComputerById(id: string) {
+    return computerService.getComputerById(id);
   }
 
-  async logResearchTimesheet(entry: any): Promise<any> {
-    const response = await this.api.post('/research/timesheets', entry);
-    return transformKeysToCAmelCase(response.data);
+  async createComputer(computer: any) {
+    return computerService.createComputer(computer);
   }
 
-  async approveResearchTimesheet(entryId: string, approvedBy: string): Promise<any> {
-    const response = await this.api.put(`/research/timesheets/${entryId}/approve`, { approvedBy });
-    return transformKeysToCAmelCase(response.data);
+  async updateComputer(id: string, updates: any) {
+    return computerService.updateComputer(id, updates);
   }
 
-  async deleteResearchTimesheet(entryId: string): Promise<void> {
-    await this.api.delete(`/research/timesheets/${entryId}`);
+  async deleteComputer(id: string) {
+    return computerService.deleteComputer(id);
   }
 
-  // ==================== Activity Log - Enhanced ====================
-
-  async getAllActivity(filters?: any): Promise<any> {
-    const response = await this.api.get('/activity', { params: filters });
-    return response.data;
+  async getComputersAssignedTo(userId: string, filters?: any) {
+    return computerService.getComputersAssignedTo(userId, filters);
   }
 
-  async getActivityById(id: string): Promise<any> {
-    const response = await this.api.get(`/activity/${id}`);
-    return response.data;
+  async assignComputerToUser(
+    computerId: string,
+    userId: string,
+    installedSoftware?: string[],
+    notes?: string
+  ) {
+    return computerService.assignComputerToUser(computerId, userId, installedSoftware, notes);
   }
 
-  async getActivityByUser(userId: string, filters?: any): Promise<any> {
-    const response = await this.api.get(`/activity/user/${userId}`, { params: filters });
-    return response.data;
+  async unassignComputer(computerId: string) {
+    return computerService.unassignComputer(computerId);
   }
 
-  async getActivityByModule(module: string, filters?: any): Promise<any> {
-    const response = await this.api.get(`/activity/module/${module}`, { params: filters });
-    return response.data;
+  async setMaintenanceStatus(computerId: string, inMaintenance: boolean) {
+    return computerService.setMaintenanceStatus(computerId, inMaintenance);
   }
 
-  // ==================== Environment Info ====================
+  // ==================== Research (delegates to researchService) ====================
 
-  isProduction(): boolean {
-    return import.meta.env.PROD;
+  async getAllResearchProjects(filters?: any) {
+    return researchService.getAllResearchProjects(filters);
   }
 
-  getEnvironmentInfo(): { isProduction: boolean; url: string } {
-    return {
-      isProduction: this.isProduction(),
-      url: this.api.defaults.baseURL || 'Unknown',
-    };
+  async getResearchProjectById(id: string) {
+    return researchService.getResearchProjectById(id);
   }
 
-  // ==================== Migration ====================
-
-  async uploadMigrationFile(file: File): Promise<any> {
-    const formData = new FormData();
-    formData.append('file', file);
-    const response = await this.api.post('/migration/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return response.data;
+  async createResearchProject(project: any) {
+    return researchService.createResearchProject(project);
   }
 
-  async executeMigration(projects: any[]): Promise<any> {
-    const response = await this.api.post('/migration/execute', { projects });
-    return response.data;
+  async updateResearchProject(id: string, updates: any) {
+    return researchService.updateResearchProject(id, updates);
   }
 
-  async getMigrationTemplate(): Promise<any> {
-    const response = await this.api.get('/migration/template');
-    return response.data;
+  async deleteResearchProject(id: string) {
+    return researchService.deleteResearchProject(id);
   }
 
-  // ==================== Purchase Orders ====================
-
-  async getAllPurchaseOrders(filters?: any): Promise<any> {
-    const response = await this.api.get('/purchase-orders', { params: filters });
-    return response.data;
+  async getResearchProjectsByStatus(status: string, filters?: any) {
+    return researchService.getResearchProjectsByStatus(status, filters);
   }
 
-  async getPurchaseOrderById(id: string): Promise<any> {
-    const response = await this.api.get(`/purchase-orders/${id}`);
-    return response.data;
+  async logResearchTimesheet(entry: any) {
+    return researchService.logResearchTimesheet(entry);
+  }
+
+  async approveResearchTimesheet(entryId: string, approvedBy: string) {
+    return researchService.approveResearchTimesheet(entryId, approvedBy);
+  }
+
+  async deleteResearchTimesheet(entryId: string) {
+    return researchService.deleteResearchTimesheet(entryId);
+  }
+
+  async getResearchTimesheets(filters?: {
+    projectId?: string;
+    teamMemberId?: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+  }) {
+    return researchService.getResearchTimesheets(filters);
+  }
+
+  // ==================== Finance (delegates to financeService) ====================
+
+  // Purchase Orders
+  async getAllPurchaseOrders(filters?: any) {
+    return financeService.getAllPurchaseOrders(filters);
+  }
+
+  async getPurchaseOrderById(id: string) {
+    return financeService.getPurchaseOrderById(id);
   }
 
   async createPurchaseOrder(data: {
@@ -580,170 +423,166 @@ class ApiService {
     projectCode: string;
     clientName: string;
     amount: number | string;
+    currency?: string;
     receivedDate: Date | string;
     dueDate?: Date | string;
     description?: string;
     status?: string;
     fileUrl?: string;
-  }): Promise<any> {
-    const response = await this.api.post('/purchase-orders', data);
-    return response.data;
+  }) {
+    return financeService.createPurchaseOrder(data);
   }
 
-  async updatePurchaseOrder(id: string, updates: any): Promise<any> {
-    const response = await this.api.put(`/purchase-orders/${id}`, updates);
-    return response.data;
+  async updatePurchaseOrder(id: string, updates: any) {
+    return financeService.updatePurchaseOrder(id, updates);
   }
 
-  async deletePurchaseOrder(id: string): Promise<any> {
-    const response = await this.api.delete(`/purchase-orders/${id}`);
-    return response.data;
+  async deletePurchaseOrder(id: string) {
+    return financeService.deletePurchaseOrder(id);
   }
 
-  async uploadPurchaseOrderFile(formData: FormData): Promise<any> {
-    const response = await this.api.post('/purchase-orders/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return response.data;
+  async uploadPurchaseOrderFile(formData: FormData) {
+    return financeService.uploadPurchaseOrderFile(formData);
   }
 
-  async downloadPurchaseOrderFile(filename: string): Promise<Blob> {
-    const response = await this.api.get(`/purchase-orders/download/${filename}`, {
-      responseType: 'blob',
-    });
-    return response.data;
+  async downloadPurchaseOrderFile(filename: string) {
+    return financeService.downloadPurchaseOrderFile(filename);
   }
 
-  // ==================== Invoices ====================
-
-  async getAllInvoices(filters?: any): Promise<any[]> {
-    const response = await this.api.get('/invoices', { params: filters });
-    return transformKeysToCAmelCase(response.data);
+  async getPurchaseOrders(filters?: any) {
+    return financeService.getPurchaseOrders(filters);
   }
 
-  async getInvoiceById(id: string): Promise<any> {
-    const response = await this.api.get(`/invoices/${id}`);
-    return transformKeysToCAmelCase(response.data);
+  // PO Revisions
+  async getPORevisions(poNumberBase: string) {
+    return financeService.getPORevisions(poNumberBase);
   }
 
-  async getNextInvoiceNumber(): Promise<string> {
-    const response = await this.api.get('/invoices/next-number');
-    return response.data.nextNumber;
+  async createPORevision(
+    poId: string,
+    data: {
+      amount: number;
+      currency: string;
+      receivedDate: Date | string;
+      description?: string;
+      fileUrl?: string;
+      revisionReason: string;
+    }
+  ) {
+    return financeService.createPORevision(poId, data);
   }
 
-  async getInvoiceProjectContext(projectCode: string): Promise<any> {
-    const response = await this.api.get(`/invoices/project/${projectCode}/context`);
-    return transformKeysToCAmelCase(response.data);
+  async adjustPOMYRAmount(poId: string, adjustedAmount: number, reason: string) {
+    return financeService.adjustPOMYRAmount(poId, adjustedAmount, reason);
   }
 
-  async createInvoice(invoice: any): Promise<any> {
-    const response = await this.api.post('/invoices', invoice);
-    return transformKeysToCAmelCase(response.data);
+  // Invoices
+  async getAllInvoices(filters?: any) {
+    return financeService.getAllInvoices(filters);
   }
 
-  async updateInvoice(id: string, updates: any): Promise<any> {
-    const response = await this.api.put(`/invoices/${id}`, updates);
-    return transformKeysToCAmelCase(response.data);
+  async getInvoiceById(id: string) {
+    return financeService.getInvoiceById(id);
   }
 
-  async deleteInvoice(id: string): Promise<void> {
-    await this.api.delete(`/invoices/${id}`);
+  async getNextInvoiceNumber() {
+    return financeService.getNextInvoiceNumber();
   }
 
-  async downloadInvoicePDF(id: string): Promise<Blob> {
-    const response = await this.api.get(`/invoices/${id}/pdf`, {
-      responseType: 'blob',
-    });
-    return response.data;
+  async getInvoiceProjectContext(projectCode: string) {
+    return financeService.getInvoiceProjectContext(projectCode);
   }
 
-  // ==================== Issued POs (Outgoing) ====================
-
-  async getAllIssuedPOs(filters?: any): Promise<any[]> {
-    const response = await this.api.get('/issued-pos', { params: filters });
-    return transformKeysToCAmelCase(response.data);
+  async createInvoice(invoice: any) {
+    return financeService.createInvoice(invoice);
   }
 
-  async getIssuedPOById(id: string): Promise<any> {
-    const response = await this.api.get(`/issued-pos/${id}`);
-    return transformKeysToCAmelCase(response.data);
+  async updateInvoice(id: string, updates: any) {
+    return financeService.updateInvoice(id, updates);
   }
 
-  async getNextIssuedPONumber(): Promise<string> {
-    const response = await this.api.get('/issued-pos/next-number');
-    return response.data.nextNumber;
+  async deleteInvoice(id: string) {
+    return financeService.deleteInvoice(id);
   }
 
-  async createIssuedPO(issuedPO: any): Promise<any> {
-    const response = await this.api.post('/issued-pos', issuedPO);
-    return transformKeysToCAmelCase(response.data);
+  async downloadInvoicePDF(id: string) {
+    return financeService.downloadInvoicePDF(id);
   }
 
-  async updateIssuedPO(id: string, updates: any): Promise<any> {
-    const response = await this.api.put(`/issued-pos/${id}`, updates);
-    return transformKeysToCAmelCase(response.data);
+  // Issued POs
+  async getAllIssuedPOs(filters?: any) {
+    return financeService.getAllIssuedPOs(filters);
   }
 
-  async deleteIssuedPO(id: string): Promise<void> {
-    await this.api.delete(`/issued-pos/${id}`);
+  async getIssuedPOById(id: string) {
+    return financeService.getIssuedPOById(id);
   }
 
-  async downloadIssuedPOPDF(id: string): Promise<Blob> {
-    const response = await this.api.get(`/issued-pos/${id}/pdf`, {
-      responseType: 'blob',
-    });
-    return response.data;
+  async getNextIssuedPONumber() {
+    return financeService.getNextIssuedPONumber();
   }
 
-  // ==================== Project Hourly Rates ====================
-
-  async getProjectHourlyRates(projectId: string): Promise<any[]> {
-    const response = await this.api.get(`/project-hourly-rates/${projectId}`);
-    return response.data?.data || [];
+  async createIssuedPO(issuedPO: any) {
+    return financeService.createIssuedPO(issuedPO);
   }
 
-  async saveProjectHourlyRates(projectId: string, rates: Record<string, number>): Promise<any> {
-    const response = await this.api.put(`/project-hourly-rates/${projectId}`, { rates });
-    return response.data;
+  async updateIssuedPO(id: string, updates: any) {
+    return financeService.updateIssuedPO(id, updates);
   }
 
-  async deleteProjectHourlyRate(projectId: string, teamMemberId: string): Promise<void> {
-    await this.api.delete(`/project-hourly-rates/${projectId}/${teamMemberId}`);
+  async deleteIssuedPO(id: string) {
+    return financeService.deleteIssuedPO(id);
   }
 
-  // ==================== Categories ===================
-
-  async getAllCategories(): Promise<any[]> {
-    const response = await this.api.get('/categories');
-    return response.data || [];
+  async downloadIssuedPOPDF(id: string) {
+    return financeService.downloadIssuedPOPDF(id);
   }
 
-  async getCategoryById(id: string): Promise<any> {
-    const response = await this.api.get(`/categories/${id}`);
-    return response.data;
+  // Categories
+  async getAllCategories() {
+    return financeService.getAllCategories();
   }
 
-  async createCategory(data: { name: string; description?: string }): Promise<any> {
-    const response = await this.api.post('/categories', data);
-    return response.data;
+  async getCategoryById(id: string) {
+    return financeService.getCategoryById(id);
   }
 
-  async updateCategory(id: string, data: Partial<{ name: string; description: string }>): Promise<any> {
-    const response = await this.api.put(`/categories/${id}`, data);
-    return response.data;
+  async createCategory(data: { name: string; description?: string }) {
+    return financeService.createCategory(data);
   }
 
-  async deleteCategory(id: string): Promise<void> {
-    await this.api.delete(`/categories/${id}`);
+  async updateCategory(id: string, data: Partial<{ name: string; description: string }>) {
+    return financeService.updateCategory(id, data);
+  }
+
+  async deleteCategory(id: string) {
+    return financeService.deleteCategory(id);
+  }
+
+  // Exchange Rates
+  async getExchangeRates() {
+    return financeService.getExchangeRates();
+  }
+
+  async createExchangeRate(data: { fromCurrency: string; rate: number; effectiveDate: string }) {
+    return financeService.createExchangeRate(data);
+  }
+
+  async importExchangeRates() {
+    return financeService.importExchangeRates();
+  }
+
+  async convertCurrency(amount: number, fromCurrency: string) {
+    return financeService.convertCurrency(amount, fromCurrency);
   }
 }
 
 // Export singleton instance
 export default new ApiService();
 
-// Also export named functions for backward compatibility
+// Named exports for backward compatibility
+const service = new ApiService();
+
 export const {
   login,
   logout,
@@ -835,4 +674,8 @@ export const {
   createCategory,
   updateCategory,
   deleteCategory,
-} = new ApiService();
+  getExchangeRates,
+  createExchangeRate,
+  importExchangeRates,
+  convertCurrency,
+} = service;

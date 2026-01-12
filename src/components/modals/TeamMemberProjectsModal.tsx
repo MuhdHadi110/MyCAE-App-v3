@@ -42,7 +42,7 @@ export const TeamMemberProjectsModal: React.FC<TeamMemberProjectsModalProps> = (
 
   // Calculate statistics
   const stats = useMemo(() => {
-    const totalHours = memberProjects.reduce((sum, p) => sum + p.actualHours, 0);
+    const totalHours = memberProjects.reduce((sum, p) => sum + (p.actualHours || 0), 0);
     const totalPlannedHours = memberProjects.reduce((sum, p) => sum + p.plannedHours, 0);
     const totalHoursUtilization = totalPlannedHours > 0 ? (totalHours / totalPlannedHours) * 100 : 0;
 

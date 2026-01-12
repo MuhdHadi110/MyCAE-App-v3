@@ -8,7 +8,7 @@ import { BulkCheckInModal } from '../components/modals/BulkCheckInModal';
 import { useCheckoutStore } from '../store/checkoutStore';
 import { useResponsive } from '../hooks/useResponsive';
 import { getCurrentUser } from '../lib/auth';
-import apiService from '../services/api.service';
+import checkoutService from '../services/api.service';
 import toast from 'react-hot-toast';
 import type { CheckoutStatus } from '../types/checkout.types';
 import type { BulkCheckInData } from '../components/modals/BulkCheckInModal';
@@ -91,7 +91,7 @@ export const CheckoutsScreen: React.FC = () => {
   const handleCheckInSubmit = async (checkInData: BulkCheckInData) => {
     try {
       // Note: API method may need to be implemented
-      // await apiService.checkInItems(checkInData);
+      // await checkoutService.checkInItems(checkInData);
       toast.success('Items checked in successfully!');
       setIsCheckInModalOpen(false);
       await fetchCheckouts();

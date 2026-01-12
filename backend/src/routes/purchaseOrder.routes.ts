@@ -5,10 +5,13 @@ import { Project, ProjectStatus } from '../entities/Project';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { body, validationResult } from 'express-validator';
 import { upload, generateFileUrl, deleteFile } from '../utils/fileUpload';
+import { CurrencyService } from '../services/currency.service';
+import { PurchaseOrderService } from '../services/purchaseOrder.service';
 import path from 'path';
 import fs from 'fs';
 
 const router = Router();
+const poService = new PurchaseOrderService();
 
 // All PO routes require authentication
 router.use(authenticate);
@@ -16,40 +19,60 @@ router.use(authenticate);
 /**
  * GET /api/purchase-orders
  * Get all purchase orders with filters
+ * By default, only returns active revisions (is_active = true)
+ * Use includeInactive=true to get all revisions
  */
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
-    const { status, project_code, limit = 100, offset = 0 } = req.query;
-    const poRepo = AppDataSource.getRepository(PurchaseOrder);
+    const { status, project_code, limit = 100, offset = 0, includeInactive } = req.query;
 
-    let query = poRepo.createQueryBuilder('po')
-      .leftJoinAndSelect('po.project', 'project')
-      .select([
-        'po',
-        'project.project_code',
-        'project.title',
-      ])
-      .orderBy('po.received_date', 'DESC');
+    if (includeInactive === 'true') {
+      // For inactive revisions, use direct repo query
+      const poRepo = AppDataSource.getRepository(PurchaseOrder);
+      let query = poRepo.createQueryBuilder('po')
+        .leftJoinAndSelect('po.project', 'project')
+        .select([
+          'po',
+          'project.project_code',
+          'project.title',
+        ])
+        .orderBy('po.received_date', 'DESC');
 
-    if (status) {
-      query = query.where('po.status = :status', { status });
+      if (status) {
+        query = query.where('po.status = :status', { status });
+      }
+
+      if (project_code) {
+        query = query.andWhere('po.project_code = :project_code', { project_code });
+      }
+
+      const [purchaseOrders, total] = await query
+        .take(parseInt(limit as string))
+        .skip(parseInt(offset as string))
+        .getManyAndCount();
+
+      res.json({
+        data: purchaseOrders,
+        total,
+        limit: parseInt(limit as string),
+        offset: parseInt(offset as string),
+      });
+    } else {
+      // Use service for active POs
+      const result = await poService.getAllActivePOs({
+        project_code: project_code as string,
+        status: status as POStatus,
+        limit: parseInt(limit as string),
+        offset: parseInt(offset as string),
+      });
+
+      res.json({
+        data: result.data,
+        total: result.total,
+        limit: parseInt(limit as string),
+        offset: parseInt(offset as string),
+      });
     }
-
-    if (project_code) {
-      query = query.andWhere('po.project_code = :project_code', { project_code });
-    }
-
-    const [purchaseOrders, total] = await query
-      .take(parseInt(limit as string))
-      .skip(parseInt(offset as string))
-      .getManyAndCount();
-
-    res.json({
-      data: purchaseOrders,
-      total,
-      limit: parseInt(limit as string),
-      offset: parseInt(offset as string),
-    });
   } catch (error: any) {
     console.error('Error fetching purchase orders:', error);
     res.status(500).json({ error: 'Failed to fetch purchase orders' });
@@ -62,11 +85,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
  */
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const poRepo = AppDataSource.getRepository(PurchaseOrder);
-    const po = await poRepo.findOne({
-      where: { id: req.params.id },
-      relations: ['project'],
-    });
+    const po = await poService.getById(req.params.id);
 
     if (!po) {
       return res.status(404).json({ error: 'Purchase order not found' });
@@ -104,6 +123,7 @@ router.post(
         projectCode,
         clientName,
         amount,
+        currency = 'MYR',
         receivedDate,
         dueDate,
         description,
@@ -111,59 +131,29 @@ router.post(
         fileUrl,
       } = req.body;
 
-      const poRepo = AppDataSource.getRepository(PurchaseOrder);
-      const projectRepo = AppDataSource.getRepository(Project);
-
-      // Check if PO number already exists
-      const existingPO = await poRepo.findOne({ where: { po_number: poNumber } });
-      if (existingPO) {
-        return res.status(400).json({ error: 'Purchase order with this PO number already exists' });
-      }
-
-      // Find the project by project code
-      const project = await projectRepo.findOne({ where: { project_code: projectCode } });
-      if (!project) {
-        return res.status(404).json({ error: `Project with code ${projectCode} not found` });
-      }
-
-      // Create the purchase order
-      const po = poRepo.create({
-        po_number: poNumber,
-        project_code: projectCode,
-        client_name: clientName,
+      const po = await poService.createPO({
+        poNumber,
+        projectCode,
+        clientName,
         amount: parseFloat(amount),
-        received_date: new Date(receivedDate),
-        due_date: dueDate ? new Date(dueDate) : undefined,
+        currency,
+        receivedDate: new Date(receivedDate),
+        dueDate: dueDate ? new Date(dueDate) : undefined,
         description,
         status: status as POStatus,
-        file_url: fileUrl,
+        fileUrl,
       });
-
-      const savedPO = await poRepo.save(po);
-
-      // Automatically update project status from 'pre-lim' to 'ongoing' when PO is received
-      if (project.status === ProjectStatus.PRE_LIM) {
-        console.log(`📋 Updating project ${projectCode} status from pre-lim to ongoing`);
-        project.status = ProjectStatus.ONGOING;
-        project.po_received_date = new Date(receivedDate);
-        await projectRepo.save(project);
-        console.log(`✅ Project ${projectCode} status updated to ongoing`);
-      }
 
       // Fetch the complete PO with project relation
-      const fullPO = await poRepo.findOne({
-        where: { id: savedPO.id },
-        relations: ['project'],
-      });
+      const fullPO = await poService.getById(po.id);
 
       res.status(201).json({
         message: 'Purchase order created successfully',
         data: fullPO,
-        projectStatusUpdated: project.status === ProjectStatus.ONGOING,
       });
     } catch (error: any) {
       console.error('Error creating purchase order:', error);
-      res.status(500).json({ error: 'Failed to create purchase order' });
+      res.status(500).json({ error: error.message || 'Failed to create purchase order' });
     }
   }
 );
@@ -174,13 +164,6 @@ router.post(
  */
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const poRepo = AppDataSource.getRepository(PurchaseOrder);
-    const po = await poRepo.findOne({ where: { id: req.params.id } });
-
-    if (!po) {
-      return res.status(404).json({ error: 'Purchase order not found' });
-    }
-
     const {
       poNumber,
       clientName,
@@ -192,59 +175,39 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
       fileUrl,
     } = req.body;
 
-    // Update fields if provided
-    if (poNumber !== undefined) po.po_number = poNumber;
-    if (clientName !== undefined) po.client_name = clientName;
-    if (amount !== undefined) po.amount = parseFloat(amount);
-    if (receivedDate !== undefined) po.received_date = new Date(receivedDate);
-    if (dueDate !== undefined) po.due_date = dueDate ? new Date(dueDate) : undefined;
-    if (description !== undefined) po.description = description;
-    if (status !== undefined) po.status = status as POStatus;
-    if (fileUrl !== undefined) po.file_url = fileUrl;
+    const updates: any = {};
+    if (poNumber !== undefined) updates.po_number = poNumber;
+    if (clientName !== undefined) updates.client_name = clientName;
+    if (amount !== undefined) updates.amount = parseFloat(amount);
+    if (receivedDate !== undefined) updates.received_date = new Date(receivedDate);
+    if (dueDate !== undefined) updates.due_date = dueDate ? new Date(dueDate) : undefined;
+    if (description !== undefined) updates.description = description;
+    if (status !== undefined) updates.status = status as POStatus;
+    if (fileUrl !== undefined) updates.file_url = fileUrl;
 
-    const updatedPO = await poRepo.save(po);
-
-    // Fetch with relations
-    const fullPO = await poRepo.findOne({
-      where: { id: updatedPO.id },
-      relations: ['project'],
-    });
+    const updatedPO = await poService.updatePO(req.params.id, updates);
 
     res.json({
       message: 'Purchase order updated successfully',
-      data: fullPO,
+      data: updatedPO,
     });
   } catch (error: any) {
     console.error('Error updating purchase order:', error);
-    res.status(500).json({ error: 'Failed to update purchase order' });
+    res.status(500).json({ error: error.message || 'Failed to update purchase order' });
   }
 });
 
 /**
  * DELETE /api/purchase-orders/:id
- * Delete purchase order (soft delete)
+ * Delete purchase order
  */
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const poRepo = AppDataSource.getRepository(PurchaseOrder);
-    const po = await poRepo.findOne({ where: { id: req.params.id } });
-
-    if (!po) {
-      return res.status(404).json({ error: 'Purchase order not found' });
-    }
-
-    // Delete associated file if exists
-    if (po.file_url) {
-      deleteFile(po.file_url);
-    }
-
-    // Hard delete for now (can be changed to soft delete if needed)
-    await poRepo.remove(po);
-
+    await poService.deletePO(req.params.id);
     res.json({ message: 'Purchase order deleted successfully' });
   } catch (error: any) {
     console.error('Error deleting purchase order:', error);
-    res.status(500).json({ error: 'Failed to delete purchase order' });
+    res.status(500).json({ error: error.message || 'Failed to delete purchase order' });
   }
 });
 
@@ -311,5 +274,117 @@ router.get('/download/:filename', async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: 'Failed to download file' });
   }
 });
+
+/**
+ * GET /api/purchase-orders/:poNumberBase/revisions
+ * Get all revisions for a PO number
+ */
+router.get('/:poNumberBase/revisions', async (req: AuthRequest, res: Response) => {
+  try {
+    const { poNumberBase } = req.params;
+    const revisions = await poService.getRevisionHistory(poNumberBase);
+
+    if (revisions.length === 0) {
+      return res.status(404).json({ error: 'No revisions found for this PO' });
+    }
+
+    const activeRevision = revisions.find(r => r.is_active);
+
+    res.json({
+      data: revisions,
+      total: revisions.length,
+      activeRevision,
+    });
+  } catch (error: any) {
+    console.error('Error fetching PO revisions:', error);
+    res.status(500).json({ error: 'Failed to fetch PO revisions' });
+  }
+});
+
+/**
+ * POST /api/purchase-orders/:id/revisions
+ * Create new revision of existing PO
+ */
+router.post(
+  '/:id/revisions',
+  [
+    body('amount').isNumeric().withMessage('Amount must be a number'),
+    body('currency').notEmpty().withMessage('Currency is required'),
+    body('receivedDate').isISO8601().withMessage('Valid received date is required'),
+    body('revisionReason').notEmpty().withMessage('Revision reason is required'),
+  ],
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { id } = req.params;
+      const { amount, currency, receivedDate, description, fileUrl, revisionReason } = req.body;
+      const userId = req.user!.id;
+
+      const newRevision = await poService.createRevision(
+        id,
+        {
+          amount: parseFloat(amount),
+          currency,
+          receivedDate: new Date(receivedDate),
+          description,
+          fileUrl,
+          revisionReason,
+        },
+        userId
+      );
+
+      res.status(201).json({
+        message: 'PO revision created successfully',
+        data: newRevision,
+      });
+    } catch (error: any) {
+      console.error('Error creating PO revision:', error);
+      res.status(500).json({ error: error.message || 'Failed to create PO revision' });
+    }
+  }
+);
+
+/**
+ * PATCH /api/purchase-orders/:id/adjust-myr
+ * Manually adjust MYR amount
+ */
+router.patch(
+  '/:id/adjust-myr',
+  [
+    body('adjustedAmount').isNumeric().withMessage('Adjusted amount must be a number'),
+    body('reason').notEmpty().withMessage('Adjustment reason is required'),
+  ],
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { id } = req.params;
+      const { adjustedAmount, reason } = req.body;
+      const userId = req.user!.id;
+
+      const updatedPO = await poService.adjustMYRAmount(
+        id,
+        parseFloat(adjustedAmount),
+        reason,
+        userId
+      );
+
+      res.json({
+        message: 'MYR amount adjusted successfully',
+        data: updatedPO,
+      });
+    } catch (error: any) {
+      console.error('Error adjusting MYR amount:', error);
+      res.status(500).json({ error: error.message || 'Failed to adjust MYR amount' });
+    }
+  }
+);
 
 export default router;

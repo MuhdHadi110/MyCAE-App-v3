@@ -1,3 +1,5 @@
+export type InventoryLastAction = 'added' | 'returned' | 'checked-out' | 'updated';
+
 export interface InventoryItem {
   id: string;
   title: string;
@@ -16,6 +18,9 @@ export interface InventoryItem {
   notes?: string;
   lastUpdated: string;
   createdBy: string;
+  lastAction?: InventoryLastAction;
+  lastActionDate?: string;
+  lastActionBy?: string;
 }
 
 export interface Category {

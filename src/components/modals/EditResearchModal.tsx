@@ -18,7 +18,7 @@ export const EditResearchModal: React.FC<EditResearchModalProps> = ({ isOpen, on
     title: project.title,
     description: project.description || '',
     status: project.status,
-    endDate: project.endDate || '',
+    plannedEndDate: project.plannedEndDate || '',
     leadResearcherId: project.leadResearcherId,
     leadResearcherName: project.leadResearcherName || '',
     budget: project.budget || 0,
@@ -34,7 +34,7 @@ export const EditResearchModal: React.FC<EditResearchModalProps> = ({ isOpen, on
         title: project.title,
         description: project.description || '',
         status: project.status,
-        endDate: project.endDate || '',
+        plannedEndDate: project.plannedEndDate || '',
         leadResearcherId: project.leadResearcherId,
         leadResearcherName: project.leadResearcherName || '',
         budget: project.budget || 0,
@@ -64,7 +64,7 @@ export const EditResearchModal: React.FC<EditResearchModalProps> = ({ isOpen, on
       title: formData.title,
       description: formData.description,
       status: formData.status,
-      endDate: formData.endDate || undefined,
+      plannedEndDate: formData.plannedEndDate || undefined,
       leadResearcherId: formData.leadResearcherId,
       leadResearcherName: formData.leadResearcherName,
       budget: formData.budget || undefined,
@@ -168,10 +168,10 @@ export const EditResearchModal: React.FC<EditResearchModalProps> = ({ isOpen, on
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 bg-white"
             >
               <option value="planning">Planning</option>
-              <option value="active">Active</option>
-              <option value="completed">Completed</option>
+              <option value="in-progress">In Progress</option>
               <option value="on-hold">On Hold</option>
-              <option value="cancelled">Cancelled</option>
+              <option value="completed">Completed</option>
+              <option value="archived">Archived</option>
             </select>
           </div>
 
@@ -195,15 +195,15 @@ export const EditResearchModal: React.FC<EditResearchModalProps> = ({ isOpen, on
             {errors.leadResearcherId && <p className="text-red-500 text-xs mt-1">{errors.leadResearcherId}</p>}
           </div>
 
-          {/* End Date */}
+          {/* Planned End Date */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              End Date (Optional)
+              Planned End Date (Optional)
             </label>
             <input
               type="date"
-              value={formData.endDate}
-              onChange={(e) => handleInputChange('endDate', e.target.value)}
+              value={formData.plannedEndDate}
+              onChange={(e) => handleInputChange('plannedEndDate', e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
             />
           </div>

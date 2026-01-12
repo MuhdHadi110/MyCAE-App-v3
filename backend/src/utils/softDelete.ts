@@ -3,7 +3,7 @@
  * Provides helper functions for soft deleting entities and querying with soft delete support
  */
 
-import { Repository, SelectQueryBuilder } from 'typeorm';
+import { Repository, SelectQueryBuilder, ObjectLiteral } from 'typeorm';
 
 /**
  * Mark an entity as deleted (soft delete)
@@ -76,7 +76,7 @@ export async function restoreEntity<T extends { id: string; deletedAt?: Date; de
  * @param queryBuilder The query builder instance
  * @param alias The entity alias
  */
-export function excludeSoftDeleted<T>(
+export function excludeSoftDeleted<T extends ObjectLiteral>(
   queryBuilder: SelectQueryBuilder<T>,
   alias: string = 'entity'
 ): SelectQueryBuilder<T> {
@@ -87,7 +87,7 @@ export function excludeSoftDeleted<T>(
  * Query builder extension to include soft-deleted records
  * @param queryBuilder The query builder instance
  */
-export function includeSoftDeleted<T>(
+export function includeSoftDeleted<T extends ObjectLiteral>(
   queryBuilder: SelectQueryBuilder<T>
 ): SelectQueryBuilder<T> {
   // TypeORM's withDeleted is handled at the repository level
@@ -100,7 +100,7 @@ export function includeSoftDeleted<T>(
  * @param queryBuilder The query builder instance
  * @param alias The entity alias
  */
-export function onlySoftDeleted<T>(
+export function onlySoftDeleted<T extends ObjectLiteral>(
   queryBuilder: SelectQueryBuilder<T>,
   alias: string = 'entity'
 ): SelectQueryBuilder<T> {

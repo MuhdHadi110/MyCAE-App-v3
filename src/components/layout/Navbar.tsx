@@ -16,7 +16,7 @@ interface CurrentUser {
   email: string;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onMenuClick, title = 'MYCAE Equipment Tracker' }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onMenuClick, title = 'MyCAE App' }) => {
   const { isMobile } = useResponsive();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);

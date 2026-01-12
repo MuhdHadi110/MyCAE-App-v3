@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { AppDataSource } from '../config/database';
-import { InventoryItem, InventoryStatus } from '../entities/InventoryItem';
+import { InventoryItem, InventoryStatus, InventoryLastAction } from '../entities/InventoryItem';
 import { Checkout, CheckoutStatus } from '../entities/Checkout';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { UserRole } from '../entities/User';
@@ -23,14 +23,22 @@ const INVENTORY_MODIFY_ROLES = [
   UserRole.ADMIN,
 ];
 
+// Helper to validate and sanitize pagination params
+const validatePagination = (limit: unknown, offset: unknown) => ({
+  limit: Math.min(Math.max(parseInt(String(limit)) || 100, 1), 500), // Max 500 records
+  offset: Math.max(parseInt(String(offset)) || 0, 0)
+});
+
 /**
  * GET /api/inventory
  * Get all inventory items
+ * Authorization: All authenticated users can view inventory
  */
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const inventoryRepo = AppDataSource.getRepository(InventoryItem);
-    const { category, status, lowStock, search } = req.query;
+    const { category, status, lowStock, search, limit = 100, offset = 0 } = req.query;
+    const pagination = validatePagination(limit, offset);
 
     let query = inventoryRepo.createQueryBuilder('item');
 
@@ -53,9 +61,17 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       );
     }
 
-    const items = await query.getMany();
+    const [items, total] = await query
+      .take(pagination.limit)
+      .skip(pagination.offset)
+      .getManyAndCount();
 
-    res.json(items);
+    res.json({
+      data: items,
+      total,
+      limit: pagination.limit,
+      offset: pagination.offset,
+    });
   } catch (error: any) {
     console.error('Error fetching inventory:', error);
     res.status(500).json({ error: 'Failed to fetch inventory' });
@@ -114,6 +130,10 @@ router.post(
       }
 
       const item = inventoryRepo.create(req.body) as unknown as InventoryItem;
+      // Set the last_action to ADDED for new items
+      item.last_action = InventoryLastAction.ADDED;
+      item.last_action_date = new Date();
+      item.last_action_by = req.user!.name || req.user!.email;
       await inventoryRepo.save(item);
 
       // Create an initial "in-stock" checkout record to track the item
@@ -201,17 +221,27 @@ router.put('/:id', authorize(...INVENTORY_MODIFY_ROLES), async (req: AuthRequest
  * DELETE /api/inventory/:id
  * Delete inventory item
  * Requires: senior-engineer or above
+ * Note: First deletes related checkout records, then deletes the item
  */
 router.delete('/:id', authorize(...INVENTORY_MODIFY_ROLES), async (req: AuthRequest, res) => {
   try {
     const inventoryRepo = AppDataSource.getRepository(InventoryItem);
+    const checkoutRepo = AppDataSource.getRepository(Checkout);
+
     const item = await inventoryRepo.findOne({ where: { id: req.params.id } });
 
     if (!item) {
       return res.status(404).json({ error: 'Item not found' });
     }
 
+    // Delete all related checkout records first using raw query to bypass foreign key constraints
+    const itemId = req.params.id;
+    await AppDataSource.query('DELETE FROM checkouts WHERE item_id = ?', [itemId]);
+    console.log(`Deleted checkout records for item ${itemId}`);
+
+    // Then delete the inventory item
     await inventoryRepo.remove(item);
+    console.log(`Successfully deleted inventory item ${itemId}`);
 
     res.json({ message: 'Item deleted successfully' });
   } catch (error: any) {

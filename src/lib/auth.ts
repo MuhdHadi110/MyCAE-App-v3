@@ -8,6 +8,7 @@ export interface CurrentUser {
   email: string;
   userId?: string;
   role?: string;
+  roles?: string[]; // Multi-role support
   id?: string;
   name?: string;
   department?: string;
@@ -31,7 +32,8 @@ export function getCurrentUser(): CurrentUser {
         userId: userId,
         id: userId,
         name: userName,
-        role: user.roles || user.role || 'engineer',
+        role: user.role || (user.roles && user.roles[0]) || 'engineer',
+        roles: user.roles || (user.role ? [user.role] : ['engineer']),
         department: user.department || 'engineering',
       };
     } catch (e) {
