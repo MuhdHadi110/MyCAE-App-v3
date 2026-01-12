@@ -17,15 +17,20 @@ router.use(authenticate);
  */
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
-    const { status, type, assignedTo, search, limit = 100, offset = 0 } = req.query;
+    const { status, type, assignedTo, search, limit = 100, offset = 0, includeDecommissioned = 'false' } = req.query;
     const computerRepo = AppDataSource.getRepository(Computer);
 
     let query = computerRepo.createQueryBuilder('computer')
       .leftJoinAndSelect('computer.assignee', 'assignee')
       .orderBy('computer.device_name', 'ASC');
 
+    // Exclude decommissioned PCs by default (unless explicitly requested)
+    if (includeDecommissioned !== 'true') {
+      query = query.where('computer.status != :decommissioned', { decommissioned: ComputerStatus.DECOMMISSIONED });
+    }
+
     if (status) {
-      query = query.where('computer.status = :status', { status });
+      query = query.andWhere('computer.status = :status', { status });
     }
 
     if (type) {
@@ -172,6 +177,17 @@ router.put(
         return res.status(404).json({ error: 'Computer not found' });
       }
 
+      // Map frontend field names to backend field names
+      const updateData: any = {};
+      if (req.body.name !== undefined) updateData.device_name = req.body.name;
+      if (req.body.location !== undefined) updateData.location = req.body.location;
+      if (req.body.notes !== undefined) updateData.notes = req.body.notes;
+      if (req.body.softwareUsed !== undefined) {
+        updateData.installed_software = Array.isArray(req.body.softwareUsed)
+          ? req.body.softwareUsed.join(',')
+          : req.body.softwareUsed;
+      }
+
       // Validate assignee if changing
       if (req.body.assignedTo && req.body.assignedTo !== computer.assigned_to) {
         const userRepo = AppDataSource.getRepository(User);
@@ -181,7 +197,7 @@ router.put(
         }
       }
 
-      computerRepo.merge(computer, req.body);
+      computerRepo.merge(computer, updateData);
       await computerRepo.save(computer);
 
       const updatedComputer = await computerRepo.findOne({
@@ -269,7 +285,7 @@ router.get('/assigned/:userId', async (req: AuthRequest, res: Response) => {
  */
 router.post('/:id/assign', async (req: AuthRequest, res: Response) => {
   try {
-    const { userId } = req.body;
+    const { userId, installedSoftware, notes } = req.body;
 
     if (!userId) {
       return res.status(400).json({ error: 'User ID is required' });
@@ -291,6 +307,19 @@ router.post('/:id/assign', async (req: AuthRequest, res: Response) => {
 
     computer.assigned_to = userId;
     computer.status = ComputerStatus.ACTIVE;
+
+    // Save installed software (comma-separated string)
+    if (installedSoftware !== undefined) {
+      computer.installed_software = Array.isArray(installedSoftware)
+        ? installedSoftware.join(',')
+        : installedSoftware;
+    }
+
+    // Save notes
+    if (notes !== undefined) {
+      computer.notes = notes;
+    }
+
     await computerRepo.save(computer);
 
     const updatedComputer = await computerRepo.findOne({
@@ -318,7 +347,9 @@ router.post('/:id/unassign', async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: 'Computer not found' });
     }
 
-    computer.assigned_to = undefined;
+    // Use null to actually clear the field in the database (undefined doesn't work with TypeORM)
+    computer.assigned_to = null as any;
+    computer.installed_software = null as any; // Also clear software when releasing
     await computerRepo.save(computer);
 
     const updatedComputer = await computerRepo.findOne({
@@ -330,6 +361,44 @@ router.post('/:id/unassign', async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     console.error('Error unassigning computer:', error);
     res.status(500).json({ error: 'Failed to unassign computer' });
+  }
+});
+
+/**
+ * POST /api/computers/:id/maintenance
+ * Set computer maintenance status
+ */
+router.post('/:id/maintenance', async (req: AuthRequest, res: Response) => {
+  try {
+    const { inMaintenance } = req.body;
+    const computerRepo = AppDataSource.getRepository(Computer);
+    const computer = await computerRepo.findOne({ where: { id: req.params.id } });
+
+    if (!computer) {
+      return res.status(404).json({ error: 'Computer not found' });
+    }
+
+    if (inMaintenance) {
+      // Enter maintenance mode - also clear assignment
+      computer.status = ComputerStatus.IN_REPAIR;
+      computer.assigned_to = null as any;
+      computer.installed_software = null as any;
+    } else {
+      // Exit maintenance mode
+      computer.status = ComputerStatus.ACTIVE;
+    }
+
+    await computerRepo.save(computer);
+
+    const updatedComputer = await computerRepo.findOne({
+      where: { id: computer.id },
+      relations: ['assignee'],
+    });
+
+    res.json(updatedComputer);
+  } catch (error: any) {
+    console.error('Error updating computer maintenance status:', error);
+    res.status(500).json({ error: 'Failed to update maintenance status' });
   }
 });
 
