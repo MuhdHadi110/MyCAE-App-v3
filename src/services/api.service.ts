@@ -429,6 +429,8 @@ class ApiService {
     description?: string;
     status?: string;
     fileUrl?: string;
+    plannedHours?: number;
+    customExchangeRate?: number;
   }) {
     return financeService.createPurchaseOrder(data);
   }

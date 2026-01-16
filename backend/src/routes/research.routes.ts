@@ -191,63 +191,6 @@ router.get('/timesheets', async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Helper function to generate research code
-async function generateResearchCode(): Promise<string> {
-  const currentYear = new Date().getFullYear();
-  const yearSuffix = currentYear.toString().slice(-2); // Get last 2 digits (e.g., "25" for 2025)
-
-  // Get the highest research code number for current year
-  const result = await AppDataSource.query(`
-    SELECT research_code FROM research_projects
-    WHERE research_code LIKE 'R${yearSuffix}%'
-    ORDER BY research_code DESC
-    LIMIT 1
-  `);
-
-  let maxNumber = 0;
-  if (result && result.length > 0 && result[0].research_code) {
-    const match = result[0].research_code.match(/^R\d{2}(\d{3})$/);
-    if (match) {
-      maxNumber = parseInt(match[1], 10);
-    }
-  }
-
-  const nextNumber = maxNumber + 1;
-  const numberStr = nextNumber.toString().padStart(3, '0');
-  return `R${yearSuffix}${numberStr}`;
-}
-
-// Backfill research codes for existing projects without one
-router.post('/projects/backfill-codes', async (req: AuthRequest, res: Response) => {
-  try {
-    // Get all projects without a research code
-    const projectsWithoutCode = await AppDataSource.query(`
-      SELECT id, created_at FROM research_projects
-      WHERE research_code IS NULL OR research_code = ''
-      ORDER BY created_at ASC
-    `);
-
-    if (projectsWithoutCode.length === 0) {
-      return res.json({ message: 'All projects already have research codes', updated: 0 });
-    }
-
-    let updated = 0;
-    for (const project of projectsWithoutCode) {
-      const newCode = await generateResearchCode();
-      await AppDataSource.query(
-        `UPDATE research_projects SET research_code = ? WHERE id = ?`,
-        [newCode, project.id]
-      );
-      updated++;
-    }
-
-    res.json({ message: `Successfully backfilled ${updated} research codes`, updated });
-  } catch (error) {
-    console.error('Error backfilling research codes:', error);
-    res.status(500).json({ error: 'Failed to backfill research codes' });
-  }
-});
-
 // Create new research project
 router.post('/projects', async (req: AuthRequest, res: Response) => {
   try {
@@ -257,13 +200,10 @@ router.post('/projects', async (req: AuthRequest, res: Response) => {
       budget, fundingSource, category, objectives, methodology
     } = req.body;
 
-    // Auto-generate research code if not provided
-    const finalResearchCode = researchCode || await generateResearchCode();
-
     const projectRepo = AppDataSource.getRepository(ResearchProject);
     const project = projectRepo.create({
       id: uuidv4(),
-      researchCode: finalResearchCode,
+      researchCode,
       title,
       description: description || null,
       status: status || 'planning',

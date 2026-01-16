@@ -2,7 +2,8 @@ import { Router, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { PurchaseOrder, POStatus } from '../entities/PurchaseOrder';
 import { Project, ProjectStatus } from '../entities/Project';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { User, UserRole } from '../entities/User';
+import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { body, validationResult } from 'express-validator';
 import { upload, generateFileUrl, deleteFile } from '../utils/fileUpload';
 import { CurrencyService } from '../services/currency.service';
@@ -31,10 +32,12 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       const poRepo = AppDataSource.getRepository(PurchaseOrder);
       let query = poRepo.createQueryBuilder('po')
         .leftJoinAndSelect('po.project', 'project')
+        .leftJoinAndSelect('project.client', 'client')
         .select([
           'po',
           'project.project_code',
           'project.title',
+          'client.name',
         ])
         .orderBy('po.received_date', 'DESC');
 
@@ -110,6 +113,7 @@ router.post(
     body('clientName').notEmpty().withMessage('Client name is required'),
     body('amount').isNumeric().withMessage('Amount must be a number'),
     body('receivedDate').isISO8601().withMessage('Valid received date is required'),
+    body('plannedHours').optional().isNumeric().withMessage('Planned hours must be a number'),
   ],
   async (req: AuthRequest, res: Response) => {
     try {
@@ -129,6 +133,8 @@ router.post(
         description,
         status = POStatus.RECEIVED,
         fileUrl,
+        plannedHours,
+        customExchangeRate,
       } = req.body;
 
       const po = await poService.createPO({
@@ -142,6 +148,8 @@ router.post(
         description,
         status: status as POStatus,
         fileUrl,
+        plannedHours: plannedHours ? parseFloat(plannedHours) : undefined,
+        customExchangeRate: customExchangeRate ? parseFloat(customExchangeRate) : undefined,
       });
 
       // Fetch the complete PO with project relation
@@ -168,6 +176,8 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
       poNumber,
       clientName,
       amount,
+      currency,
+      customExchangeRate,
       receivedDate,
       dueDate,
       description,
@@ -179,6 +189,8 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
     if (poNumber !== undefined) updates.po_number = poNumber;
     if (clientName !== undefined) updates.client_name = clientName;
     if (amount !== undefined) updates.amount = parseFloat(amount);
+    if (currency !== undefined) updates.currency = currency;
+    if (customExchangeRate !== undefined) updates.customExchangeRate = parseFloat(customExchangeRate);
     if (receivedDate !== undefined) updates.received_date = new Date(receivedDate);
     if (dueDate !== undefined) updates.due_date = dueDate ? new Date(dueDate) : undefined;
     if (description !== undefined) updates.description = description;
@@ -200,8 +212,11 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 /**
  * DELETE /api/purchase-orders/:id
  * Delete purchase order
+ * Authorization: Senior Engineer and above
  */
-router.delete('/:id', async (req: AuthRequest, res: Response) => {
+router.delete('/:id',
+  authorize(UserRole.SENIOR_ENGINEER, UserRole.PRINCIPAL_ENGINEER, UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN),
+  async (req: AuthRequest, res: Response) => {
   try {
     await poService.deletePO(req.params.id);
     res.json({ message: 'Purchase order deleted successfully' });

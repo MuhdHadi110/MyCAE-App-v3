@@ -34,6 +34,7 @@ const navItems = [
   { to: '/research', icon: FlaskConical, label: 'Research', section: 'projects' },
   { to: '/timesheets', icon: Clock, label: 'Timesheets', section: 'projects' },
   { to: '/team-workload', icon: Users, label: 'Team Workload', section: 'projects' },
+  { to: '/pcs', icon: Monitor, label: 'PC Assignment', section: 'projects' },
   { to: '/team', icon: Users, label: 'Team Members', section: 'people' },
   { to: '/companies', icon: Building2, label: 'Business Contacts', section: 'people' },
   { to: '/finance', icon: DollarSign, label: 'Finance Overview', section: 'finance', requiresPermission: 'canAccessFinance' },
@@ -41,7 +42,6 @@ const navItems = [
   { to: '/finance/exchange-rates', icon: ArrowLeftRight, label: 'Exchange Rates', section: 'finance', requiresPermission: 'canAccessFinance' },
   { to: '/inventory', icon: Package, label: 'Inventory', section: 'equipment' },
   { to: '/equipment', icon: ClipboardList, label: 'Equipment Management', section: 'equipment' },
-  { to: '/pcs', icon: Monitor, label: 'PC Assignment', section: 'equipment' },
   { to: '/maintenance', icon: Wrench, label: 'Maintenance', section: 'equipment' },
   { to: '/settings', icon: Settings, label: 'Settings', section: 'system' },
 ];

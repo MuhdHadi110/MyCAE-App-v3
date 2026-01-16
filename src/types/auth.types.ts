@@ -23,9 +23,9 @@ export interface AuthContextType {
 
 export const ROLE_HIERARCHY: Record<UserRole, number> = {
   'engineer': 1,
-  'senior-engineer': 2, // Level 2: Senior Engineer
-  'principal-engineer': 2, // Level 2: Same as Senior Engineer and Manager
-  'manager': 2, // Level 2: Same as Senior Engineer and Principal Engineer
-  'managing-director': 3, // Level 3: Managing Director
-  'admin': 4, // Level 4: Admin (highest)
+  'senior-engineer': 2,
+  'principal-engineer': 3,
+  'manager': 3,
+  'managing-director': 4,
+  'admin': 5,
 };

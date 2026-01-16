@@ -1,5 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
 import { Project } from './Project';
+import { ReceivedInvoice } from './ReceivedInvoice';
 
 export enum IssuedPOStatus {
   ISSUED = 'issued',
@@ -61,4 +62,7 @@ export class IssuedPO {
   @ManyToOne(() => Project, { nullable: true })
   @JoinColumn({ name: 'project_code', referencedColumnName: 'project_code' })
   project: Project;
+
+  @OneToMany(() => ReceivedInvoice, (receivedInvoice) => receivedInvoice.issuedPO)
+  receivedInvoices: ReceivedInvoice[];
 }

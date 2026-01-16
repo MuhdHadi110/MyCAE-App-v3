@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Plus, Search, Filter, Trash2, FlaskConical, Eye, Edit } from 'lucide-react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { Plus, Search, Filter, Trash2, Eye, Edit, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { useResearchStore } from '../store/researchStore';
 import { useTeamStore } from '../store/teamStore';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -13,13 +13,15 @@ import { logger } from '../lib/logger';
 
 export const ResearchScreen: React.FC = () => {
   const { researchProjects, loading, fetchResearchProjects, deleteResearchProject, updateResearchProject } = useResearchStore();
-  const { teamMembers, fetchTeamMembers } = useTeamStore();
+  const { fetchTeamMembers } = useTeamStore();
 
   const currentUser = getCurrentUser();
   const canAdd = currentUser && checkPermission((currentUser.role || 'engineer') as any, 'canAddProject');
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<ResearchStatus | 'all'>('all');
+  const [sortColumn, setSortColumn] = useState<string>('researchCode');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -33,7 +35,7 @@ export const ResearchScreen: React.FC = () => {
   useEffect(() => {
     fetchResearchProjects();
     fetchTeamMembers();
-  }, []);
+  }, [fetchTeamMembers]);
 
   const handleAddResearch = () => {
     if (!canAdd) {
@@ -65,6 +67,24 @@ export const ResearchScreen: React.FC = () => {
     });
   };
 
+  const handleSort = useCallback((column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  }, [sortColumn]);
+
+  const getSortIcon = (column: string) => {
+    if (sortColumn !== column) {
+      return <ChevronsUpDown className="w-4 h-4 ml-1 inline-block" />;
+    }
+    return sortDirection === 'asc'
+      ? <ChevronUp className="w-4 h-4 ml-1 inline-block" />
+      : <ChevronDown className="w-4 h-4 ml-1 inline-block" />;
+  };
+
   const confirmDeleteResearch = async () => {
     if (!confirmDialog.projectId) return;
 
@@ -79,16 +99,51 @@ export const ResearchScreen: React.FC = () => {
     }
   };
 
-  const filteredProjects = researchProjects.filter((project) => {
-    const matchesSearch =
-      searchTerm === '' ||
-      project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      project.description?.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredProjects = useMemo(() => {
+    return researchProjects.filter((project) => {
+      const matchesSearch =
+        searchTerm === '' ||
+        project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        project.description?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesStatus = statusFilter === 'all' || project.status === statusFilter;
+      const matchesStatus = statusFilter === 'all' || project.status === statusFilter;
 
-    return matchesSearch && matchesStatus;
-  });
+      return matchesSearch && matchesStatus;
+    }).sort((a, b) => {
+      const getSortValue = (project: ResearchProject) => {
+        switch (sortColumn) {
+          case 'researchCode':
+            return (project.researchCode || '').toLowerCase();
+          case 'title':
+            return project.title.toLowerCase();
+          case 'leadResearcher':
+            return (project.leadResearcherName || '').toLowerCase();
+          case 'status':
+            const statusOrder = { 'planning': 0, 'in-progress': 1, 'on-hold': 2, 'completed': 3, 'archived': 4 };
+            return statusOrder[project.status] ?? 5;
+          case 'hours':
+            return project.totalHoursLogged || 0;
+          case 'startDate':
+            return new Date(project.startDate).getTime();
+          default:
+            return (project.researchCode || '').toLowerCase();
+        }
+      };
+
+      const aValue = getSortValue(a);
+      const bValue = getSortValue(b);
+
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return sortDirection === 'asc'
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      } else {
+        return sortDirection === 'asc'
+          ? aValue - bValue
+          : bValue - aValue;
+      }
+    });
+  }, [researchProjects, searchTerm, statusFilter, sortColumn, sortDirection]);
 
   const getStatusBadgeColor = (status: ResearchStatus): string => {
     switch (status) {
@@ -130,12 +185,9 @@ export const ResearchScreen: React.FC = () => {
         {/* Header Container */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <FlaskConical className="w-6 h-6 text-primary-600" />
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Research Projects</h1>
-                <p className="text-gray-600 mt-1">Manage and track research initiatives and timesheet hours</p>
-              </div>
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Research Projects</h1>
+              <p className="text-gray-600 mt-1">Manage and track research initiatives and timesheet hours</p>
             </div>
             {canAdd && (
               <button
@@ -255,7 +307,6 @@ export const ResearchScreen: React.FC = () => {
             </div>
           ) : filteredProjects.length === 0 ? (
             <div className="text-center py-12">
-              <FlaskConical className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-500 text-lg">No research projects found</p>
               <p className="text-gray-400 text-sm mt-2">Create a new project to get started</p>
             </div>
@@ -264,23 +315,23 @@ export const ResearchScreen: React.FC = () => {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Code
+                    <th onClick={() => handleSort('researchCode')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors">
+                      Code {getSortIcon('researchCode')}
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Title
+                    <th onClick={() => handleSort('title')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors">
+                      Title {getSortIcon('title')}
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Lead Researcher
+                    <th onClick={() => handleSort('leadResearcher')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors">
+                      Lead Researcher {getSortIcon('leadResearcher')}
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
+                    <th onClick={() => handleSort('status')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors">
+                      Status {getSortIcon('status')}
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Hours
+                    <th onClick={() => handleSort('hours')} className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors">
+                      Hours {getSortIcon('hours')}
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Start Date
+                    <th onClick={() => handleSort('startDate')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors">
+                      Start Date {getSortIcon('startDate')}
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions

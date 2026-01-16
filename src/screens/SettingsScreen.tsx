@@ -290,7 +290,7 @@ export const SettingsScreen: React.FC = () => {
           <CardTitle>About</CardTitle>
         </CardHeader>
         <CardContent>
-          <button className="w-full flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors">
+          <div className="w-full flex items-center justify-between p-3 rounded-lg">
             <div className="flex items-center gap-3">
               <Info className="w-5 h-5 text-gray-600" />
               <div className="text-left">
@@ -298,7 +298,7 @@ export const SettingsScreen: React.FC = () => {
                 <p className="text-sm text-gray-500">1.0.0</p>
               </div>
             </div>
-          </button>
+          </div>
           <div className="mt-4 p-3 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-600">
               MyCAE Equipment Tracker - Inventory Management System

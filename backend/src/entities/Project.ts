@@ -11,6 +11,7 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import { User } from './User';
 import { Contact } from './Contact';
+import { Client } from './Client';
 
 export enum ProjectStatus {
   PRE_LIM = 'pre-lim',
@@ -39,6 +40,10 @@ export class Project {
   @JoinColumn({ name: 'contact_id' })
   contact?: Contact;
 
+  @ManyToOne(() => Client)
+  @JoinColumn({ name: 'client_id' })
+  client?: Client;
+
   @Column({
     type: 'enum',
     enum: ProjectStatus,
@@ -66,6 +71,9 @@ export class Project {
 
   @Column({ type: 'int' })
   planned_hours: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  daily_rate: number | null;
 
   @Column({ type: 'int', default: 0 })
   actual_hours: number;

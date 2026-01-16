@@ -25,8 +25,10 @@ export interface RolePermissions {
   // Finance
   canAccessFinance: boolean;
   canUploadPO: boolean;
+  canDeletePO: boolean;
   canApproveInvoices: boolean;
   canEditInvoices: boolean;
+  canDeleteInvoices: boolean;
   canViewManHourCost: boolean;
   canViewAnalytics: boolean;
   canManageProjectRates: boolean;
@@ -65,8 +67,10 @@ const getPermissionsForRole = (role: UserRole): RolePermissions => {
       // Finance
       canAccessFinance: true,
       canUploadPO: true,
+      canDeletePO: true,
       canApproveInvoices: true,
       canEditInvoices: true,
+      canDeleteInvoices: true,
       canViewManHourCost: true,
       canViewAnalytics: true,
       canManageProjectRates: true,
@@ -84,9 +88,9 @@ const getPermissionsForRole = (role: UserRole): RolePermissions => {
     canExportTimesheet: level >= ROLE_HIERARCHY['senior-engineer'], // Level 2+
 
     // Team - Principal Engineer, Manager, and Managing Director can manage teams
-    canAddTeamMember: level >= ROLE_HIERARCHY['principal-engineer'], // Level 2.5+ (Principal Engineer, Manager, Managing Director)
-    canEditTeamMember: level >= ROLE_HIERARCHY['principal-engineer'], // Level 2.5+ (Principal Engineer, Manager, Managing Director)
-    canDeleteTeamMember: level >= ROLE_HIERARCHY['principal-engineer'], // Level 2.5+ (Principal Engineer, Manager, Managing Director)
+    canAddTeamMember: level >= ROLE_HIERARCHY['principal-engineer'], // Level 3+ (Principal Engineer, Manager, Managing Director)
+    canEditTeamMember: level >= ROLE_HIERARCHY['principal-engineer'], // Level 3+ (Principal Engineer, Manager, Managing Director)
+    canDeleteTeamMember: level >= ROLE_HIERARCHY['principal-engineer'], // Level 3+ (Principal Engineer, Manager, Managing Director)
 
     // Inventory & Equipment
     canAddOrRemoveInventory: level >= ROLE_HIERARCHY.engineer, // Level 1+
@@ -98,8 +102,10 @@ const getPermissionsForRole = (role: UserRole): RolePermissions => {
     // Finance
     canAccessFinance: level >= ROLE_HIERARCHY['senior-engineer'], // Level 2+
     canUploadPO: level >= ROLE_HIERARCHY['senior-engineer'], // Level 2+
-    canApproveInvoices: level >= ROLE_HIERARCHY['managing-director'], // Level 3+ (Only Managing Director and Admin)
+    canDeletePO: level >= ROLE_HIERARCHY['senior-engineer'], // Level 2+ (Senior Engineer and above)
+    canApproveInvoices: level >= ROLE_HIERARCHY['managing-director'], // Level 4+ (Only Managing Director and Admin)
     canEditInvoices: level >= ROLE_HIERARCHY['senior-engineer'], // Level 2+ (Senior Engineer and above)
+    canDeleteInvoices: level >= ROLE_HIERARCHY['senior-engineer'], // Level 2+ (Senior Engineer and above)
     canViewManHourCost: level >= ROLE_HIERARCHY['senior-engineer'], // Level 2+
     canViewAnalytics: level >= ROLE_HIERARCHY['senior-engineer'], // Level 2+
     canManageProjectRates: level >= ROLE_HIERARCHY['senior-engineer'], // Level 2+ (Senior Engineer, Principal Engineer, Manager, Managing Director, Admin)

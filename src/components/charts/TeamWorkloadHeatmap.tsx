@@ -96,6 +96,22 @@ export const TeamWorkloadHeatmap: React.FC<TeamWorkloadHeatmapProps> = ({ filter
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [filteredAssignments]);
 
+  // Count unique lead engineers from ongoing projects
+  const leadEngineerCount = useMemo(() => {
+    const leadEngineerIds = new Set<string>();
+
+    assignments
+      .filter((assignment) =>
+        assignment.status === 'ongoing' &&
+        assignment.role === 'lead-engineer'
+      )
+      .forEach((assignment) => {
+        leadEngineerIds.add(assignment.engineerId);
+      });
+
+    return leadEngineerIds.size;
+  }, [assignments]);
+
   const toggleEngineerExpand = (engineerId: string) => {
     const newExpanded = new Set(expandedEngineers);
     if (newExpanded.has(engineerId)) {
@@ -154,31 +170,38 @@ export const TeamWorkloadHeatmap: React.FC<TeamWorkloadHeatmapProps> = ({ filter
           <div className="text-2xl font-bold text-gray-900">{filteredAssignments.length}</div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center">
-              <TrendingUp className="w-6 h-6 text-purple-600" />
-            </div>
-          </div>
-          <div className="text-sm font-medium text-gray-600 mb-1">Avg Projects/Engineer</div>
-          <div className="text-2xl font-bold text-gray-900">
-            {engineerGroups.length > 0 ? (filteredAssignments.length / engineerGroups.length).toFixed(1) : '0'}
-          </div>
-        </div>
-      </div>
-
-      {/* Filter Toggle */}
-      <div className="flex items-center justify-end">
+        {/* Card 3: Lead Engineers - Clickable to toggle filter */}
         <button
           onClick={() => setShowLeadEngineersOnly(!showLeadEngineersOnly)}
-          className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+          className={`w-full bg-white rounded-2xl shadow-sm border p-6 transition-all text-left ${
             showLeadEngineersOnly
-              ? 'bg-purple-100 text-purple-700 border border-purple-200'
-              : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+              ? 'border-purple-500 shadow-md ring-2 ring-purple-100'
+              : 'border-gray-100 hover:shadow-md hover:border-purple-200'
           }`}
         >
-          <Users className="w-4 h-4" />
-          Lead Engineers Only
+          <div className="flex items-center justify-between mb-4">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+              showLeadEngineersOnly
+                ? 'bg-purple-600'
+                : 'bg-purple-100'
+            }`}>
+              <TrendingUp className={`w-6 h-6 ${
+                showLeadEngineersOnly
+                  ? 'text-white'
+                  : 'text-purple-600'
+              }`} />
+            </div>
+            {showLeadEngineersOnly && (
+              <div className="text-xs font-medium text-purple-600 bg-purple-100 px-2 py-1 rounded-full">
+                Active Filter
+              </div>
+            )}
+          </div>
+          <div className="text-sm font-medium text-gray-600 mb-1">Lead Engineers</div>
+          <div className="text-2xl font-bold text-gray-900">{leadEngineerCount}</div>
+          <div className="text-xs text-gray-500 mt-2">
+            {showLeadEngineersOnly ? 'Click to show all engineers' : 'Click to filter'}
+          </div>
         </button>
       </div>
 
@@ -207,7 +230,14 @@ export const TeamWorkloadHeatmap: React.FC<TeamWorkloadHeatmapProps> = ({ filter
                     <tr className="bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer" onClick={() => toggleEngineerExpand(group.id)}>
                       <td colSpan={6} className="px-6 py-4">
                         <div className="flex items-center gap-3 w-full text-left">
-                          <button className="p-1 hover:bg-gray-200 rounded transition-colors">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleEngineerExpand(group.id);
+                            }}
+                            className="p-1 hover:bg-gray-200 rounded transition-colors"
+                            aria-label={isExpanded ? 'Collapse projects' : 'Expand projects'}
+                          >
                             {isExpanded ? (
                               <ChevronDown className="w-4 h-4 text-gray-500" />
                             ) : (

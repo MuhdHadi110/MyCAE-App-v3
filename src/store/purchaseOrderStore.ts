@@ -3,20 +3,31 @@ import financeService from '../services/api.service';
 
 export interface PurchaseOrder {
   id: string;
-  po_number: string;
-  project_code: string;
-  client_name: string;
+  poNumber: string;
+  projectCode: string;
+  clientName: string;
   amount: number;
   status: 'received' | 'in-progress' | 'invoiced' | 'paid';
-  received_date: string;
-  due_date?: string;
+  receivedDate: string;
+  dueDate?: string;
   description?: string;
-  file_url?: string;
-  created_at?: string;
-  updated_at?: string;
+  fileUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  isActive: boolean;
+  currency?: string;
+  amountMyr?: number;
+  amountMyrAdjusted?: number;
+  exchangeRate?: number;
+  revisionNumber?: number;
+  supersedes?: string;
+  supersededBy?: string;
   project?: {
-    project_code: string;
-    project_name: string;
+    projectCode: string;
+    title: string;
+    client?: {
+      name: string;
+    };
   };
 }
 
@@ -32,7 +43,7 @@ interface PurchaseOrderStore {
   deletePurchaseOrder: (id: string) => Promise<void>;
 }
 
-export const usePurchaseOrderStore = create<PurchaseOrderStore>((set, get) => ({
+export const usePurchaseOrderStore = create<PurchaseOrderStore>((set) => ({
   purchaseOrders: [],
   loading: false,
   error: null,

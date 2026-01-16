@@ -1,28 +1,44 @@
 import { useState, useEffect } from 'react';
-import { Plus, Download, XCircle, FileText, X, Search } from 'lucide-react';
+import { Plus, XCircle, X, Search } from 'lucide-react';
 import { FinanceDocumentTabs, type FinanceTab } from '../components/FinanceDocumentTabs';
 import { FileUploadZone } from '../components/FileUploadZone';
 import { AddReceivedPOModal } from '../components/modals/AddReceivedPOModal';
 import { AddInvoiceModal } from '../components/modals/AddInvoiceModal';
 import { EditInvoiceModal } from '../components/modals/EditInvoiceModal';
 import { AddIssuedPOModal } from '../components/modals/AddIssuedPOModal';
+import { AddReceivedInvoiceModal } from '../components/modals/AddReceivedInvoiceModal';
 import { EditPOModal } from '../components/modals/EditPOModal';
 import { ViewPODetailsModal } from '../components/modals/ViewPODetailsModal';
 import { ReceivedPOsTab } from '../components/finance/ReceivedPOsTab';
 import { InvoicesTab } from '../components/finance/InvoicesTab';
 import { IssuedPOsTab } from '../components/finance/IssuedPOsTab';
+import { ReceivedInvoicesTab } from '../components/finance/ReceivedInvoicesTab';
 import { getCurrentUser } from '../lib/auth';
 import { checkPermission, getPermissionMessage } from '../lib/permissions';
 import { toast } from 'react-hot-toast';
 import financeService from '../services/finance.service';
 import type { FileAttachment } from '../types/fileAttachment.types';
 import { logger } from '../lib/logger';
+import {
+  exportReceivedPOsToCSV,
+  exportReceivedPOsToExcel,
+  exportInvoicesToCSV,
+  exportInvoicesToExcel,
+  exportIssuedPOsToCSV,
+  exportIssuedPOsToExcel,
+  exportReceivedInvoicesToCSV,
+  exportReceivedInvoicesToExcel,
+} from '../utils/financeExport';
+import { FinanceExportButton } from '../components/ui/FinanceExportButton';
 
 export const FinanceDocumentsScreen = () => {
   const currentUser = getCurrentUser();
-  const canAccess = currentUser && checkPermission(currentUser.role as any, 'canAccessFinance');
-  const canUpload = currentUser && checkPermission(currentUser.role as any, 'canUploadPO');
-  const canApprove = currentUser && checkPermission(currentUser.role as any, 'canApproveInvoices');
+  const userRoles = (currentUser?.roles || [currentUser?.role || 'engineer']) as any[];
+  const canAccess = currentUser && checkPermission(userRoles, 'canAccessFinance');
+  const canUpload = currentUser && checkPermission(userRoles, 'canUploadPO');
+  const canDeletePO = currentUser && checkPermission(userRoles, 'canDeletePO');
+  const canDeleteInvoice = currentUser && checkPermission(userRoles, 'canDeleteInvoices');
+  const canApprove = currentUser && checkPermission(userRoles, 'canApproveInvoices');
 
 
 
@@ -35,6 +51,8 @@ export const FinanceDocumentsScreen = () => {
   const [showEditInvoiceModal, setShowEditInvoiceModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [showAddIssuedPOModal, setShowAddIssuedPOModal] = useState(false);
+  const [showAddReceivedInvoiceModal, setShowAddReceivedInvoiceModal] = useState(false);
+  const [editingReceivedInvoice, setEditingReceivedInvoice] = useState<any | null>(null);
   const [showEditPOModal, setShowEditPOModal] = useState(false);
   const [selectedPO, setSelectedPO] = useState<any | null>(null);
   const [showViewDetailsModal, setShowViewDetailsModal] = useState(false);
@@ -43,7 +61,34 @@ export const FinanceDocumentsScreen = () => {
   const [receivedPOs, setReceivedPOs] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [issuedPOs, setIssuedPOs] = useState<any[]>([]);
+  const [receivedInvoices, setReceivedInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Export handler
+  const handleExport = (format: 'csv' | 'excel') => {
+    switch (activeTab) {
+      case 'received-pos':
+        format === 'csv'
+          ? exportReceivedPOsToCSV(receivedPOs)
+          : exportReceivedPOsToExcel(receivedPOs);
+        break;
+      case 'invoices':
+        format === 'csv'
+          ? exportInvoicesToCSV(invoices)
+          : exportInvoicesToExcel(invoices);
+        break;
+      case 'issued-pos':
+        format === 'csv'
+          ? exportIssuedPOsToCSV(issuedPOs)
+          : exportIssuedPOsToExcel(issuedPOs);
+        break;
+      case 'received-invoices':
+        format === 'csv'
+          ? exportReceivedInvoicesToCSV(receivedInvoices)
+          : exportReceivedInvoicesToExcel(receivedInvoices);
+        break;
+    }
+  };
 
   // Load data on mount and when tab changes
   useEffect(() => {
@@ -64,6 +109,9 @@ export const FinanceDocumentsScreen = () => {
       } else if (activeTab === 'issued-pos') {
         const data = await financeService.getAllIssuedPOs();
         setIssuedPOs(data || []);
+      } else if (activeTab === 'received-invoices') {
+        const data = await financeService.getAllReceivedInvoices();
+        setReceivedInvoices(data || []);
       }
     } catch (error: any) {
       logger.error('Error loading data:', error);
@@ -105,6 +153,9 @@ export const FinanceDocumentsScreen = () => {
         break;
       case 'issued-pos':
         setShowAddIssuedPOModal(true);
+        break;
+      case 'received-invoices':
+        setShowAddReceivedInvoiceModal(true);
         break;
     }
   };
@@ -164,6 +215,43 @@ export const FinanceDocumentsScreen = () => {
   const handleEditInvoice = (invoice: any) => {
     setSelectedInvoice(invoice);
     setShowEditInvoiceModal(true);
+  };
+
+  const handleDeletePO = async (po: any) => {
+    if (!window.confirm(`Are you sure you want to delete PO ${po.po_number || po.poNumber}?`)) {
+      return;
+    }
+
+    try {
+      toast.loading('Deleting PO...');
+      const isIssued = activeTab === 'issued-pos';
+      if (isIssued) {
+        await financeService.deleteIssuedPO(po.id);
+      } else {
+        await financeService.deletePurchaseOrder(po.id);
+      }
+      toast.success('PO deleted successfully');
+      loadData();
+    } catch (error: any) {
+      logger.error('Error deleting PO:', error);
+      toast.error(error.message || 'Failed to delete PO');
+    }
+  };
+
+  const handleDeleteInvoice = async (invoice: any) => {
+    if (!window.confirm(`Are you sure you want to delete invoice ${invoice.invoiceNumber}?`)) {
+      return;
+    }
+
+    try {
+      toast.loading('Deleting invoice...');
+      await financeService.deleteInvoice(invoice.id);
+      toast.success('Invoice deleted successfully');
+      loadData();
+    } catch (error: any) {
+      logger.error('Error deleting invoice:', error);
+      toast.error(error.message || 'Failed to delete invoice');
+    }
   };
 
   const handleViewIssuedPOPDF = async (poId: string) => {
@@ -277,6 +365,73 @@ export const FinanceDocumentsScreen = () => {
     }
   };
 
+  const handleMarkAsPaid = async (invoiceId: string) => {
+    try {
+      await financeService.markInvoiceAsPaid(invoiceId);
+      toast.success('Invoice marked as paid');
+      loadData();
+    } catch (error: any) {
+      logger.error('Error marking invoice as paid:', error);
+      toast.error(error.message || 'Failed to mark invoice as paid');
+    }
+  };
+
+  const handleEditReceivedInvoice = (invoice: any) => {
+    setEditingReceivedInvoice(invoice);
+    setShowAddReceivedInvoiceModal(true);
+  };
+
+  const handleDeleteReceivedInvoice = async (invoiceId: string) => {
+    if (!window.confirm('Are you sure you want to delete this received invoice?')) {
+      return;
+    }
+    try {
+      toast.loading('Deleting received invoice...');
+      await financeService.deleteReceivedInvoice(invoiceId);
+      toast.success('Received invoice deleted successfully');
+      loadData();
+    } catch (error: any) {
+      logger.error('Error deleting received invoice:', error);
+      toast.error(error.message || 'Failed to delete received invoice');
+    }
+  };
+
+  const handleVerifyReceivedInvoice = async (invoiceId: string) => {
+    try {
+      toast.loading('Verifying received invoice...');
+      await financeService.verifyReceivedInvoice(invoiceId);
+      toast.success('Received invoice verified successfully');
+      loadData();
+    } catch (error: any) {
+      logger.error('Error verifying received invoice:', error);
+      toast.error(error.message || 'Failed to verify received invoice');
+    }
+  };
+
+  const handleMarkReceivedInvoiceAsPaid = async (invoiceId: string) => {
+    try {
+      toast.loading('Marking received invoice as paid...');
+      await financeService.markReceivedInvoiceAsPaid(invoiceId);
+      toast.success('Received invoice marked as paid');
+      loadData();
+    } catch (error: any) {
+      logger.error('Error marking received invoice as paid:', error);
+      toast.error(error.message || 'Failed to mark received invoice as paid');
+    }
+  };
+
+  const handleDisputeReceivedInvoice = async (invoiceId: string) => {
+    try {
+      toast.loading('Disputing received invoice...');
+      await financeService.disputeReceivedInvoice(invoiceId);
+      toast.success('Received invoice disputed successfully');
+      loadData();
+    } catch (error: any) {
+      logger.error('Error disputing received invoice:', error);
+      toast.error(error.message || 'Failed to dispute received invoice');
+    }
+  };
+
   return (
     <div className="min-h-full bg-gray-50">
       <div className="p-4 md:p-6  space-y-6">
@@ -284,21 +439,20 @@ export const FinanceDocumentsScreen = () => {
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-3">
-                <FileText className="w-8 h-8 text-primary-600" />
-                Finance Documents
-              </h1>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Finance Documents</h1>
               <p className="text-gray-600 mt-1">Manage POs, invoices, and financial documents</p>
             </div>
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => toast.success('Export - Coming Soon')}
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                disabled
-              >
-                <Download className="w-4 h-4" />
-                Export
-              </button>
+              <FinanceExportButton
+                onExport={handleExport}
+                disabled={loading}
+                totalCount={
+                  activeTab === 'received-pos' ? receivedPOs.length :
+                  activeTab === 'invoices' ? invoices.length :
+                  activeTab === 'issued-pos' ? issuedPOs.length :
+                  receivedInvoices.length
+                }
+              />
               <button
                 onClick={handleCreateNew}
                 disabled={!canUpload}
@@ -322,6 +476,7 @@ export const FinanceDocumentsScreen = () => {
           receivedPOCount={receivedPOs.length}
           invoiceCount={invoices.length}
           issuedPOCount={issuedPOs.length}
+          receivedInvoiceCount={receivedInvoices.length}
         />
 
         {/* Content */}
@@ -361,9 +516,11 @@ export const FinanceDocumentsScreen = () => {
                 receivedPOs={receivedPOs}
                 searchQuery={searchQuery}
                 canUpload={canUpload}
+                canDeletePO={canDeletePO || false}
                 onViewDocument={handleViewDocument}
                 onAttachDocument={handleAttachDocument}
                 onEditPO={handleEditPO}
+                onDeletePO={handleDeletePO}
                 onViewDetails={handleViewDetails}
               />
             )}
@@ -373,12 +530,15 @@ export const FinanceDocumentsScreen = () => {
                 searchQuery={searchQuery}
                 onViewPDF={handleViewInvoicePDF}
                 onEditInvoice={handleEditInvoice}
+                onDeleteInvoice={handleDeleteInvoice}
                 canUpload={canUpload}
+                canDelete={canDeleteInvoice || false}
                 canApprove={canApprove}
                 onSubmitForApproval={handleSubmitForApproval}
                 onApprove={handleApproveInvoice}
                 onWithdraw={handleWithdrawInvoice}
                 onMarkAsSent={handleMarkAsSent}
+                onMarkAsPaid={handleMarkAsPaid}
                 currentUserId={currentUser?.id}
               />
             )}
@@ -387,7 +547,23 @@ export const FinanceDocumentsScreen = () => {
                 issuedPOs={issuedPOs}
                 searchQuery={searchQuery}
                 canApprove={canApprove}
+                canDeletePO={canDeletePO || false}
                 onViewPDF={handleViewIssuedPOPDF}
+                onDeletePO={handleDeletePO}
+              />
+            )}
+            {activeTab === 'received-invoices' && (
+              <ReceivedInvoicesTab
+                receivedInvoices={receivedInvoices}
+                searchQuery={searchQuery}
+                canVerify={canApprove}
+                canDelete={canDeleteInvoice || false}
+                onViewDocument={() => {}}
+                onEditInvoice={handleEditReceivedInvoice}
+                onDeleteInvoice={(invoice: any) => handleDeleteReceivedInvoice(invoice.id)}
+                onVerify={handleVerifyReceivedInvoice}
+                onMarkAsPaid={handleMarkReceivedInvoiceAsPaid}
+                onDispute={handleDisputeReceivedInvoice}
               />
             )}
           </>
@@ -475,6 +651,24 @@ export const FinanceDocumentsScreen = () => {
             loadData(); // Refresh data after modal closes
           }}
         />
+
+        {/* Add Received Invoice Modal */}
+        {showAddReceivedInvoiceModal && (
+          <AddReceivedInvoiceModal
+            isOpen={showAddReceivedInvoiceModal}
+            onClose={() => {
+              setShowAddReceivedInvoiceModal(false);
+              setEditingReceivedInvoice(null);
+              loadData(); // Refresh data after modal closes
+            }}
+            onSuccess={() => {
+              setEditingReceivedInvoice(null);
+              loadData();
+              setShowAddReceivedInvoiceModal(false);
+            }}
+            editingInvoice={editingReceivedInvoice}
+          />
+        )}
 
         {/* Edit PO Modal */}
         {showEditPOModal && selectedPO && (

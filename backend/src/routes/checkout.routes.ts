@@ -470,8 +470,9 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       } else if (group.returnedItems > 0) {
         group.status = 'partial-return';
       } else if (
-        checkout.expected_return_date &&
-        new Date(checkout.expected_return_date) < new Date()
+        group.remainingItems > 0 &&
+        group.expectedReturnDate &&
+        new Date(group.expectedReturnDate) < new Date()
       ) {
         group.status = 'overdue';
       } else {

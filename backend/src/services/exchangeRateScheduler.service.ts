@@ -1,4 +1,4 @@
-import cron from 'node-cron';
+import cron, { ScheduledTask } from 'node-cron';
 import { ExchangeRateApiService } from './exchangeRateApi.service';
 import { logger } from '../utils/logger';
 
@@ -14,6 +14,7 @@ import { logger } from '../utils/logger';
  */
 
 let isSchedulerRunning = false;
+let scheduledTask: ScheduledTask | null = null;
 
 /**
  * Start the exchange rate scheduler
@@ -35,7 +36,7 @@ export function startExchangeRateScheduler(): void {
     return;
   }
 
-  cron.schedule(
+  scheduledTask = cron.schedule(
     cronExpression,
     async () => {
       logger.info('Starting scheduled exchange rate import...');
@@ -54,6 +55,19 @@ export function startExchangeRateScheduler(): void {
 
   isSchedulerRunning = true;
   logger.info('Exchange rate scheduler started (daily at 5:00 PM MYT, Mon-Fri)');
+}
+
+/**
+ * Stop the exchange rate scheduler
+ * Call this during graceful shutdown
+ */
+export function stopExchangeRateScheduler(): void {
+  if (scheduledTask) {
+    scheduledTask.stop();
+    scheduledTask = null;
+    isSchedulerRunning = false;
+    logger.info('Exchange rate scheduler stopped');
+  }
 }
 
 /**
@@ -81,6 +95,7 @@ export function isSchedulerActive(): boolean {
 
 export default {
   startExchangeRateScheduler,
+  stopExchangeRateScheduler,
   triggerManualImport,
   isSchedulerActive,
 };

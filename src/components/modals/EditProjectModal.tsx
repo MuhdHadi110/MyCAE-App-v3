@@ -8,7 +8,7 @@ interface EditProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
   project: Project | null;
-  onSave: (updatedProject: Partial<Project>) => void;
+  onSave: (updatedProject: Partial<Project>) => Promise<void>;
 }
 
 export const EditProjectModal: React.FC<EditProjectModalProps> = ({
@@ -26,7 +26,10 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
 
   useEffect(() => {
     if (project) {
-      setFormData({ ...project });
+      setFormData({ 
+        ...project,
+        dailyRate: (project as any).dailyRate || null
+      });
     }
   }, [project]);
 
@@ -44,10 +47,14 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
     setFormData({ ...formData, ...updates });
   };
 
-  const handleSave = () => {
-    onSave(formData);
-    toast.success('Project updated successfully!');
-    onClose();
+  const handleSave = async () => {
+    try {
+      await onSave(formData);
+      toast.success('Project updated successfully!');
+      onClose();
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to update project');
+    }
   };
 
   return (
@@ -88,13 +95,12 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
                     Lead Engineer
                   </label>
                   <select
-                    value={formData.engineerId || formData.leadEngineerId || ''}
+                    value={formData.leadEngineerId || ''}
                     onChange={(e) => {
                       const selectedEngineer = teamMembers.find(tm => tm.id === e.target.value);
                       setFormData({
                         ...formData,
-                        engineerId: e.target.value,
-                        leadEngineerId: e.target.value, // Backend field
+                        leadEngineerId: e.target.value,
                         engineerName: selectedEngineer?.name
                       });
                     }}
@@ -177,8 +183,7 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
                 <select
                   value={formData.status}
                   onChange={(e) => handleStatusChange(e.target.value as ProjectStatus)}
-                  disabled={formData.status === 'pre-lim'}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 >
                   <option value="pre-lim">Preliminary</option>
                   <option value="ongoing">Ongoing</option>
@@ -212,6 +217,25 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
                 onChange={(e) => setFormData({ ...formData, plannedHours: parseInt(e.target.value) })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
+            </div>
+
+            {/* Hourly Rate */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Hourly Rate (MYR)
+                <span className="text-xs text-gray-500 font-normal ml-2">(Optional)</span>
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={formData.dailyRate || ''}
+                onChange={(e) => setFormData({ ...formData, dailyRate: parseFloat(e.target.value) || null })}
+                placeholder="e.g., 500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Leave blank to use default RM 437.50/hr
+              </p>
             </div>
 
             {/* Remarks */}

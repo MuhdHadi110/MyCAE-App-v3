@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Search, Filter, Package, Clock, User, Calendar } from 'lucide-react';
+import { Search, Filter, Package, Clock, User, Calendar, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
@@ -8,7 +8,7 @@ import { BulkCheckInModal } from '../components/modals/BulkCheckInModal';
 import { useCheckoutStore } from '../store/checkoutStore';
 import { useResponsive } from '../hooks/useResponsive';
 import { getCurrentUser } from '../lib/auth';
-import checkoutService from '../services/api.service';
+import inventoryService from '../services/inventory.service';
 import toast from 'react-hot-toast';
 import type { CheckoutStatus } from '../types/checkout.types';
 import type { BulkCheckInData } from '../components/modals/BulkCheckInModal';
@@ -20,9 +20,22 @@ export const CheckoutsScreen: React.FC = () => {
   const { isMobile } = useResponsive();
   const currentUser = getCurrentUser();
 
+  // Null check for currentUser
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <p className="text-gray-600 text-lg">Please log in to access checkouts</p>
+        </div>
+      </div>
+    );
+  }
+
   const [activeTab, setActiveTab] = useState<TabType>('my-checkouts');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<CheckoutStatus | 'all'>('all');
+  const [sortColumn, setSortColumn] = useState<string>('masterBarcode');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false);
   const [selectedCheckoutForCheckIn, setSelectedCheckoutForCheckIn] = useState<any>(null);
 
@@ -88,10 +101,27 @@ export const CheckoutsScreen: React.FC = () => {
     setIsCheckInModalOpen(true);
   };
 
+  const handleSort = useCallback((column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  }, [sortColumn]);
+
+  const getSortIcon = (column: string) => {
+    if (sortColumn !== column) {
+      return <ChevronsUpDown className="w-4 h-4 ml-1 inline-block" />;
+    }
+    return sortDirection === 'asc'
+      ? <ChevronUp className="w-4 h-4 ml-1 inline-block" />
+      : <ChevronDown className="w-4 h-4 ml-1 inline-block" />;
+  };
+
   const handleCheckInSubmit = async (checkInData: BulkCheckInData) => {
     try {
-      // Note: API method may need to be implemented
-      // await checkoutService.checkInItems(checkInData);
+      await inventoryService.checkInBulk(checkInData);
       toast.success('Items checked in successfully!');
       setIsCheckInModalOpen(false);
       await fetchCheckouts();
@@ -105,9 +135,48 @@ export const CheckoutsScreen: React.FC = () => {
     'all-checkouts': filteredCheckouts.length,
   };
 
-  const displayCheckouts = activeTab === 'my-checkouts'
-    ? filteredCheckouts.filter(c => c.checkedOutByEmail === currentUser.email)
-    : filteredCheckouts;
+  const displayCheckouts = useMemo(() => {
+    const baseCheckouts = activeTab === 'my-checkouts'
+      ? filteredCheckouts.filter(c => c.checkedOutByEmail === currentUser.email)
+      : filteredCheckouts;
+
+    return [...baseCheckouts].sort((a, b) => {
+      const getSortValue = (checkout: any) => {
+        switch (sortColumn) {
+          case 'masterBarcode':
+            return checkout.masterBarcode.toLowerCase();
+          case 'checkedOutBy':
+            return checkout.checkedOutBy.toLowerCase();
+          case 'items':
+            return checkout.totalItems || 0;
+          case 'purpose':
+            return (checkout.purpose || '').toLowerCase();
+          case 'checkoutDate':
+            return new Date(checkout.checkedOutDate).getTime();
+          case 'dueDate':
+            return checkout.expectedReturnDate ? new Date(checkout.expectedReturnDate).getTime() : 0;
+          case 'status':
+            const statusOrder = { 'active': 0, 'partial-return': 1, 'overdue': 2, 'fully-returned': 3 };
+            return statusOrder[checkout.status as keyof typeof statusOrder] ?? 4;
+          default:
+            return checkout.masterBarcode.toLowerCase();
+        }
+      };
+
+      const aValue = getSortValue(a);
+      const bValue = getSortValue(b);
+
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return sortDirection === 'asc'
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      } else {
+        return sortDirection === 'asc'
+          ? aValue - bValue
+          : bValue - aValue;
+      }
+    });
+  }, [activeTab, filteredCheckouts, currentUser.email, sortColumn, sortDirection]);
 
   return (
     <div className="min-h-full bg-gray-50">
@@ -264,35 +333,21 @@ export const CheckoutsScreen: React.FC = () => {
 
         {/* Checkouts List - Desktop Table */}
         {!loading && !isMobile && (
-          <Card variant="bordered" padding="none">
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Master Barcode
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Checked Out By
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Items
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Purpose
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Checkout Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Due Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Status
-                  </th>
+                  <th onClick={() => handleSort('masterBarcode')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Master Barcode {getSortIcon('masterBarcode')}</th>
+                  <th onClick={() => handleSort('checkedOutBy')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Checked Out By {getSortIcon('checkedOutBy')}</th>
+                  <th onClick={() => handleSort('items')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Items {getSortIcon('items')}</th>
+                  <th onClick={() => handleSort('purpose')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Purpose {getSortIcon('purpose')}</th>
+                  <th onClick={() => handleSort('checkoutDate')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Checkout Date {getSortIcon('checkoutDate')}</th>
+                  <th onClick={() => handleSort('dueDate')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Due Date {getSortIcon('dueDate')}</th>
+                  <th onClick={() => handleSort('status')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Status {getSortIcon('status')}</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-gray-100">
                 {displayCheckouts.map((checkout) => {
                   const daysInfo = getDaysInfo(checkout.expectedReturnDate);
                   const isOwnCheckout = checkout.checkedOutByEmail === currentUser.email;
@@ -300,66 +355,64 @@ export const CheckoutsScreen: React.FC = () => {
                   return (
                     <tr
                       key={checkout.id}
-                      className="hover:bg-gray-50 cursor-pointer transition-colors"
+                      className="hover:bg-gray-50 transition-colors"
                     >
-                      <td className="px-6 py-4">
-                        <div>
-                          <p className="font-mono text-sm font-medium text-gray-900">
-                            {checkout.masterBarcode}
-                          </p>
-                        </div>
+                      <td className="px-3 py-2">
+                        <p className="font-mono font-medium text-gray-900">
+                          {checkout.masterBarcode}
+                        </p>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 py-2">
                         <div className="flex items-center gap-2">
                           <User className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-900">
+                          <span className="text-gray-900">
                             {isOwnCheckout ? 'You' : checkout.checkedOutBy}
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 py-2">
                         <div className="flex items-center gap-2">
                           <Package className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-900">
+                          <span className="text-gray-900">
                             {checkout.status === 'partial-return'
                               ? `${checkout.remainingItems}/${checkout.totalItems} out`
                               : `${checkout.totalItems}`}
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm text-gray-900 max-w-xs truncate">
+                      <td className="px-3 py-2">
+                        <p className="text-gray-900 max-w-xs truncate">
                           {checkout.purpose || '-'}
                         </p>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 py-2">
                         <div className="flex items-center gap-2">
                           <Calendar className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-900">
+                          <span className="text-gray-900">
                             {new Date(checkout.checkedOutDate).toLocaleDateString()}
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 py-2">
                         {daysInfo ? (
                           <div className="flex items-center gap-2">
                             <Clock className="w-4 h-4 text-gray-400" />
-                            <span className={`text-sm font-medium ${daysInfo.className}`}>
+                            <span className={`font-medium ${daysInfo.className}`}>
                               {daysInfo.text}
                             </span>
                           </div>
                         ) : (
-                          <span className="text-sm text-gray-500">-</span>
+                          <span className="text-gray-500">-</span>
                         )}
                       </td>
-                      <td className="px-6 py-4">{getStatusBadge(checkout.status)}</td>
+                      <td className="px-3 py-2">{getStatusBadge(checkout.status)}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
-          </Card>
+          </div>
         )}
 
         {/* Empty State */}

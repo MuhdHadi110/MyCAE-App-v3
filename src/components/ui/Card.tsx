@@ -2,22 +2,28 @@ import React from 'react';
 import { cn } from '../../lib/utils';
 
 export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
-  variant?: 'default' | 'bordered' | 'elevated';
+  variant?: 'default' | 'bordered' | 'elevated' | 'stat' | 'clickable';
   padding?: 'none' | 'sm' | 'md' | 'lg';
+  active?: boolean;
 }
 
 export const Card = React.forwardRef<HTMLDivElement, CardProps>(
-  ({ className, variant = 'default', padding = 'md', children, ...props }, ref) => {
+  ({ className, variant = 'default', padding = 'md', active, children, ...props }, ref) => {
     return (
       <div
         ref={ref}
         className={cn(
-          'bg-white rounded-lg',
+          'bg-white',
           {
-            // Variants
-            'shadow-sm': variant === 'default',
-            'border border-gray-200': variant === 'bordered',
-            'shadow-md': variant === 'elevated',
+            // Base styles
+            'rounded-lg shadow-sm': variant === 'default',
+            'rounded-lg border border-gray-200': variant === 'bordered',
+            'rounded-lg shadow-md': variant === 'elevated',
+            'rounded-2xl shadow-sm border border-gray-100': variant === 'stat',
+            'rounded-2xl shadow-sm border border-gray-100 cursor-pointer transition-all hover:shadow-md hover:scale-[1.02]': variant === 'clickable',
+
+            // Active state for clickable cards
+            'ring-2 ring-primary-500 ring-offset-2': active,
 
             // Padding
             'p-0': padding === 'none',
@@ -68,5 +74,76 @@ export const CardContent: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ cl
 export const CardFooter: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ className, children, ...props }) => (
   <div className={cn('mt-4 flex items-center gap-2', className)} {...props}>
     {children}
+  </div>
+);
+
+// Stat Card variant for dashboard stats
+export const StatCard: React.FC<{
+  title: string;
+  value: number | string;
+  color?: 'gray' | 'blue' | 'green' | 'yellow' | 'purple' | 'indigo' | 'red';
+  onClick?: () => void;
+  active?: boolean;
+}> = ({ title, value, color = 'gray', onClick, active }) => {
+  const colorClasses = {
+    gray: 'text-gray-900',
+    blue: 'text-blue-600',
+    green: 'text-green-600',
+    yellow: 'text-yellow-600',
+    purple: 'text-purple-600',
+    indigo: 'text-indigo-600',
+    red: 'text-red-600',
+  };
+
+  const ringColorClasses = {
+    gray: 'ring-gray-500',
+    blue: 'ring-blue-500',
+    green: 'ring-green-500',
+    yellow: 'ring-yellow-500',
+    purple: 'ring-purple-500',
+    indigo: 'ring-indigo-500',
+    red: 'ring-red-500',
+  };
+
+  if (onClick) {
+    return (
+      <button
+        onClick={onClick}
+        className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-left transition-all hover:shadow-md hover:scale-105 ${
+          active ? `ring-2 ${ringColorClasses[color]} ring-offset-2` : ''
+        }`}
+      >
+        <div className="text-sm font-medium text-gray-600 mb-2">{title}</div>
+        <div className={`text-3xl font-bold ${colorClasses[color]}`}>{value}</div>
+      </button>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+      <div className="text-sm font-medium text-gray-600 mb-2">{title}</div>
+      <div className={`text-3xl font-bold ${colorClasses[color]}`}>{value}</div>
+    </div>
+  );
+};
+
+// Page Header Card
+export const PageHeader: React.FC<{
+  title: string;
+  description?: string;
+  action?: React.ReactNode;
+  icon?: React.ReactNode;
+}> = ({ title, description, action, icon }) => (
+  <div className="bg-white rounded-lg border border-gray-200 p-6">
+    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="flex items-center gap-4">
+        {icon && <div className="hidden md:flex text-primary-600">{icon}</div>}
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{title}</h1>
+          {description && <p className="text-sm text-gray-600 mt-1">{description}</p>}
+        </div>
+      </div>
+      {action && <div className="flex-shrink-0">{action}</div>}
+    </div>
   </div>
 );

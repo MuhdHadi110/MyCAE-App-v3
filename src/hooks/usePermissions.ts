@@ -58,7 +58,7 @@ export function usePermissions() {
           const roleHierarchy: Record<string, number> = {
             'engineer': 1,
             'senior-engineer': 2,
-            'principal-engineer': 2.5,
+            'principal-engineer': 3,
             'manager': 3,
             'managing-director': 4,
             'admin': 5,

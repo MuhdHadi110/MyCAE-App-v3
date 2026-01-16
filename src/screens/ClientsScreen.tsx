@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Search, Building2, Mail, Phone, Edit, Trash2, Grid3x3, List as ListIcon, Tag } from 'lucide-react';
+import { Plus, Search, Building2, Mail, Phone, Edit, Trash2, Grid3x3, List as ListIcon, Tag, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { useClientStore } from '../store/clientStore';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import type { Client, ClientCategory } from '../types/client.types';
@@ -13,6 +13,8 @@ export const ClientsScreen: React.FC = () => {
   // 1. Destructure all required actions from the store
   const { clients, loading, error, fetchClients, addClient, updateClient, deleteClient } = useClientStore();
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortColumn, setSortColumn] = useState<string>('name');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [viewMode, setViewMode] = useState<'card' | 'list'>(() => {
     return (localStorage.getItem('clientsViewMode') as 'card' | 'list') || 'card';
   });
@@ -115,16 +117,68 @@ export const ClientsScreen: React.FC = () => {
     return category.charAt(0).toUpperCase() + category.slice(1);
   };
 
-  const filteredClients = clients.filter((client) => {
-    if (!client || !client.name) return false;
+  const handleSort = useCallback((column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  }, [sortColumn]);
 
-    const matchesSearch =
-      searchTerm === '' ||
-      client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.industry?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = categoryFilter === 'all' || (client.categories && client.categories.includes(categoryFilter as ClientCategory));
-    return matchesSearch && matchesCategory;
-  });
+  const getSortIcon = (column: string) => {
+    if (sortColumn !== column) {
+      return <ChevronsUpDown className="w-4 h-4 ml-1 inline-block" />;
+    }
+    return sortDirection === 'asc'
+      ? <ChevronUp className="w-4 h-4 ml-1 inline-block" />
+      : <ChevronDown className="w-4 h-4 ml-1 inline-block" />;
+  };
+
+  const filteredClients = useMemo(() => {
+    return clients.filter((client) => {
+      if (!client || !client.name) return false;
+
+      const matchesSearch =
+        searchTerm === '' ||
+        client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        client.industry?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = categoryFilter === 'all' || (client.categories && client.categories.includes(categoryFilter as ClientCategory));
+      return matchesSearch && matchesCategory;
+    }).sort((a, b) => {
+      const getSortValue = (client: Client) => {
+        switch (sortColumn) {
+          case 'name':
+            return client.name.toLowerCase();
+          case 'category':
+            return (client.categories?.[0] || '').toLowerCase();
+          case 'contact':
+            return (client.contactPerson || '').toLowerCase();
+          case 'email':
+            return (client.email || '').toLowerCase();
+          case 'active':
+            return client.activeProjects || 0;
+          case 'total':
+            return client.totalProjects || 0;
+          default:
+            return client.name.toLowerCase();
+        }
+      };
+
+      const aValue = getSortValue(a);
+      const bValue = getSortValue(b);
+
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return sortDirection === 'asc'
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      } else {
+        return sortDirection === 'asc'
+          ? aValue - bValue
+          : bValue - aValue;
+      }
+    });
+  }, [clients, searchTerm, categoryFilter, sortColumn, sortDirection]);
 
   return (
     <div className="min-h-full bg-gray-50">
@@ -359,48 +413,34 @@ export const ClientsScreen: React.FC = () => {
         </div>
       ) : (
         // List View
-        <div className="bg-white rounded-lg shadow overflow-hidden" >
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Company
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Category
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Contact
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Email
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Active
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Total
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
+                  <th onClick={() => handleSort('name')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Company {getSortIcon('name')}</th>
+                  <th onClick={() => handleSort('category')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Category {getSortIcon('category')}</th>
+                  <th onClick={() => handleSort('contact')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Contact {getSortIcon('contact')}</th>
+                  <th onClick={() => handleSort('email')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Email {getSortIcon('email')}</th>
+                  <th onClick={() => handleSort('active')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Active {getSortIcon('active')}</th>
+                  <th onClick={() => handleSort('total')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Total {getSortIcon('total')}</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold text-gray-700">Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-gray-100">
                 {filteredClients.map((client) => (
                   <tr key={client.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 py-2">
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{client.name}</div>
-                        <div className="text-sm text-gray-500">{client.industry || '-'}</div>
+                        <div className="font-medium text-gray-900">{client.name}</div>
+                        <div className="text-xs text-gray-500">{client.industry || '-'}</div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-2">
                       <div className="flex flex-wrap gap-1">
                         {client.categories && client.categories.length > 0 ? (
                           client.categories.map((category) => (
-                            <span key={category} className={`px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(category)}`}>
+                            <span key={category} className={`px-2 py-0.5 rounded-full text-xs font-medium ${getCategoryColor(category)}`}>
                               {getCategoryLabel(category)}
                             </span>
                           ))
@@ -409,14 +449,14 @@ export const ClientsScreen: React.FC = () => {
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-2 text-gray-900">
                       {client.contactPerson || '-'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 py-2">
                       {client.email ? (
                         <a
                           href={`mailto:${client.email}`}
-                          className="text-sm text-primary-600 hover:text-primary-900"
+                          className="text-primary-600 hover:text-primary-900"
                         >
                           {client.email}
                         </a>
@@ -424,18 +464,18 @@ export const ClientsScreen: React.FC = () => {
                         <span className="text-gray-400">-</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-green-600">{client.activeProjects}</div>
+                    <td className="px-3 py-2">
+                      <span className="font-medium text-green-600">{client.activeProjects}</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{client.totalProjects}</div>
+                    <td className="px-3 py-2">
+                      <span className="font-medium text-gray-900">{client.totalProjects}</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex gap-2">
+                    <td className="px-3 py-2 text-right">
+                      <div className="flex gap-1 justify-end">
                         {canAdd && (
                           <button
                             onClick={() => handleEditClient(client)}
-                            className="text-primary-600 hover:text-primary-900"
+                            className="p-1.5 hover:bg-blue-100 text-blue-600 rounded transition-colors"
                             title="Edit client"
                           >
                             <Edit className="w-4 h-4" />
@@ -444,7 +484,7 @@ export const ClientsScreen: React.FC = () => {
                         {canAdd && (
                           <button
                             onClick={() => handleDeleteClient(client.id, client.name)}
-                            className="text-red-600 hover:text-red-900"
+                            className="p-1.5 hover:bg-red-100 text-red-600 rounded transition-colors"
                             title="Delete client"
                           >
                             <Trash2 className="w-4 h-4" />

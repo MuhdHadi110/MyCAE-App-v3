@@ -7,13 +7,13 @@ interface AdjustMYRModalProps {
   onClose: () => void;
   po: {
     id: string;
-    po_number: string;
+    poNumber: string;
     amount: number;
     currency: string;
-    amount_myr: number;
-    exchange_rate: number;
-    amount_myr_adjusted: number | null;
-    adjustment_reason: string | null;
+    amountMyr: number;
+    exchangeRate: number;
+    amountMyrAdjusted: number | null;
+    adjustmentReason: string | null;
   };
   onSuccess: () => void;
 }
@@ -25,13 +25,13 @@ export const AdjustMYRModal: React.FC<AdjustMYRModalProps> = ({
   onSuccess,
 }) => {
   const [adjustedAmount, setAdjustedAmount] = useState<string>(
-    (po.amount_myr_adjusted || po.amount_myr).toFixed(2)
+    (po.amountMyrAdjusted || po.amountMyr || 0).toFixed(2)
   );
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const calculatedAmount = po.amount_myr;
+  const calculatedAmount = po.amountMyr || 0;
   const currentAdjusted = parseFloat(adjustedAmount) || 0;
   const difference = currentAdjusted - calculatedAmount;
   const percentDiff = calculatedAmount !== 0 ? (difference / calculatedAmount) * 100 : 0;
@@ -81,7 +81,7 @@ export const AdjustMYRModal: React.FC<AdjustMYRModalProps> = ({
             <Edit3 className="w-6 h-6 text-yellow-600" />
             <div>
               <h2 className="text-xl font-semibold text-gray-900">Adjust MYR Amount</h2>
-              <p className="text-sm text-gray-500">PO Number: {po.po_number}</p>
+              <p className="text-sm text-gray-500">PO Number: {po.poNumber}</p>
             </div>
           </div>
           <button
@@ -120,17 +120,17 @@ export const AdjustMYRModal: React.FC<AdjustMYRModalProps> = ({
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Exchange Rate:</span>
-                <span className="text-gray-900 font-medium">{po.exchange_rate.toFixed(6)}</span>
+                <span className="text-gray-900 font-medium">{po.exchangeRate.toFixed(6)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Calculated MYR:</span>
                 <span className="text-gray-900 font-medium">MYR {calculatedAmount.toFixed(2)}</span>
               </div>
-              {po.amount_myr_adjusted && (
+              {po.amountMyrAdjusted && (
                 <div className="flex justify-between pt-2 border-t border-gray-200">
                   <span className="text-gray-500">Current Adjusted MYR:</span>
                   <span className="text-yellow-700 font-medium">
-                    MYR {po.amount_myr_adjusted.toFixed(2)}
+                    MYR {po.amountMyrAdjusted.toFixed(2)}
                   </span>
                 </div>
               )}

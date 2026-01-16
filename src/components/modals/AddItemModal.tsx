@@ -61,13 +61,22 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onS
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const categories = [
-    'Electronics',
-    'Office Supplies',
-    'Furniture',
-    'Tools & Equipment',
-    'Safety Equipment',
-    'IT Equipment',
+    'Chassis',
     'Consumables',
+    'Data Acquisition Module',
+    'Dytran Impact Hammer',
+    'Electronics',
+    'Furniture',
+    'Impulse Force Hammer',
+    'IT Equipment',
+    'Laptop',
+    'Microphone',
+    'Office Supplies',
+    'Safety Equipment',
+    'Sound Level Meter',
+    'Tools & Equipment',
+    'Triaxial Vibration Sensor',
+    'Vibration Sensor',
     'Other',
   ];
 

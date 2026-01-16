@@ -14,6 +14,7 @@ import { InventoryItem } from '../entities/InventoryItem';
 import { Invoice } from '../entities/Invoice';
 import { IssuedPO } from '../entities/IssuedPO';
 import { MaintenanceTicket } from '../entities/MaintenanceTicket';
+import { ReceivedInvoice } from '../entities/ReceivedInvoice';
 import { Project } from '../entities/Project';
 import { ProjectHourlyRate } from '../entities/ProjectHourlyRate';
 import { PurchaseOrder } from '../entities/PurchaseOrder';
@@ -38,6 +39,7 @@ const entities = [
   Invoice,
   IssuedPO,
   MaintenanceTicket,
+  ReceivedInvoice,
   Project,
   ProjectHourlyRate,
   PurchaseOrder,

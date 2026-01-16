@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Plus, Search, Mail, Phone, Award, Briefcase, Edit2, Trash2, RefreshCw } from 'lucide-react';
 import { useTeamStore } from '../store/teamStore';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import { Card, StatCard, PageHeader } from '../components/ui/Card';
 import { getCurrentUser } from '../lib/auth';
 import { getPermissions } from '../lib/permissions';
 import { AddTeamMemberModal } from '../components/modals/AddTeamMemberModal';
@@ -154,115 +155,80 @@ export const TeamScreen: React.FC = () => {
     <div className="min-h-full bg-gray-50">
       <div className="p-4 md:p-6  space-y-6">
         {/* Header Container */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Team</h1>
-              <p className="text-sm text-gray-600 mt-1">
-                Manage your team members and track their workload
-              </p>
+        <PageHeader
+          title="Team"
+          description="Manage your team members and track their workload"
+          action={permissions.canAddTeamMember ? (
+            <button
+              onClick={handleAddTeamMember}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add Team Member
+            </button>
+          ) : undefined}
+        />
+
+        {/* Filters */}
+        <Card variant="stat" padding="sm">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Search */}
+            <div className="relative">
+              <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search by name or department..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
             </div>
-            {permissions.canAddTeamMember && (
-              <button
-                onClick={handleAddTeamMember}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+
+            {/* Role Filter */}
+            <div>
+              <select
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value as UserRole | 'all')}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               >
-                <Plus className="w-4 h-4" />
-                Add Team Member
-              </button>
-            )}
+                <option value="all">All Roles</option>
+                <option value="engineer">Engineers</option>
+                <option value="senior-engineer">Senior Engineers</option>
+                <option value="principal-engineer">Principal Engineers</option>
+                <option value="manager">Managers</option>
+                <option value="managing-director">Managing Directors</option>
+              </select>
+            </div>
+
+            {/* Status Filter */}
+            <div>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as 'active' | 'inactive' | 'all')}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              >
+                <option value="active">Active Members</option>
+                <option value="inactive">Inactive Members</option>
+                <option value="all">All Members</option>
+              </select>
+            </div>
           </div>
+        </Card>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+          <StatCard title="Total" value={teamMembers.length} color="gray" />
+          <StatCard title="Engineers" value={teamMembers.filter((m) => m.role === 'engineer').length} color="blue" />
+          <StatCard title="Senior Eng" value={teamMembers.filter((m) => m.role === 'senior-engineer').length} color="indigo" />
+          <StatCard title="Principal Eng" value={teamMembers.filter((m) => m.role === 'principal-engineer').length} color="purple" />
+          <StatCard title="Managers" value={teamMembers.filter((m) => m.role === 'manager').length} color="green" />
+          <StatCard title="Man. Directors" value={teamMembers.filter((m) => m.role === 'managing-director').length} color="red" />
         </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Search */}
-          <div className="relative">
-            <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by name or department..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
-          </div>
-
-          {/* Role Filter */}
-          <div>
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value as UserRole | 'all')}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            >
-              <option value="all">All Roles</option>
-              <option value="engineer">Engineers</option>
-              <option value="senior-engineer">Senior Engineers</option>
-              <option value="principal-engineer">Principal Engineers</option>
-              <option value="manager">Managers</option>
-              <option value="managing-director">Managing Directors</option>
-            </select>
-          </div>
-
-          {/* Status Filter */}
-          <div>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as 'active' | 'inactive' | 'all')}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            >
-              <option value="active">Active Members</option>
-              <option value="inactive">Inactive Members</option>
-              <option value="all">All Members</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="text-sm font-medium text-gray-600">Total</div>
-          <div className="text-3xl font-bold text-gray-900 mt-2">{teamMembers.length}</div>
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="text-sm font-medium text-gray-600">Engineers</div>
-          <div className="text-3xl font-bold text-blue-600 mt-2">
-            {teamMembers.filter((m) => m.role === 'engineer').length}
-          </div>
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="text-sm font-medium text-gray-600">Senior Eng</div>
-          <div className="text-3xl font-bold text-indigo-600 mt-2">
-            {teamMembers.filter((m) => m.role === 'senior-engineer').length}
-          </div>
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="text-sm font-medium text-gray-600">Principal Eng</div>
-          <div className="text-3xl font-bold text-purple-600 mt-2">
-            {teamMembers.filter((m) => m.role === 'principal-engineer').length}
-          </div>
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="text-sm font-medium text-gray-600">Managers</div>
-          <div className="text-3xl font-bold text-green-600 mt-2">
-            {teamMembers.filter((m) => m.role === 'manager').length}
-          </div>
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="text-sm font-medium text-gray-600">Man. Directors</div>
-          <div className="text-3xl font-bold text-red-600 mt-2">
-            {teamMembers.filter((m) => m.role === 'managing-director').length}
-          </div>
-        </div>
-      </div>
-
-      {/* Team Members Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredMembers.map((member) => (
-          <div key={member.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition-shadow">
-            <div className="p-6">
+        {/* Team Members Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredMembers.map((member) => (
+            <Card key={member.id} variant="stat" className="hover:shadow-lg transition-shadow">
               {/* Avatar and Role */}
               <div className="flex items-start gap-4 mb-4">
                 <div className="relative">
@@ -399,10 +365,9 @@ export const TeamScreen: React.FC = () => {
                   </>
                 )}
               </div>
-            </div>
-          </div>
-        ))}
-      </div>
+            </Card>
+          ))}
+        </div>
 
       {/* Add Team Member Modal */}
       <AddTeamMemberModal

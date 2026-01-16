@@ -76,6 +76,11 @@ class FinanceService {
     return transformKeysToCAmelCase(response.data);
   }
 
+  async markInvoiceAsPaid(id: string): Promise<any> {
+    const response = await api.post(`/invoices/${id}/mark-as-paid`);
+    return transformKeysToCAmelCase(response.data);
+  }
+
   // ==================== Issued POs (Outgoing) ====================
 
   async getAllIssuedPOs(filters?: any): Promise<any[]> {
@@ -115,6 +120,48 @@ class FinanceService {
     return response.data;
   }
 
+  // ==================== Received Invoices (From Vendors) ====================
+
+  async getAllReceivedInvoices(filters?: any): Promise<any[]> {
+    const response = await api.get('/received-invoices', { params: filters });
+    const data = Array.isArray(response.data) ? response.data : (response.data.data || []);
+    return transformKeysToCAmelCase(data);
+  }
+
+  async getReceivedInvoiceById(id: string): Promise<any> {
+    const response = await api.get(`/received-invoices/${id}`);
+    return transformKeysToCAmelCase(response.data);
+  }
+
+  async createReceivedInvoice(invoice: any): Promise<any> {
+    const response = await api.post('/received-invoices', invoice);
+    return transformKeysToCAmelCase(response.data);
+  }
+
+  async updateReceivedInvoice(id: string, updates: any): Promise<any> {
+    const response = await api.put(`/received-invoices/${id}`, updates);
+    return transformKeysToCAmelCase(response.data);
+  }
+
+  async deleteReceivedInvoice(id: string): Promise<void> {
+    await api.delete(`/received-invoices/${id}`);
+  }
+
+  async verifyReceivedInvoice(id: string): Promise<any> {
+    const response = await api.post(`/received-invoices/${id}/verify`);
+    return transformKeysToCAmelCase(response.data);
+  }
+
+  async markReceivedInvoiceAsPaid(id: string): Promise<any> {
+    const response = await api.post(`/received-invoices/${id}/mark-as-paid`);
+    return transformKeysToCAmelCase(response.data);
+  }
+
+  async disputeReceivedInvoice(id: string): Promise<any> {
+    const response = await api.post(`/received-invoices/${id}/dispute`);
+    return transformKeysToCAmelCase(response.data);
+  }
+
   // ==================== Purchase Orders (Received from Clients) ====================
 
   async getAllPurchaseOrders(filters?: any): Promise<any> {
@@ -139,6 +186,7 @@ class FinanceService {
     description?: string;
     status?: string;
     fileUrl?: string;
+    customExchangeRate?: number;
   }): Promise<any> {
     const response = await api.post('/purchase-orders', data);
     return transformKeysToCAmelCase(response.data);

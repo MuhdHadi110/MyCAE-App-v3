@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { Paperclip, FileText, Edit2, Eye } from 'lucide-react';
+import { Paperclip, FileText, Edit2, Eye, Trash2 } from 'lucide-react';
 import { getStatusBadge, formatDate } from '../../lib/financeUtils';
 import { toast } from 'react-hot-toast';
 
@@ -7,9 +7,11 @@ interface ReceivedPOsTabProps {
   receivedPOs: any[];
   searchQuery: string;
   canUpload: boolean;
+  canDeletePO: boolean;
   onViewDocument: (po: any) => void;
   onAttachDocument: (poId: string) => void;
   onEditPO: (po: any) => void;
+  onDeletePO: (po: any) => void;
   onViewDetails: (po: any) => void;
 }
 
@@ -17,9 +19,11 @@ export const ReceivedPOsTab: React.FC<ReceivedPOsTabProps> = memo(({
   receivedPOs,
   searchQuery,
   canUpload,
+  canDeletePO,
   onViewDocument,
   onAttachDocument,
   onEditPO,
+  onDeletePO,
   onViewDetails,
 }) => {
   const filteredPOs = receivedPOs.filter((po) => {
@@ -27,9 +31,9 @@ export const ReceivedPOsTab: React.FC<ReceivedPOsTabProps> = memo(({
     if (!query) return true;
 
     return (
-      po.po_number?.toLowerCase().includes(query) ||
-      po.client_name?.toLowerCase().includes(query) ||
-      po.project_code?.toLowerCase().includes(query) ||
+      (po.poNumber || po.po_number)?.toLowerCase().includes(query) ||
+      (po.clientName || po.client_name)?.toLowerCase().includes(query) ||
+      (po.projectCode || po.project_code)?.toLowerCase().includes(query) ||
       po.project?.title?.toLowerCase().includes(query)
     );
   });
@@ -48,19 +52,27 @@ export const ReceivedPOsTab: React.FC<ReceivedPOsTabProps> = memo(({
         const statusBadge = getStatusBadge(po.status);
         const StatusIcon = statusBadge.icon;
 
+        // Support both camelCase (transformed) and snake_case (raw) field names
+        const poNumber = po.poNumber || po.po_number;
+        const projectCode = po.projectCode || po.project_code || po.project?.projectCode || po.project?.project_code;
+        const clientName = po.project?.client?.name || po.clientName || po.client_name;
+        const fileUrl = po.fileUrl || po.file_url;
+        const receivedDate = po.receivedDate || po.received_date;
+        const dueDate = po.dueDate || po.due_date;
+
         return (
           <div key={po.id} className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow">
             <div className="mb-4">
               {/* PO Number and badges */}
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-3">
-                  <h3 className="text-lg font-semibold text-gray-900">{po.po_number}</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">{poNumber}</h3>
                   <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${statusBadge.color}`}>
                     <StatusIcon className="w-3 h-3" />
                     {statusBadge.label}
                   </span>
                   {/* Document uploaded indicator */}
-                  {po.file_url && (
+                  {fileUrl && (
                     <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 bg-green-100 text-green-800 rounded-full">
                       <FileText className="w-3 h-3" />
                       Document
@@ -77,38 +89,42 @@ export const ReceivedPOsTab: React.FC<ReceivedPOsTabProps> = memo(({
               </div>
 
               {/* Project code and title as subheading */}
-              {po.project_code || po.project?.title ? (
+              {(projectCode || po.project?.title) ? (
                 <h4 className="text-lg font-semibold text-primary-600 mb-2">
-                  {po.project_code || po.project?.project_code || 'Unknown'} - {po.project?.title || po.project_code || 'Untitled Project'}
+                  {projectCode || 'No Code'} - {po.project?.title || 'Untitled Project'}
                 </h4>
               ) : (
                 <p className="text-sm text-gray-500 mb-2">No project linked</p>
               )}
 
               {/* Client name */}
-              <p className="text-sm text-gray-600 mb-1">{po.client_name}</p>
+              <p className="text-sm text-gray-600 mb-1">{clientName || 'Unknown'}</p>
 
               {/* Description */}
               {po.description && <p className="text-sm text-gray-500">{po.description}</p>}
             </div>
 
-            <div className="grid grid-cols-3 gap-4 py-3 border-t border-gray-100">
+            <div className="grid grid-cols-4 gap-4 py-3 border-t border-gray-100">
+              <div>
+                <p className="text-xs text-gray-500">Project Code</p>
+                <p className="text-sm font-medium text-gray-900">{projectCode || 'N/A'}</p>
+              </div>
               <div>
                 <p className="text-xs text-gray-500">Received Date</p>
-                <p className="text-sm font-medium text-gray-900">{formatDate(po.received_date)}</p>
+                <p className="text-sm font-medium text-gray-900">{formatDate(receivedDate)}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-500">Due Date</p>
-                <p className="text-sm font-medium text-gray-900">{formatDate(po.due_date)}</p>
+                <p className="text-sm font-medium text-gray-900">{formatDate(dueDate)}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-500">Amount</p>
-                <p className="text-sm font-medium text-gray-900">RM {po.amount?.toLocaleString() || '0.00'}</p>
+                <p className="text-sm font-medium text-gray-900">RM {po.amount_myr?.toLocaleString() || '0.00'}</p>
               </div>
             </div>
 
             {/* Document view button */}
-            {po.file_url && (
+            {fileUrl && (
               <div className="mt-3 pt-3 border-t border-gray-100">
                 <button
                   onClick={() => onViewDocument(po)}
@@ -138,16 +154,16 @@ export const ReceivedPOsTab: React.FC<ReceivedPOsTabProps> = memo(({
                     Edit PO
                   </button>
                 )}
-                {po.status === 'in-progress' && (
+                {canDeletePO && (
                   <button
-                    onClick={() => toast.success('Create Invoice - Coming Soon')}
-                    className="px-3 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700"
-                    disabled
+                    onClick={() => onDeletePO(po)}
+                    className="px-3 py-1.5 bg-red-100 text-red-700 text-sm rounded-lg hover:bg-red-200 flex items-center gap-1.5"
                   >
-                    Create Invoice
+                    <Trash2 className="w-4 h-4" />
+                    Delete
                   </button>
                 )}
-                <button
+                                <button
                   onClick={() => onViewDetails(po)}
                   className="px-3 py-1.5 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200"
                 >

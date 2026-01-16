@@ -12,6 +12,7 @@ interface Logger {
   info: (...args: unknown[]) => void;
   warn: (...args: unknown[]) => void;
   error: (...args: unknown[]) => void;
+  axiosError: (message: string, error: any) => void;
 }
 
 const formatArgs = (level: LogLevel, args: unknown[]): unknown[] => {
@@ -41,6 +42,20 @@ export const logger: Logger = {
   error: (...args: unknown[]) => {
     // Errors are always logged
     console.error(...formatArgs('error', args));
+  },
+
+  // Helper to log AxiosError with details
+  axiosError: (message: string, error: any) => {
+    if (isDev) {
+      console.error(...formatArgs('error', [message]));
+      if (error?.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+      }
+      if (error?.message) {
+        console.error('Error message:', error.message);
+      }
+    }
   },
 };
 

@@ -145,7 +145,10 @@
       "Bash(do kill -9 $pid)",
       "Bash(true echo \"Killed $pid\" done sleep 2 ps aux)",
       "Skill(review-ui-ux)",
-      "Skill(review-ui-ux:*)"
+      "Skill(review-ui-ux:*)",
+      "Bash(git -C \"c:\\\\Users\\\\User\\\\Documents\\\\MycaeTracker\" log --oneline)",
+      "Bash(killall node:*)",
+      "Bash(PORT=3001 npm run dev:*)"
     ],
     "deny": [],
     "ask": []

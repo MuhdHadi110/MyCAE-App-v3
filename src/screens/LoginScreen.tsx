@@ -5,12 +5,13 @@ import { toast } from 'react-hot-toast';
 import { PasswordChangeModal } from '../components/modals/PasswordChangeModal';
 import { ForgotPasswordModal } from '../components/modals/ForgotPasswordModal';
 import ReCAPTCHA from 'react-google-recaptcha';
-import { Lock } from 'lucide-react';
+import { Lock, Eye, EyeOff } from 'lucide-react';
 import { logger } from '../lib/logger';
 
 export const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isPasswordChangeOpen, setIsPasswordChangeOpen] = useState(false);
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
   const [loginEmail, setLoginEmail] = useState('');
@@ -24,8 +25,11 @@ export const LoginScreen: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  // Google reCAPTCHA site key (you'll need to get this from Google reCAPTCHA admin)
-  const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI';
+  const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+
+  if (!RECAPTCHA_SITE_KEY) {
+    console.error('❌ VITE_RECAPTCHA_SITE_KEY environment variable is not set');
+  }
 
   const validateForm = () => {
     let isValid = true;
@@ -234,7 +238,7 @@ export const LoginScreen: React.FC = () => {
               </div>
             </div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Login</h1>
-            <p className="text-gray-500 text-sm">Welcome back to MyCAE Tracker</p>
+            <p className="text-gray-500 text-sm">Welcome back to MyCAE Technologies App</p>
           </div>
 
           {/* Form */}
@@ -264,17 +268,26 @@ export const LoginScreen: React.FC = () => {
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1.5">
                 Password
               </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                disabled={isLoading}
-                className={`w-full px-4 py-3 border ${
-                  passwordError ? 'border-red-300' : 'border-gray-200'
-                } rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:cursor-not-allowed`}
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  disabled={isLoading}
+                  className={`w-full px-4 py-3 pr-10 border ${
+                    passwordError ? 'border-red-300' : 'border-gray-200'
+                  } rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:cursor-not-allowed`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
               {passwordError && (
                 <p className="mt-1.5 text-sm text-red-600">{passwordError}</p>
               )}

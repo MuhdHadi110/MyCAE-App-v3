@@ -183,10 +183,10 @@ export const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ isOpen, onClos
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setFormData({
-      ...formData,
+    setFormData(prev => ({
+      ...prev,
       [e.target.name]: e.target.value,
-    });
+    }));
 
     // Track which field was edited for auto-calculation
     if (e.target.name === 'amount') {
@@ -261,9 +261,11 @@ export const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ isOpen, onClos
                 onChange={handleChange}
                 required
                 placeholder="e.g., MCE1548"
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-gray-50"
-                readOnly
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Auto-generated but can be edited manually
+              </p>
             </div>
 
             {/* Project Code */}
@@ -370,6 +372,7 @@ export const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ isOpen, onClos
               {projectTotalValue > 0 && (
                 <p className="text-xs text-gray-500 mt-1">
                   Project Total: RM {projectTotalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {lastEditedField === 'percentage' && <span className="text-blue-600 ml-1">Auto-calculated from percentage</span>}
                 </p>
               )}
             </div>
@@ -394,6 +397,7 @@ export const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ isOpen, onClos
               {projectContext && (
                 <p className="text-xs text-gray-500 mt-1">
                   Suggested: {projectContext.remainingPercentage}% remaining
+                  {lastEditedField === 'amount' && <span className="text-blue-600 ml-1">Auto-calculated from amount</span>}
                 </p>
               )}
             </div>

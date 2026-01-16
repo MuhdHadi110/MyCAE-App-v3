@@ -1,7 +1,8 @@
 import { Router, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { IssuedPO, IssuedPOStatus } from '../entities/IssuedPO';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { User, UserRole } from '../entities/User';
+import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { body, validationResult } from 'express-validator';
 import { IssuedPOPDFService } from '../services/issued-po-pdf.service';
 
@@ -220,18 +221,21 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 /**
  * DELETE /api/issued-pos/:id
  * Delete issued PO
+ * Authorization: Senior Engineer and above
  */
-router.delete('/:id', async (req: AuthRequest, res: Response) => {
+router.delete('/:id',
+  authorize(UserRole.SENIOR_ENGINEER, UserRole.PRINCIPAL_ENGINEER, UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN),
+  async (req: AuthRequest, res: Response) => {
   try {
     const issuedPORepo = AppDataSource.getRepository(IssuedPO);
     const po = await issuedPORepo.findOne({ where: { id: req.params.id } });
-
+    
     if (!po) {
       return res.status(404).json({ error: 'Issued PO not found' });
     }
-
+    
     await issuedPORepo.remove(po);
-
+    
     res.json({ message: 'Issued PO deleted successfully' });
   } catch (error: any) {
     console.error('Error deleting issued PO:', error);

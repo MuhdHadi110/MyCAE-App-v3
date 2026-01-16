@@ -20,9 +20,10 @@ export const EditResearchModal: React.FC<EditResearchModalProps> = ({ isOpen, on
     status: project.status,
     plannedEndDate: project.plannedEndDate || '',
     leadResearcherId: project.leadResearcherId,
-    leadResearcherName: project.leadResearcherName || '',
+    leadResearcherName: project.leadResearcher?.name || '',
     budget: project.budget || 0,
     plannedHours: project.plannedHours || 0,
+    researchCode: project.researchCode || '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -36,9 +37,10 @@ export const EditResearchModal: React.FC<EditResearchModalProps> = ({ isOpen, on
         status: project.status,
         plannedEndDate: project.plannedEndDate || '',
         leadResearcherId: project.leadResearcherId,
-        leadResearcherName: project.leadResearcherName || '',
+        leadResearcherName: project.leadResearcher?.name || '',
         budget: project.budget || 0,
         plannedHours: project.plannedHours || 0,
+        researchCode: project.researchCode || '',
       });
       setErrors({});
     }
@@ -69,6 +71,7 @@ export const EditResearchModal: React.FC<EditResearchModalProps> = ({ isOpen, on
       leadResearcherName: formData.leadResearcherName,
       budget: formData.budget || undefined,
       plannedHours: formData.plannedHours || undefined,
+      researchCode: formData.researchCode,
     });
 
     onClose();
@@ -116,15 +119,18 @@ export const EditResearchModal: React.FC<EditResearchModalProps> = ({ isOpen, on
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Research Code (Read-only) */}
+          {/* Research Code (Editable) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Research Code
             </label>
-            <div className="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-700 font-mono font-semibold">
-              {project.researchCode || 'N/A'}
-            </div>
-            <p className="text-xs text-gray-500 mt-1">Research code cannot be changed</p>
+            <input
+              type="text"
+              value={formData.researchCode}
+              onChange={(e) => handleInputChange('researchCode', e.target.value.toUpperCase())}
+              placeholder="e.g., R25001"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            />
           </div>
 
           {/* Title */}

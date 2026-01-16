@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { MapPin, Package, User, Search, Building2, TrendingUp, Box, Clock } from 'lucide-react';
+import { MapPin, Package, User, Search, Building2, TrendingUp, Box, Clock, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Input } from '../components/ui/Input';
@@ -29,6 +29,8 @@ export const EquipmentLocationDashboardScreen: React.FC = () => {
   const { isMobile } = useResponsive();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'person' | 'site'>('all');
+  const [sortColumn, setSortColumn] = useState<string>('location');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     fetchCheckouts();
@@ -97,8 +99,58 @@ export const EquipmentLocationDashboardScreen: React.FC = () => {
       );
     }
 
-    return filtered;
-  }, [locationSummaries, searchTerm]);
+    return filtered.sort((a, b) => {
+      const getSortValue = (summary: LocationSummary) => {
+        switch (sortColumn) {
+          case 'location':
+            return summary.location.toLowerCase();
+          case 'checkedOutBy':
+            return summary.checkedOutBy.toLowerCase();
+          case 'totalItems':
+            return summary.totalItems;
+          case 'uniqueEquipment':
+            return summary.uniqueEquipment;
+          case 'checkoutDate':
+            return new Date(summary.checkoutDate).getTime();
+          case 'expectedReturn':
+            return summary.expectedReturn ? new Date(summary.expectedReturn).getTime() : 0;
+          default:
+            return summary.location.toLowerCase();
+        }
+      };
+
+      const aValue = getSortValue(a);
+      const bValue = getSortValue(b);
+
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return sortDirection === 'asc'
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      } else {
+        return sortDirection === 'asc'
+          ? aValue - bValue
+          : bValue - aValue;
+      }
+    });
+  }, [locationSummaries, searchTerm, sortColumn, sortDirection]);
+
+  const handleSort = useCallback((column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  }, [sortColumn]);
+
+  const getSortIcon = (column: string) => {
+    if (sortColumn !== column) {
+      return <ChevronsUpDown className="w-4 h-4 ml-1 inline-block" />;
+    }
+    return sortDirection === 'asc'
+      ? <ChevronUp className="w-4 h-4 ml-1 inline-block" />
+      : <ChevronDown className="w-4 h-4 ml-1 inline-block" />;
+  };
 
   // Calculate stats
   const stats = useMemo(() => {
@@ -297,23 +349,23 @@ export const EquipmentLocationDashboardScreen: React.FC = () => {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Location / Purpose
+                    <th onClick={() => handleSort('location')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors">
+                      Location / Purpose {getSortIcon('location')}
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Checked Out By
+                    <th onClick={() => handleSort('checkedOutBy')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors">
+                      Checked Out By {getSortIcon('checkedOutBy')}
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Total Items
+                    <th onClick={() => handleSort('totalItems')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors">
+                      Total Items {getSortIcon('totalItems')}
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Equipment
+                    <th onClick={() => handleSort('uniqueEquipment')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors">
+                      Equipment {getSortIcon('uniqueEquipment')}
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Checkout Date
+                    <th onClick={() => handleSort('checkoutDate')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors">
+                      Checkout Date {getSortIcon('checkoutDate')}
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Expected Return
+                    <th onClick={() => handleSort('expectedReturn')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors">
+                      Expected Return {getSortIcon('expectedReturn')}
                     </th>
                   </tr>
                 </thead>

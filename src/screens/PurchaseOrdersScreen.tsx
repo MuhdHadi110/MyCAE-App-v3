@@ -226,14 +226,14 @@ export const PurchaseOrdersScreen: React.FC = () => {
                       </div>
 
                       <div className="space-y-1">
-                        <p className="text-sm text-gray-600">Client: {po.client_name}</p>
+                        <p className="text-sm text-gray-600">Client: {po.clientName}</p>
 
                         {/* Enhanced project display */}
-                        {po.project_code ? (
+                        {po.projectCode ? (
                           <p className="text-sm text-gray-600">
-                            Project: <span className="font-medium text-gray-900">{po.project_code}</span>
-                            {po.project?.project_name && (
-                              <span className="text-gray-500"> - {po.project.project_name}</span>
+                            Project: <span className="font-medium text-gray-900">{po.projectCode}</span>
+                            {po.project?.title && (
+                              <span className="text-gray-500"> - {po.project.title}</span>
                             )}
                           </p>
                         ) : (

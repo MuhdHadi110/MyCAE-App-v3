@@ -10,6 +10,12 @@ lerna-debug.log*
 # System files
 nul
 
+# Deployment package (build artifacts)
+deployment-package/frontend/assets/*
+deployment-package/frontend/*.svg
+deployment-package/frontend/*.png
+deployment-package/mycae_tracker_backup.sql
+
 # Environment files (contain secrets)
 .env
 .env.local
@@ -18,6 +24,11 @@ nul
 .env*.local
 backend/.env
 backend/.env.*
+!backend/.env.production.example
+
+# Logs directory (created by Winston in production)
+logs/
+backend/logs/
 
 node_modules
 dist

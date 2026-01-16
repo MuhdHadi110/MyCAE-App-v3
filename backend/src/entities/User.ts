@@ -125,14 +125,14 @@ export class User {
 
   /**
    * Get the hierarchy level of the highest role
-   * Hierarchy: Engineer(1) < Senior Engineer(2) < Principal Engineer(2.5) < Manager(3) < Managing Director(4) < Admin(5)
+   * Hierarchy: Engineer(1) < Senior Engineer(2) < Principal Engineer(3) < Manager(3) < Managing Director(4) < Admin(5)
    */
   getRoleLevel(): number {
     const roleHierarchy: Record<UserRole, number> = {
       [UserRole.ADMIN]: 5,
       [UserRole.MANAGING_DIRECTOR]: 4,
       [UserRole.MANAGER]: 3,
-      [UserRole.PRINCIPAL_ENGINEER]: 2.5,
+      [UserRole.PRINCIPAL_ENGINEER]: 3,
       [UserRole.SENIOR_ENGINEER]: 2,
       [UserRole.ENGINEER]: 1,
     };

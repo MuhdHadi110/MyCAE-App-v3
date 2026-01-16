@@ -1,5 +1,5 @@
-import { useEffect, useState, useMemo } from 'react';
-import { Search, Package, Clock, User, Calendar, MapPin, Building2, TrendingUp, Box, BarChart3 } from 'lucide-react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { Search, Package, Clock, User, Calendar, MapPin, Building2, TrendingUp, Box, BarChart3, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
@@ -39,10 +39,14 @@ export const EquipmentManagementScreen: React.FC = () => {
   // Transaction view state
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<CheckoutStatus | 'all'>('all');
-
+  const [transactionSortColumn, setTransactionSortColumn] = useState<string>('masterBarcode');
+  const [transactionSortDirection, setTransactionSortDirection] = useState<'asc' | 'desc'>('asc');
+  
   // Location view state
   const [locationSearch, setLocationSearch] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'person' | 'site'>('all');
+  const [locationSortColumn, setLocationSortColumn] = useState<string>('location');
+  const [locationSortDirection, setLocationSortDirection] = useState<'asc' | 'desc'>('asc');
 
   const loading = checkoutsLoading || inventoryLoading;
 
@@ -129,8 +133,40 @@ export const EquipmentManagementScreen: React.FC = () => {
       );
     }
 
-    return filtered;
-  }, [locationSummaries, locationSearch]);
+    return filtered.sort((a, b) => {
+      const getSortValue = (summary: LocationSummary) => {
+        switch (locationSortColumn) {
+          case 'location':
+            return summary.location.toLowerCase();
+          case 'checkedOutBy':
+            return summary.checkedOutBy.toLowerCase();
+          case 'totalItems':
+            return summary.totalItems;
+          case 'uniqueEquipment':
+            return summary.uniqueEquipment;
+          case 'checkoutDate':
+            return new Date(summary.checkoutDate).getTime();
+          case 'expectedReturn':
+            return summary.expectedReturn ? new Date(summary.expectedReturn).getTime() : 0;
+          default:
+            return summary.location.toLowerCase();
+        }
+      };
+
+      const aValue = getSortValue(a);
+      const bValue = getSortValue(b);
+
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return locationSortDirection === 'asc'
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      } else {
+        return locationSortDirection === 'asc'
+          ? aValue - bValue
+          : bValue - aValue;
+      }
+    });
+  }, [locationSummaries, locationSearch, locationSortColumn, locationSortDirection]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -186,7 +222,80 @@ export const EquipmentManagementScreen: React.FC = () => {
     return new Date(expectedReturn) < new Date();
   };
 
-  const displayCheckouts = filteredCheckouts;
+  // Sort handlers for transactions view
+  const handleTransactionSort = useCallback((column: string) => {
+    if (transactionSortColumn === column) {
+      setTransactionSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setTransactionSortColumn(column);
+      setTransactionSortDirection('asc');
+    }
+  }, [transactionSortColumn]);
+
+  const getTransactionSortIcon = (column: string) => {
+    if (transactionSortColumn !== column) {
+      return <ChevronsUpDown className="w-4 h-4 ml-1 inline-block" />;
+    }
+    return transactionSortDirection === 'asc'
+      ? <ChevronUp className="w-4 h-4 ml-1 inline-block" />
+      : <ChevronDown className="w-4 h-4 ml-1 inline-block" />;
+  };
+
+  // Sort handlers for locations view
+  const handleLocationSort = useCallback((column: string) => {
+    if (locationSortColumn === column) {
+      setLocationSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setLocationSortColumn(column);
+      setLocationSortDirection('asc');
+    }
+  }, [locationSortColumn]);
+
+  const getLocationSortIcon = (column: string) => {
+    if (locationSortColumn !== column) {
+      return <ChevronsUpDown className="w-4 h-4 ml-1 inline-block" />;
+    }
+    return locationSortDirection === 'asc'
+      ? <ChevronUp className="w-4 h-4 ml-1 inline-block" />
+      : <ChevronDown className="w-4 h-4 ml-1 inline-block" />;
+  };
+
+  const displayCheckouts = useMemo(() => {
+    return [...filteredCheckouts].sort((a, b) => {
+      const getSortValue = (checkout: any) => {
+        switch (transactionSortColumn) {
+          case 'masterBarcode':
+            return checkout.masterBarcode.toLowerCase();
+          case 'checkedOutBy':
+            return checkout.checkedOutBy.toLowerCase();
+          case 'purpose':
+            return (checkout.purpose || '').toLowerCase();
+          case 'items':
+            return checkout.totalItems || 0;
+          case 'dueDate':
+            return checkout.expectedReturnDate ? new Date(checkout.expectedReturnDate).getTime() : 0;
+          case 'status':
+            const statusOrder = { 'active': 0, 'partial-return': 1, 'overdue': 2, 'fully-returned': 3 };
+            return statusOrder[checkout.status] ?? 4;
+          default:
+            return checkout.masterBarcode.toLowerCase();
+        }
+      };
+
+      const aValue = getSortValue(a);
+      const bValue = getSortValue(b);
+
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return transactionSortDirection === 'asc'
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      } else {
+        return transactionSortDirection === 'asc'
+          ? aValue - bValue
+          : bValue - aValue;
+      }
+    });
+  }, [filteredCheckouts, transactionSortColumn, transactionSortDirection]);
 
   return (
     <div className="min-h-full bg-gray-50">
@@ -397,12 +506,12 @@ export const EquipmentManagementScreen: React.FC = () => {
                   <table className="w-full">
                     <thead className="bg-gray-50 border-b border-gray-200">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Master Barcode</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Checked Out By</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Purpose</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Due Date</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th onClick={() => handleTransactionSort('masterBarcode')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors">Master Barcode {getTransactionSortIcon('masterBarcode')}</th>
+                        <th onClick={() => handleTransactionSort('checkedOutBy')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors">Checked Out By {getTransactionSortIcon('checkedOutBy')}</th>
+                        <th onClick={() => handleTransactionSort('purpose')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors">Purpose {getTransactionSortIcon('purpose')}</th>
+                        <th onClick={() => handleTransactionSort('items')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors">Items {getTransactionSortIcon('items')}</th>
+                        <th onClick={() => handleTransactionSort('dueDate')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors">Due Date {getTransactionSortIcon('dueDate')}</th>
+                        <th onClick={() => handleTransactionSort('status')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors">Status {getTransactionSortIcon('status')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -569,12 +678,12 @@ export const EquipmentManagementScreen: React.FC = () => {
                   <table className="w-full">
                     <thead className="bg-gray-50 border-b border-gray-200">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Checked Out By</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Types</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Checkout Date</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Expected Return</th>
+                        <th onClick={() => handleLocationSort('location')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors">Location {getLocationSortIcon('location')}</th>
+                        <th onClick={() => handleLocationSort('checkedOutBy')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors">Checked Out By {getLocationSortIcon('checkedOutBy')}</th>
+                        <th onClick={() => handleLocationSort('totalItems')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors">Items {getLocationSortIcon('totalItems')}</th>
+                        <th onClick={() => handleLocationSort('uniqueEquipment')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors">Types {getLocationSortIcon('uniqueEquipment')}</th>
+                        <th onClick={() => handleLocationSort('checkoutDate')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors">Checkout Date {getLocationSortIcon('checkoutDate')}</th>
+                        <th onClick={() => handleLocationSort('expectedReturn')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors">Expected Return {getLocationSortIcon('expectedReturn')}</th>
                       </tr>
                     </thead>
                     <tbody>

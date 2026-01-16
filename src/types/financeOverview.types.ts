@@ -72,17 +72,17 @@ export interface FinanceTotals {
  */
 export interface PurchaseOrderData {
   id: string;
-  po_number: string;
-  project_code: string;
-  client_name: string;
+  poNumber: string;
+  projectCode: string;
+  clientName: string;
   amount: number;
   currency: string;
-  amount_myr: number;
-  amount_myr_adjusted?: number;
-  exchange_rate?: number;
-  received_date: string;
+  amountMyr: number;
+  amountMyrAdjusted?: number;
+  exchangeRate?: number;
+  receivedDate: string;
   status: string;
-  is_active: boolean;
+  isActive: boolean;
 }
 
 /**
@@ -90,16 +90,16 @@ export interface PurchaseOrderData {
  */
 export interface InvoiceData {
   id: string;
-  invoice_number: string;
-  project_code: string;
-  project_name: string;
+  invoiceNumber: string;
+  projectCode: string;
+  projectName: string;
   amount: number;
   currency: string;
-  amount_myr: number;
-  exchange_rate?: number;
-  invoice_date: string;
+  amountMyr: number;
+  exchangeRate?: number;
+  invoiceDate: string;
   status: string;
-  percentage_of_total?: number;
+  percentageOfTotal?: number;
 }
 
 /**

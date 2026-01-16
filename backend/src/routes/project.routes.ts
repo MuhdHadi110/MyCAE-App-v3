@@ -4,6 +4,7 @@ import { Project, ProjectStatus } from '../entities/Project';
 import { TeamMember } from '../entities/TeamMember';
 import { User } from '../entities/User';
 import { Client } from '../entities/Client';
+import { Contact } from '../entities/Contact';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { UserRole } from '../entities/User';
 import { body, validationResult } from 'express-validator';
@@ -49,6 +50,75 @@ router.get('/', async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     console.error('Error fetching projects:', error);
     res.status(500).json({ error: 'Failed to fetch projects' });
+  }
+});
+
+/**
+ * GET /api/projects/next-code
+ * Get the latest project code and suggest next one
+ * IMPORTANT: This route must come BEFORE /:id to avoid matching "/next-code" as an ID
+ *
+ * Project code format: J2XXXX where:
+ * - J is the prefix
+ * - 2X is the 2-digit year (e.g., 26 for 2026)
+ * - XXX is the 3-digit sequence number (001-999)
+ * Example: J26001, J26002, ..., J26999
+ */
+router.get('/next-code', async (req: AuthRequest, res: Response) => {
+  try {
+    const projectRepo = AppDataSource.getRepository(Project);
+
+    // Get current year (e.g., 2026 -> "26")
+    const currentYear = new Date().getFullYear();
+    const yearSuffix = currentYear.toString().slice(-2); // "26" for 2026
+    const yearPrefix = `J${yearSuffix}`; // "J26"
+
+    // Find all projects with current year prefix (J26xxx)
+    const yearProjects = await projectRepo
+      .createQueryBuilder('project')
+      .where('project.project_code LIKE :prefix', { prefix: `${yearPrefix}%` })
+      .getMany();
+
+    // Extract sequence numbers from project codes
+    // Valid format: J + 2-digit year + 3-digit sequence = J2XXXX (6 chars total)
+    const sequenceNumbers = yearProjects
+      .map(p => {
+        const code = p.project_code;
+        // Match format J + 2 digits (year) + 3 digits (sequence) = /^J(\d{2})(\d{3})$/
+        const match = code.match(/^J(\d{2})(\d{3})$/);
+        if (!match) {
+          console.log(`Skipping invalid project code format: ${code}`);
+          return NaN;
+        }
+        // Only use codes from current year
+        if (match[1] !== yearSuffix) {
+          return NaN;
+        }
+        return parseInt(match[2], 10); // Return just the sequence number
+      })
+      .filter(n => !isNaN(n));
+
+    const maxSequence = sequenceNumbers.length > 0 ? Math.max(...sequenceNumbers) : 0;
+    const nextSequence = maxSequence + 1;
+
+    // Format sequence with leading zeros (e.g., 001, 002, ..., 999)
+    const formatSequence = (seq: number) => seq.toString().padStart(3, '0');
+
+    const latestCode = maxSequence > 0
+      ? `${yearPrefix}${formatSequence(maxSequence)}`
+      : null;
+
+    const nextSuggestion = `${yearPrefix}${formatSequence(nextSequence)}`;
+
+    res.json({
+      latestCode,
+      nextSuggestion,
+      yearPrefix,
+      year: currentYear,
+    });
+  } catch (error: any) {
+    console.error('Error fetching next project code:', error);
+    res.status(500).json({ error: 'Failed to fetch next project code' });
   }
 });
 
@@ -153,6 +223,22 @@ router.post(
 
       const projectCode = req.body.projectCode;
 
+      // Check for duplicate project code
+      const existingProjectCode = await projectRepo.findOne({
+        where: {
+          project_code: req.body.projectCode,
+        },
+      });
+
+      if (existingProjectCode) {
+        return res.status(400).json({
+          error: 'Project code already exists. Please use a different code.',
+          field: 'projectCode',
+          existingCode: existingProjectCode.project_code,
+          existingProjectTitle: existingProjectCode.title,
+        });
+      }
+
       // Map camelCase fields from frontend to snake_case for database
       // Use resolved user_ids instead of team_member ids
       // Auto set start_date to current date, completion_date set when project is completed
@@ -160,6 +246,7 @@ router.post(
         project_code: projectCode,
         title: req.body.title,
         client_id: req.body.clientId,
+        contact_id: req.body.contactId || null,
         status: ProjectStatus.PRE_LIM, // Always start with pre-lim status
         planned_hours: req.body.plannedHours || 0,
         actual_hours: 0,
@@ -176,8 +263,17 @@ router.post(
       // Fetch related data for notifications
       const userRepo = AppDataSource.getRepository(User);
       const clientRepo = AppDataSource.getRepository(Client);
+      const contactRepo = AppDataSource.getRepository(Contact);
 
       const client = await clientRepo.findOne({ where: { id: req.body.clientId } });
+
+      const contact = await contactRepo.findOne({
+        where: { id: req.body.contactId },
+        relations: ['company']
+      });
+      const company = contact?.company;
+
+      const manager = await userRepo.findOne({ where: { id: managerUserId } });
 
       // Send notifications to assigned users
       const notificationPromises = [];
@@ -193,7 +289,10 @@ router.post(
               project.title,
               project.project_code,
               'Lead Engineer',
-              client?.name || 'Unknown Client'
+              company?.name || 'Unknown Company',
+              contact?.name || 'N/A',
+              contact?.email || 'N/A',
+              manager?.name || 'N/A'
             ).catch(err => {
               console.error('Failed to send email to lead engineer:', err.message);
               // Don't throw - let the project creation succeed even if email fails
@@ -220,7 +319,6 @@ router.post(
 
       // Notify manager if assigned
       if (managerUserId) {
-        const manager = await userRepo.findOne({ where: { id: managerUserId } });
         if (manager && manager.email && manager.id !== leadEngineerUserId) {
           // Only notify if manager is different from lead engineer
           notificationPromises.push(
@@ -230,7 +328,10 @@ router.post(
               project.title,
               project.project_code,
               'Project Manager',
-              client?.name || 'Unknown Client'
+              company?.name || 'Unknown Company',
+              contact?.name || 'N/A',
+              contact?.email || 'N/A',
+              manager?.name || 'N/A'
             ).catch(err => {
               console.error('Failed to send email to manager:', err.message);
             })
@@ -261,6 +362,20 @@ router.post(
       res.status(201).json(project);
     } catch (error: any) {
       console.error('Error creating project:', error);
+
+      // Handle database duplicate constraint errors
+      if (error.code === 'ER_DUP_ENTRY' || error.code === 'ER_DUP_KEY') {
+        // Extract project code from error message
+        const match = error.message?.match(/'(\w+)'/);
+        const duplicateCode = match ? match[1] : '';
+
+        return res.status(400).json({
+          error: `Project code "${duplicateCode}" already exists. Please use a different code.`,
+          field: 'projectCode',
+          duplicateCode,
+        });
+      }
+
       res.status(500).json({ error: 'Failed to create project' });
     }
   }
@@ -282,33 +397,53 @@ router.put(
   async (req: AuthRequest, res) => {
     try {
       const projectRepo = AppDataSource.getRepository(Project);
+      const teamMemberRepo = AppDataSource.getRepository(TeamMember);
       const project = await projectRepo.findOne({ where: { id: req.params.id } });
 
       if (!project) {
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      // Whitelist allowed fields to prevent mass assignment
-      const allowedFields = [
-        'title',
-        'planned_hours',
-        'remarks',
-        'categories',
-        'description',
-        'status',
-        'lead_engineer_id',
-        'manager_id',
-        'inquiry_date',
-        'po_received_date',
-        'completion_date',
-      ];
+      // Resolve team_member IDs to user_ids for manager and lead engineer (if provided)
+      let managerUserId = req.body.managerId;
+      let leadEngineerUserId = req.body.leadEngineerId;
 
-      const updates: any = {};
-      for (const field of allowedFields) {
-        if (field in req.body) {
-          updates[field] = req.body[field];
+      // If managerId is a team_member ID, get the user_id
+      if (managerUserId) {
+        const manager = await teamMemberRepo.findOne({
+          where: { id: managerUserId },
+          relations: ['user']
+        });
+        if (manager && manager.user_id) {
+          managerUserId = manager.user_id;
         }
       }
+
+      // If leadEngineerId is a team_member ID, get the user_id
+      if (leadEngineerUserId) {
+        const leadEngineer = await teamMemberRepo.findOne({
+          where: { id: leadEngineerUserId },
+          relations: ['user']
+        });
+        if (leadEngineer && leadEngineer.user_id) {
+          leadEngineerUserId = leadEngineer.user_id;
+        }
+      }
+
+      // Map camelCase fields from frontend to snake_case for database
+      const updates: any = {};
+
+      if (req.body.title !== undefined) updates.title = req.body.title;
+      if (req.body.plannedHours !== undefined) updates.planned_hours = req.body.plannedHours;
+      if (req.body.remarks !== undefined) updates.remarks = req.body.remarks;
+      if (req.body.categories !== undefined) updates.categories = req.body.categories;
+      if (req.body.description !== undefined) updates.description = req.body.description;
+      if (req.body.status !== undefined) updates.status = req.body.status;
+      if (leadEngineerUserId !== undefined) updates.lead_engineer_id = leadEngineerUserId;
+      if (managerUserId !== undefined) updates.manager_id = managerUserId;
+      if (req.body.inquiryDate !== undefined) updates.inquiry_date = req.body.inquiryDate;
+      if (req.body.poReceivedDate !== undefined) updates.po_received_date = req.body.poReceivedDate;
+      if (req.body.completionDate !== undefined) updates.completion_date = req.body.completionDate;
 
       // Handle status-related date auto-updates
       if (updates.status) {

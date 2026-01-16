@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import express from 'express';
+import http from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -30,11 +31,47 @@ import companySettingsRoutes from './routes/companySettings.routes';
 import scheduledMaintenanceRoutes from './routes/scheduledMaintenance.routes';
 import companyRoutes from './routes/company.routes';
 import contactRoutes from './routes/contact.routes';
-import { startExchangeRateScheduler } from './services/exchangeRateScheduler.service';
-import { startMaintenanceReminderScheduler } from './services/maintenanceReminderScheduler.service';
+import receivedInvoiceRoutes from './routes/receivedInvoice.routes';
+import healthRoutes from './routes/health.routes';
+import { startExchangeRateScheduler, stopExchangeRateScheduler } from './services/exchangeRateScheduler.service';
+import { startMaintenanceReminderScheduler, stopMaintenanceReminderScheduler } from './services/maintenanceReminderScheduler.service';
+import { AppDataSource } from './config/database';
 
 // Load environment variables
 dotenv.config();
+
+// Validate required environment variables in production
+const validateProductionEnv = () => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  if (!isProduction) return;
+
+  const requiredVars = [
+    'JWT_SECRET',
+    'DB_HOST',
+    'DB_USER',
+    'DB_PASSWORD',
+    'DB_NAME',
+    'CORS_ORIGINS',
+  ];
+
+  const missing = requiredVars.filter(v => !process.env[v]);
+
+  if (missing.length > 0) {
+    console.error('FATAL: Missing required environment variables in production:');
+    missing.forEach(v => console.error(`  - ${v}`));
+    process.exit(1);
+  }
+
+  // Warn about optional but recommended vars
+  const recommended = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASSWORD', 'RECAPTCHA_SECRET_KEY'];
+  const missingRecommended = recommended.filter(v => !process.env[v]);
+  if (missingRecommended.length > 0) {
+    console.warn('WARNING: Missing recommended environment variables:');
+    missingRecommended.forEach(v => console.warn(`  - ${v}`));
+  }
+};
+
+validateProductionEnv();
 
 const app = express();
 const PORT: number = parseInt(process.env.PORT || '3000', 10);
@@ -43,29 +80,36 @@ const PORT: number = parseInt(process.env.PORT || '3000', 10);
 app.use(express.json({ limit: '10kb' })); // Limit JSON body to 10KB to prevent DoS
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
-// CORS configuration - use environment variable or explicit whitelist
+// CORS configuration - use environment variable or localhost-only for development
 const getAllowedOrigins = (): string[] => {
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  // In production, CORS_ORIGINS is required
+  if (isProduction) {
+    if (!process.env.CORS_ORIGINS) {
+      console.error('FATAL: CORS_ORIGINS environment variable is required in production');
+      process.exit(1);
+    }
+    return process.env.CORS_ORIGINS.split(',').map(o => o.trim());
+  }
+
   // Check for environment variable first (comma-separated list)
   if (process.env.CORS_ORIGINS) {
     return process.env.CORS_ORIGINS.split(',').map(o => o.trim());
   }
 
-  // Default allowed origins (explicit whitelist, no wildcards)
+  // Development-only: localhost origins (no network IPs for security)
   return [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://192.168.100.3:5173',
     'http://localhost:3001',
     'http://127.0.0.1:3001',
-    'http://192.168.100.3:3001',
+    'http://localhost:3002',
+    'http://127.0.0.1:3002',
     'http://localhost:3003',
     'http://127.0.0.1:3003',
-    'http://192.168.100.3:3003',
-    'http://localhost:3005',
-    'http://127.0.0.1:3005',
-    'http://192.168.100.3:3005',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
   ];
 };
 
@@ -102,13 +146,21 @@ const authLimiter = rateLimit({
 // Rate limiting - normal for API endpoints
 const apiLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 100, // limit each IP to 100 requests per minute
+  max: 200, // increased from 100 to 200 requests per minute
   standardHeaders: true,
   legacyHeaders: false,
+  message: {
+    success: false,
+    error: 'Too many requests from this IP, please try again later.',
+    statusCode: 429,
+  },
 });
 
 // Serve static files (for uploaded PO files) - no rate limiting
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// Health check routes (no rate limiting, no auth)
+app.use('/api/health', healthRoutes);
 
 // API Routes with appropriate rate limiting
 
@@ -135,6 +187,7 @@ app.use('/api/company-settings', companySettingsRoutes);
 app.use('/api/scheduled-maintenance', scheduledMaintenanceRoutes);
 app.use('/api/companies', companyRoutes);
 app.use('/api/contacts', contactRoutes);
+app.use('/api/received-invoices', receivedInvoiceRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -162,25 +215,17 @@ const startServer = async () => {
     // Start maintenance reminder scheduler (sends reminders daily at 8 AM MYT)
     startMaintenanceReminderScheduler();
 
-    // Start server
-    app.listen(PORT, '0.0.0.0', () => {
+    // Start server and store reference for graceful shutdown
+    server = app.listen(PORT, '0.0.0.0', () => {
       console.log(`
 ╔═══════════════════════════════════════════════════════╗
 ║                                                       ║
 ║   🚀 MyCAE Equipment Tracker API Server              ║
 ║                                                       ║
 ║   Server running on: http://localhost:${PORT}       ║
-║   Network access: http://192.168.100.3:${PORT}      ║
 ║   Environment: ${process.env.NODE_ENV || 'development'}                    ║
 ║   Database: MySQL                                     ║
-║   Automation: n8n Integration Enabled                ║
-║                                                       ║
-║   API Endpoints:                                      ║
-║   • POST /api/auth/register                           ║
-║   • POST /api/auth/login                              ║
-║   • GET  /api/inventory                               ║
-║   • POST /api/inventory                               ║
-║   • GET  /health                                      ║
+║   Health check: /api/health                           ║
 ║                                                       ║
 ╚═══════════════════════════════════════════════════════╝
       `);
@@ -191,15 +236,69 @@ const startServer = async () => {
   }
 };
 
-// Handle graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received: closing HTTP server');
-  process.exit(0);
+// Store server instance for graceful shutdown
+let server: http.Server | null = null;
+
+/**
+ * Graceful shutdown handler
+ * Properly closes all connections and stops schedulers
+ */
+const gracefulShutdown = async (signal: string) => {
+  console.log(`\n${signal} received: Starting graceful shutdown...`);
+
+  // Set a timeout for force exit
+  const forceExitTimeout = setTimeout(() => {
+    console.error('Graceful shutdown timed out, forcing exit');
+    process.exit(1);
+  }, 30000); // 30 seconds timeout
+
+  try {
+    // 1. Stop accepting new connections
+    if (server) {
+      console.log('Closing HTTP server...');
+      await new Promise<void>((resolve, reject) => {
+        server!.close((err: Error | undefined) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+      console.log('HTTP server closed');
+    }
+
+    // 2. Stop scheduled tasks
+    console.log('Stopping scheduled tasks...');
+    stopExchangeRateScheduler();
+    stopMaintenanceReminderScheduler();
+
+    // 3. Close database connections
+    if (AppDataSource.isInitialized) {
+      console.log('Closing database connections...');
+      await AppDataSource.destroy();
+      console.log('Database connections closed');
+    }
+
+    clearTimeout(forceExitTimeout);
+    console.log('Graceful shutdown completed');
+    process.exit(0);
+  } catch (error) {
+    console.error('Error during graceful shutdown:', error);
+    clearTimeout(forceExitTimeout);
+    process.exit(1);
+  }
+};
+
+// Handle graceful shutdown signals
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  gracefulShutdown('uncaughtException');
 });
 
-process.on('SIGINT', () => {
-  console.log('SIGINT signal received: closing HTTP server');
-  process.exit(0);
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
 // Start the server

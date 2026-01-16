@@ -1,11 +1,8 @@
-import cron from 'node-cron';
-import { AppDataSource } from '../config/database';
+import cron, { ScheduledTask } from 'node-cron';
 import { ScheduledMaintenance } from '../entities/ScheduledMaintenance';
-import { User } from '../entities/User';
 import { MaintenanceSchedulerService } from './maintenanceScheduler.service';
 import emailService from './email.service';
 import { logger } from '../utils/logger';
-import { LessThanOrEqual, MoreThanOrEqual, LessThan } from 'typeorm';
 
 /**
  * Calculate days until a date from today
@@ -38,20 +35,14 @@ function formatMaintenanceType(type: string): string {
 }
 
 /**
- * Get admin users to receive notifications
+ * Get maintenance reminder recipient
+ * Sends to dedicated maintenance email address
  */
-async function getAdminUsers(): Promise<User[]> {
-  const userRepo = AppDataSource.getRepository(User);
-
-  // Get users with admin or manager roles
-  const users = await userRepo
-    .createQueryBuilder('user')
-    .where("user.roles LIKE '%admin%'")
-    .orWhere("user.roles LIKE '%manager%'")
-    .orWhere("user.roles LIKE '%managing-director%'")
-    .getMany();
-
-  return users.filter(u => u.email);
+function getMaintenanceReminderRecipient(): { email: string; name: string } {
+  return {
+    email: process.env.MAINTENANCE_REMINDER_EMAIL || 'mycaeengineer@mycae.com.my',
+    name: 'MyCAE Engineer'
+  };
 }
 
 /**
@@ -59,27 +50,24 @@ async function getAdminUsers(): Promise<User[]> {
  */
 async function sendReminder(
   schedule: ScheduledMaintenance,
-  timeframe: string,
-  adminUsers: User[]
+  timeframe: string
 ): Promise<void> {
   const itemName = schedule.item?.title || 'Unknown Item';
   const maintenanceType = formatMaintenanceType(schedule.maintenance_type);
+  const recipient = getMaintenanceReminderRecipient();
 
-  // Send email to all admin users
-  for (const admin of adminUsers) {
-    try {
-      await emailService.sendMaintenanceReminder(
-        admin.email,
-        admin.name,
-        itemName,
-        maintenanceType,
-        schedule.scheduled_date,
-        timeframe
-      );
-      logger.info(`Sent ${timeframe} reminder to ${admin.email} for schedule ${schedule.id}`);
-    } catch (error: any) {
-      logger.error(`Failed to send reminder to ${admin.email}:`, error.message);
-    }
+  try {
+    await emailService.sendMaintenanceReminder(
+      recipient.email,
+      recipient.name,
+      itemName,
+      maintenanceType,
+      schedule.scheduled_date,
+      timeframe
+    );
+    logger.info(`Sent ${timeframe} reminder to ${recipient.email} for schedule ${schedule.id}`);
+  } catch (error: any) {
+    logger.error(`Failed to send reminder to ${recipient.email}:`, error.message);
   }
 }
 
@@ -88,27 +76,24 @@ async function sendReminder(
  */
 async function sendOverdueAlert(
   schedule: ScheduledMaintenance,
-  daysOverdue: number,
-  adminUsers: User[]
+  daysOverdue: number
 ): Promise<void> {
   const itemName = schedule.item?.title || 'Unknown Item';
   const maintenanceType = formatMaintenanceType(schedule.maintenance_type);
+  const recipient = getMaintenanceReminderRecipient();
 
-  // Send email to all admin users
-  for (const admin of adminUsers) {
-    try {
-      await emailService.sendMaintenanceOverdueAlert(
-        admin.email,
-        admin.name,
-        itemName,
-        maintenanceType,
-        schedule.scheduled_date,
-        daysOverdue
-      );
-      logger.info(`Sent overdue alert to ${admin.email} for schedule ${schedule.id}`);
-    } catch (error: any) {
-      logger.error(`Failed to send overdue alert to ${admin.email}:`, error.message);
-    }
+  try {
+    await emailService.sendMaintenanceOverdueAlert(
+      recipient.email,
+      recipient.name,
+      itemName,
+      maintenanceType,
+      schedule.scheduled_date,
+      daysOverdue
+    );
+    logger.info(`Sent overdue alert to ${recipient.email} for schedule ${schedule.id}`);
+  } catch (error: any) {
+    logger.error(`Failed to send overdue alert to ${recipient.email}:`, error.message);
   }
 }
 
@@ -119,13 +104,8 @@ async function processReminders(): Promise<void> {
   logger.info('Starting maintenance reminder check...');
 
   try {
-    // Get admin users to notify
-    const adminUsers = await getAdminUsers();
-
-    if (adminUsers.length === 0) {
-      logger.warn('No admin users found to receive maintenance reminders');
-      return;
-    }
+    const recipient = getMaintenanceReminderRecipient();
+    logger.info(`Maintenance reminders will be sent to: ${recipient.email}`);
 
     // Get schedules needing reminders
     const schedules = await MaintenanceSchedulerService.getSchedulesNeedingReminders();
@@ -137,19 +117,19 @@ async function processReminders(): Promise<void> {
 
       // 14-day reminder
       if (daysUntil === 14 && !schedule.reminder_14_sent) {
-        await sendReminder(schedule, '14 days', adminUsers);
+        await sendReminder(schedule, '14 days');
         await MaintenanceSchedulerService.markReminderSent(schedule.id, 14);
       }
 
       // 7-day reminder
       if (daysUntil === 7 && !schedule.reminder_7_sent) {
-        await sendReminder(schedule, '7 days', adminUsers);
+        await sendReminder(schedule, '7 days');
         await MaintenanceSchedulerService.markReminderSent(schedule.id, 7);
       }
 
       // 1-day reminder
       if (daysUntil === 1 && !schedule.reminder_1_sent) {
-        await sendReminder(schedule, '1 day', adminUsers);
+        await sendReminder(schedule, '1 day');
         await MaintenanceSchedulerService.markReminderSent(schedule.id, 1);
       }
     }
@@ -164,7 +144,7 @@ async function processReminders(): Promise<void> {
 
       // Send overdue alert (once a week for ongoing overdue items)
       if (daysOverdue === 1 || daysOverdue % 7 === 0) {
-        await sendOverdueAlert(schedule, daysOverdue, adminUsers);
+        await sendOverdueAlert(schedule, daysOverdue);
       }
     }
 
@@ -174,13 +154,15 @@ async function processReminders(): Promise<void> {
   }
 }
 
+let scheduledTask: ScheduledTask | null = null;
+
 /**
  * Start the maintenance reminder scheduler
  * Runs daily at 8:00 AM MYT
  */
 export function startMaintenanceReminderScheduler(): void {
   // Run daily at 8:00 AM MYT (UTC+8)
-  cron.schedule(
+  scheduledTask = cron.schedule(
     '0 8 * * *',
     async () => {
       await processReminders();
@@ -194,6 +176,18 @@ export function startMaintenanceReminderScheduler(): void {
 }
 
 /**
+ * Stop the maintenance reminder scheduler
+ * Call this during graceful shutdown
+ */
+export function stopMaintenanceReminderScheduler(): void {
+  if (scheduledTask) {
+    scheduledTask.stop();
+    scheduledTask = null;
+    logger.info('Maintenance reminder scheduler stopped');
+  }
+}
+
+/**
  * Manually trigger reminder processing (for testing)
  */
 export async function triggerManualReminderCheck(): Promise<void> {
@@ -204,5 +198,5 @@ export async function triggerManualReminderCheck(): Promise<void> {
  * Get scheduler status
  */
 export function isSchedulerActive(): boolean {
-  return true; // node-cron jobs are always active once started
+  return scheduledTask !== null;
 }

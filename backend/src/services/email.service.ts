@@ -144,23 +144,83 @@ class EmailService {
     projectTitle: string,
     projectCode: string,
     role: string,
-    clientName: string
+    companyName: string,
+    contactName: string,
+    contactEmail: string,
+    managerName: string
   ): Promise<void> {
     const subject = `New Project Assignment: ${projectTitle}`;
-    const html = this.getEmailTemplate(
+    const html = this.getProjectAssignmentTemplate(
       userName,
-      `You have been assigned to a new project as ${role}.`,
-      `
-        <p><strong>Project:</strong> ${projectTitle}</p>
-        <p><strong>Project Code:</strong> ${projectCode}</p>
-        <p><strong>Client:</strong> ${clientName}</p>
-        <p><strong>Your Role:</strong> ${role}</p>
-        <p>Please review the project details and begin planning your work.</p>
-      `,
-      `${process.env.FRONTEND_URL}/projects`
+      projectTitle,
+      projectCode,
+      role,
+      companyName,
+      contactName,
+      contactEmail,
+      managerName
     );
 
     await this.sendEmail(userEmail, subject, html);
+  }
+
+  /**
+   * Project assignment email template - Clean professional format
+   */
+  private getProjectAssignmentTemplate(
+    userName: string,
+    projectTitle: string,
+    projectCode: string,
+    role: string,
+    companyName: string,
+    contactName: string,
+    contactEmail: string,
+    managerName: string
+  ): string {
+    const isManager = role.toLowerCase().includes('manager');
+
+    // Build the role/reporting line based on whether they are manager or not
+    const roleOrReportingLine = isManager
+      ? `Role : ${role}`
+      : `Reporting to : ${managerName}`;
+
+    // For Project Manager: no contact line
+    // For Lead Engineer: contact the Project Manager
+    const contactLine = isManager
+      ? ''
+      : ` Should you have any questions or require further clarification, please do not hesitate to reach ${managerName}.`;
+
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333333; margin: 0; padding: 20px;">
+  <div style="max-width: 600px; margin: 0 auto;">
+    <p>Dear ${userName},</p>
+
+    <p>You are hereby officially assigned to the <strong>${projectTitle}</strong> project. Please refer to the details of the project below:</p>
+
+    <p style="margin: 20px 0;">
+      Company Name : ${companyName}<br>
+      Customer Representative : ${contactName}<br>
+      Customer Email : ${contactEmail}<br>
+      Project Code : ${projectCode}<br>
+      ${roleOrReportingLine}
+    </p>
+
+    <p>Look forward to your contribution and commitment to ensuring the successful delivery of this project.${contactLine}</p>
+
+    <p style="margin-top: 30px;">
+      Best regards,<br>
+      MyCAE Admin.
+    </p>
+  </div>
+</body>
+</html>
+    `;
   }
 
   /**
@@ -251,7 +311,7 @@ class EmailService {
   }
 
   /**
-   * Maintenance reminder email template
+   * Maintenance reminder email template - Clean professional format
    */
   private getMaintenanceReminderTemplate(
     userName: string,
@@ -260,90 +320,43 @@ class EmailService {
     scheduledDate: string,
     timeframe: string
   ): string {
+    const supportEmail = process.env.SUPPORT_EMAIL || 'hadi@mycae.com.my';
+
     return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f3f4f6;
-          }
-          .container {
-            max-width: 600px;
-            margin: 0 auto;
-            background-color: white;
-          }
-          .header {
-            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-            color: white;
-            padding: 30px 20px;
-            text-align: center;
-          }
-          .header h1 {
-            margin: 0;
-            font-size: 24px;
-          }
-          .content {
-            padding: 30px 20px;
-            color: #374151;
-            line-height: 1.6;
-          }
-          .alert-box {
-            background-color: #fef3c7;
-            border: 1px solid #f59e0b;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 20px 0;
-          }
-          .button {
-            background: #f59e0b;
-            color: white !important;
-            padding: 12px 24px;
-            text-decoration: none;
-            border-radius: 8px;
-            display: inline-block;
-            margin-top: 20px;
-          }
-          .footer {
-            background-color: #f9fafb;
-            padding: 20px;
-            text-align: center;
-            color: #6b7280;
-            font-size: 12px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>⚠️ Maintenance Reminder</h1>
-          </div>
-          <div class="content">
-            <p>Hello ${userName},</p>
-            <div class="alert-box">
-              <p style="margin: 0;"><strong>${itemName}</strong> requires <strong>${maintenanceType}</strong> in <strong>${timeframe}</strong>.</p>
-            </div>
-            <p><strong>Item:</strong> ${itemName}</p>
-            <p><strong>Maintenance Type:</strong> ${maintenanceType}</p>
-            <p><strong>Scheduled Date:</strong> ${scheduledDate}</p>
-            <p>Please ensure the maintenance is scheduled and completed on time to maintain equipment reliability.</p>
-            <a href="${process.env.FRONTEND_URL}/maintenance" class="button">View Maintenance Schedule</a>
-          </div>
-          <div class="footer">
-            <p>This is an automated reminder from MyCAE Equipment Tracker.</p>
-            <p>&copy; ${new Date().getFullYear()} MyCAE. All rights reserved.</p>
-          </div>
-        </div>
-      </body>
-      </html>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333333; margin: 0; padding: 20px;">
+  <div style="max-width: 600px; margin: 0 auto;">
+    <p>Dear ${userName},</p>
+
+    <p>This is a reminder that <strong>${itemName}</strong> requires <strong>${maintenanceType}</strong> in <strong>${timeframe}</strong>.</p>
+
+    <p style="margin: 20px 0;">
+      Equipment : ${itemName}<br>
+      Maintenance Type : ${maintenanceType}<br>
+      Scheduled Date : ${scheduledDate}
+    </p>
+
+    <p>Please ensure the maintenance is scheduled and completed on time to maintain equipment reliability.</p>
+
+    <p>Should you have any questions, please contact ${supportEmail}.</p>
+
+    <p style="margin-top: 30px;">
+      Best regards,<br>
+      MyCAE Admin.
+    </p>
+  </div>
+</body>
+</html>
     `;
   }
 
   /**
-   * Maintenance overdue email template
+   * Maintenance overdue email template - Clean professional format
    */
   private getMaintenanceOverdueTemplate(
     userName: string,
@@ -352,90 +365,44 @@ class EmailService {
     scheduledDate: string,
     daysOverdue: number
   ): string {
+    const supportEmail = process.env.SUPPORT_EMAIL || 'hadi@mycae.com.my';
+
     return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f3f4f6;
-          }
-          .container {
-            max-width: 600px;
-            margin: 0 auto;
-            background-color: white;
-          }
-          .header {
-            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-            color: white;
-            padding: 30px 20px;
-            text-align: center;
-          }
-          .header h1 {
-            margin: 0;
-            font-size: 24px;
-          }
-          .content {
-            padding: 30px 20px;
-            color: #374151;
-            line-height: 1.6;
-          }
-          .alert-box {
-            background-color: #fee2e2;
-            border: 1px solid #dc2626;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 20px 0;
-          }
-          .button {
-            background: #dc2626;
-            color: white !important;
-            padding: 12px 24px;
-            text-decoration: none;
-            border-radius: 8px;
-            display: inline-block;
-            margin-top: 20px;
-          }
-          .footer {
-            background-color: #f9fafb;
-            padding: 20px;
-            text-align: center;
-            color: #6b7280;
-            font-size: 12px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>🚨 OVERDUE Maintenance Alert</h1>
-          </div>
-          <div class="content">
-            <p>Hello ${userName},</p>
-            <div class="alert-box">
-              <p style="margin: 0; color: #dc2626;"><strong>${itemName}</strong> ${maintenanceType} is <strong>${daysOverdue} day(s) OVERDUE</strong>!</p>
-            </div>
-            <p><strong>Item:</strong> ${itemName}</p>
-            <p><strong>Maintenance Type:</strong> ${maintenanceType}</p>
-            <p><strong>Was Due On:</strong> ${scheduledDate}</p>
-            <p style="color: #dc2626;"><strong>Immediate action required.</strong> Please complete this maintenance as soon as possible.</p>
-            <a href="${process.env.FRONTEND_URL}/maintenance" class="button">Address Now</a>
-          </div>
-          <div class="footer">
-            <p>This is an automated alert from MyCAE Equipment Tracker.</p>
-            <p>&copy; ${new Date().getFullYear()} MyCAE. All rights reserved.</p>
-          </div>
-        </div>
-      </body>
-      </html>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333333; margin: 0; padding: 20px;">
+  <div style="max-width: 600px; margin: 0 auto;">
+    <p>Dear ${userName},</p>
+
+    <p><strong>URGENT:</strong> <strong>${itemName}</strong> ${maintenanceType} is <strong>${daysOverdue} day(s) OVERDUE</strong>.</p>
+
+    <p style="margin: 20px 0;">
+      Equipment : ${itemName}<br>
+      Maintenance Type : ${maintenanceType}<br>
+      Was Due On : ${scheduledDate}<br>
+      Days Overdue : ${daysOverdue}
+    </p>
+
+    <p>Immediate action is required. Please complete this maintenance as soon as possible to ensure equipment reliability and safety.</p>
+
+    <p>Should you have any questions, please contact ${supportEmail}.</p>
+
+    <p style="margin-top: 30px;">
+      Best regards,<br>
+      MyCAE Admin.
+    </p>
+  </div>
+</body>
+</html>
     `;
   }
 
   /**
-   * Generic email template
+   * Generic email template - Clean professional format
    */
   private getEmailTemplate(
     userName: string,
@@ -443,73 +410,45 @@ class EmailService {
     content: string,
     actionUrl: string
   ): string {
+    const supportEmail = process.env.SUPPORT_EMAIL || 'hadi@mycae.com.my';
+
+    // Convert HTML content to plain text format
+    // Replace <p><strong>Label:</strong> Value</p> with Label : Value<br>
+    const plainContent = content
+      .replace(/<p><strong>([^<]+):<\/strong>\s*([^<]*)<\/p>/g, '$1 : $2<br>')
+      .replace(/<p[^>]*>/g, '')
+      .replace(/<\/p>/g, '<br>')
+      .replace(/<strong>/g, '<strong>')
+      .replace(/<\/strong>/g, '</strong>')
+      .replace(/<br>\s*<br>/g, '<br>')
+      .trim();
+
     return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f3f4f6;
-          }
-          .container {
-            max-width: 600px;
-            margin: 0 auto;
-            background-color: white;
-          }
-          .header {
-            background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
-            color: white;
-            padding: 30px 20px;
-            text-align: center;
-          }
-          .header h1 {
-            margin: 0;
-            font-size: 24px;
-          }
-          .content {
-            padding: 30px 20px;
-            color: #374151;
-            line-height: 1.6;
-          }
-          .button {
-            background: #6366F1;
-            color: white !important;
-            padding: 12px 24px;
-            text-decoration: none;
-            border-radius: 8px;
-            display: inline-block;
-            margin-top: 20px;
-          }
-          .footer {
-            background-color: #f9fafb;
-            padding: 20px;
-            text-align: center;
-            color: #6b7280;
-            font-size: 12px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>MyCAE Equipment Tracker</h1>
-          </div>
-          <div class="content">
-            <p>Hello ${userName},</p>
-            <p>${message}</p>
-            ${content}
-            <a href="${actionUrl}" class="button">View Details</a>
-          </div>
-          <div class="footer">
-            <p>This is an automated message from MyCAE Equipment Tracker.</p>
-            <p>&copy; ${new Date().getFullYear()} MyCAE. All rights reserved.</p>
-          </div>
-        </div>
-      </body>
-      </html>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333333; margin: 0; padding: 20px;">
+  <div style="max-width: 600px; margin: 0 auto;">
+    <p>Dear ${userName},</p>
+
+    <p>${message}</p>
+
+    <p style="margin: 20px 0;">
+      ${plainContent}
+    </p>
+
+    <p>Should you have any questions, please contact ${supportEmail}.</p>
+
+    <p style="margin-top: 30px;">
+      Best regards,<br>
+      MyCAE Admin.
+    </p>
+  </div>
+</body>
+</html>
     `;
   }
 
@@ -552,191 +491,129 @@ class EmailService {
   }
 
   /**
-   * Password reset email template
+   * Password reset email template - Clean professional format
    */
   private getPasswordResetTemplate(userName: string, resetUrl: string): string {
+    const supportEmail = process.env.SUPPORT_EMAIL || 'hadi@mycae.com.my';
+
     return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f3f4f6;
-          }
-          .container {
-            max-width: 600px;
-            margin: 0 auto;
-            background-color: white;
-          }
-          .header {
-            background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
-            color: white;
-            padding: 30px 20px;
-            text-align: center;
-          }
-          .header h1 {
-            margin: 0;
-            font-size: 24px;
-          }
-          .content {
-            padding: 30px 20px;
-            color: #374151;
-            line-height: 1.6;
-          }
-          .warning-box {
-            background-color: #fef3c7;
-            border: 1px solid #f59e0b;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 20px 0;
-          }
-          .button {
-            background: #6366F1;
-            color: white !important;
-            padding: 14px 28px;
-            text-decoration: none;
-            border-radius: 8px;
-            display: inline-block;
-            margin-top: 20px;
-            font-weight: bold;
-          }
-          .footer {
-            background-color: #f9fafb;
-            padding: 20px;
-            text-align: center;
-            color: #6b7280;
-            font-size: 12px;
-          }
-          .expiry-notice {
-            color: #ef4444;
-            font-weight: bold;
-            margin-top: 15px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>🔐 Password Reset Request</h1>
-          </div>
-          <div class="content">
-            <p>Hello ${userName},</p>
-            <p>We received a request to reset your password for your MyCAE Equipment Tracker account.</p>
-            <div class="warning-box">
-              <p style="margin: 0;">If you didn't request this password reset, please ignore this email. Your password will remain unchanged.</p>
-            </div>
-            <p>To reset your password, click the button below:</p>
-            <a href="${resetUrl}" class="button">Reset Password</a>
-            <p class="expiry-notice">⚠️ This link will expire in 1 hour for security reasons.</p>
-            <p style="margin-top: 30px; color: #6b7280; font-size: 14px;">If the button doesn't work, copy and paste this link into your browser:</p>
-            <p style="color: #6366F1; word-break: break-all; font-size: 12px;">${resetUrl}</p>
-          </div>
-          <div class="footer">
-            <p>This is an automated message from MyCAE Equipment Tracker.</p>
-            <p>For security reasons, never share this link with anyone.</p>
-            <p>&copy; ${new Date().getFullYear()} MyCAE. All rights reserved.</p>
-          </div>
-        </div>
-      </body>
-      </html>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333333; margin: 0; padding: 20px;">
+  <div style="max-width: 600px; margin: 0 auto;">
+    <p>Dear ${userName},</p>
+
+    <p>We received a request to reset your password for your MyCAE Equipment Tracker account.</p>
+
+    <p>To reset your password, please click the link below:</p>
+
+    <p style="margin: 20px 0;">
+      <a href="${resetUrl}" style="color: #0066cc;">${resetUrl}</a>
+    </p>
+
+    <p><strong>Note:</strong> This link will expire in 1 hour for security reasons.</p>
+
+    <p>If you didn't request this password reset, please ignore this email. Your password will remain unchanged.</p>
+
+    <p>Should you have any questions, please contact ${supportEmail}.</p>
+
+    <p style="margin-top: 30px;">
+      Best regards,<br>
+      MyCAE Admin.
+    </p>
+  </div>
+</body>
+</html>
     `;
   }
 
   /**
-   * Password reset confirmation email template
+   * Password reset confirmation email template - Clean professional format
    */
   private getPasswordResetConfirmationTemplate(userName: string): string {
+    const supportEmail = process.env.SUPPORT_EMAIL || 'hadi@mycae.com.my';
+    const loginUrl = `${process.env.FRONTEND_URL}/login`;
+
     return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f3f4f6;
-          }
-          .container {
-            max-width: 600px;
-            margin: 0 auto;
-            background-color: white;
-          }
-          .header {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            color: white;
-            padding: 30px 20px;
-            text-align: center;
-          }
-          .header h1 {
-            margin: 0;
-            font-size: 24px;
-          }
-          .content {
-            padding: 30px 20px;
-            color: #374151;
-            line-height: 1.6;
-          }
-          .success-box {
-            background-color: #d1fae5;
-            border: 1px solid #10b981;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 20px 0;
-            text-align: center;
-          }
-          .button {
-            background: #10b981;
-            color: white !important;
-            padding: 12px 24px;
-            text-decoration: none;
-            border-radius: 8px;
-            display: inline-block;
-            margin-top: 20px;
-          }
-          .footer {
-            background-color: #f9fafb;
-            padding: 20px;
-            text-align: center;
-            color: #6b7280;
-            font-size: 12px;
-          }
-          .warning-box {
-            background-color: #fee2e2;
-            border: 1px solid #dc2626;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 20px 0;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>✓ Password Reset Successful</h1>
-          </div>
-          <div class="content">
-            <p>Hello ${userName},</p>
-            <div class="success-box">
-              <p style="margin: 0; color: #10b981; font-weight: bold;">Your password has been successfully reset!</p>
-            </div>
-            <p>You can now log in to your MyCAE Equipment Tracker account with your new password.</p>
-            <div class="warning-box">
-              <p style="margin: 0; color: #dc2626;"><strong>Important:</strong> If you didn't make this change, please contact your system administrator immediately.</p>
-            </div>
-            <a href="${process.env.FRONTEND_URL}/login" class="button">Go to Login</a>
-          </div>
-          <div class="footer">
-            <p>This is an automated confirmation from MyCAE Equipment Tracker.</p>
-            <p>&copy; ${new Date().getFullYear()} MyCAE. All rights reserved.</p>
-          </div>
-        </div>
-      </body>
-      </html>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333333; margin: 0; padding: 20px;">
+  <div style="max-width: 600px; margin: 0 auto;">
+    <p>Dear ${userName},</p>
+
+    <p>Your password has been successfully reset.</p>
+
+    <p>You can now log in to your MyCAE Equipment Tracker account with your new password at:</p>
+
+    <p style="margin: 20px 0;">
+      <a href="${loginUrl}" style="color: #0066cc;">${loginUrl}</a>
+    </p>
+
+    <p><strong>Important:</strong> If you didn't make this change, please contact your system administrator immediately at ${supportEmail}.</p>
+
+    <p style="margin-top: 30px;">
+      Best regards,<br>
+      MyCAE Admin.
+    </p>
+  </div>
+</body>
+</html>
     `;
+  }
+ 
+  async sendInvoiceApprovalRequest(
+    invoiceId: string,
+    mds: any[],
+    invoiceNumber: string,
+    invoiceAmount: number,
+    currency: string,
+    projectCode: string,
+    projectName: string,
+    creatorName: string,
+    creatorEmail: string,
+    submittedDate: string,
+    submittedTime: string
+  ): Promise<void> {
+    console.log('Email service disabled: sendInvoiceApprovalRequest called');
+  }
+
+  async sendInvoiceApprovalConfirmation(
+    invoiceId: string,
+    creatorEmail: string,
+    creatorName: string,
+    invoiceNumber: string,
+    invoiceAmount: number,
+    currency: string,
+    projectCode: string,
+    projectName: string,
+    approverName: string,
+    approvedDate: string,
+    approvedTime: string
+  ): Promise<void> {
+    console.log('Email service disabled: sendInvoiceApprovalConfirmation called');
+  }
+
+  async sendInvoiceWithdrawnNotification(
+    invoiceId: string,
+    mds: any[],
+    invoiceNumber: string,
+    invoiceAmount: number,
+    currency: string,
+    projectCode: string,
+    projectName: string,
+    creatorName: string,
+    withdrawnDate: string,
+    withdrawnTime: string
+  ): Promise<void> {
+    console.log('Email service disabled: sendInvoiceWithdrawnNotification called');
   }
 }
 

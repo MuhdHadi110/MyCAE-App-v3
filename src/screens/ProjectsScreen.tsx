@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { Plus, Search, Filter, Edit, Trash2, Eye, FolderOpen } from 'lucide-react';
+import { Plus, Search, Filter, Edit, Trash2, Eye, FolderOpen, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { useProjectStore } from '../store/projectStore';
 import { useClientStore } from '../store/clientStore';
 import { useTeamStore } from '../store/teamStore';
@@ -7,6 +7,7 @@ import { AddProjectModal } from '../components/modals/AddProjectModal';
 import { EditProjectModal } from '../components/modals/EditProjectModal';
 import { ProjectDetailModal } from '../components/modals/ProjectDetailModal';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import { Card, StatCard, PageHeader } from '../components/ui/Card';
 import { getPermissionMessage } from '../lib/permissions';
 import { toast } from 'react-hot-toast';
 import type { ProjectStatus, Project } from '../types/project.types';
@@ -22,6 +23,8 @@ export const ProjectsScreen: React.FC = () => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | 'all'>('all');
+  const [sortColumn, setSortColumn] = useState<string>('projectCode');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -66,8 +69,29 @@ export const ProjectsScreen: React.FC = () => {
     }
   }, [canAdd, projects]);
 
+  const handleSort = useCallback((column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  }, [sortColumn]);
+
+  const getSortIcon = (column: string) => {
+    if (sortColumn !== column) {
+      return <ChevronsUpDown className="w-4 h-4 ml-1 inline-block" />;
+    }
+    return sortDirection === 'asc'
+      ? <ChevronUp className="w-4 h-4 ml-1 inline-block" />
+      : <ChevronDown className="w-4 h-4 ml-1 inline-block" />;
+  };
+
   const handleSaveProject = async (updatedProject: Partial<Project>) => {
-    if (!selectedProject) return;
+    if (!selectedProject) {
+      toast.error('No project selected');
+      return;
+    }
 
     try {
       // Check if status changed - use separate endpoint for status updates
@@ -97,12 +121,13 @@ export const ProjectsScreen: React.FC = () => {
       }
 
       toast.success(`Project ${selectedProject.projectCode} updated successfully!`);
-      fetchProjects(); // Refresh list
+      fetchProjects(true); // Refresh list with force flag
       setShowEditModal(false);
       setSelectedProject(null);
     } catch (error: any) {
       logger.error('Failed to update project:', error);
       toast.error(error?.message || 'Failed to update project');
+      throw error; // Re-throw so EditProjectModal can catch it
     }
   };
 
@@ -144,8 +169,47 @@ export const ProjectsScreen: React.FC = () => {
       const matchesStatus = statusFilter === 'all' || project.status === statusFilter;
 
       return matchesSearch && matchesStatus;
+    }).sort((a, b) => {
+      const getSortValue = (project: Project) => {
+        switch (sortColumn) {
+          case 'projectCode':
+            return project.projectCode.toLowerCase();
+          case 'title':
+            return project.title.toLowerCase();
+          case 'client':
+            const client = clients.find((c) => c.id === project.clientId);
+            return (client?.name || '').toLowerCase();
+          case 'engineer':
+            return (
+              project.engineerName ||
+              (project as any).leadEngineer?.name ||
+              teamMembers.find((tm) => tm.userId === project.leadEngineerId)?.name ||
+              teamMembers.find((tm) => tm.userId === project.engineerId)?.name ||
+              ''
+            ).toLowerCase();
+          case 'status':
+            return project.status;
+          case 'hours':
+            return project.actualHours || 0;
+          default:
+            return project.projectCode.toLowerCase();
+        }
+      };
+
+      const aValue = getSortValue(a);
+      const bValue = getSortValue(b);
+
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return sortDirection === 'asc'
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      } else {
+        return sortDirection === 'asc'
+          ? (aValue as number) - (bValue as number)
+          : (bValue as number) - (aValue as number);
+      }
     });
-  }, [projects, searchTerm, statusFilter]);
+  }, [projects, searchTerm, statusFilter, sortColumn, sortDirection, clients, teamMembers]);
 
   // Memoize status counts to avoid recalculating on every render
   const statusCounts = useMemo(() => ({
@@ -169,7 +233,7 @@ export const ProjectsScreen: React.FC = () => {
             </div>
             {canAdd && (
               <button
-                onClick={handleAddProject} // Standardized primary button
+                onClick={handleAddProject}
                 className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
               >
                 <Plus className="w-4 h-4" />
@@ -180,164 +244,168 @@ export const ProjectsScreen: React.FC = () => {
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Search */}
-          <div className="md:col-span-2">
-            <div className="relative">
-              <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search by project code or title..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
+        <Card variant="stat" padding="sm">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Search */}
+            <div className="md:col-span-2">
+              <div className="relative">
+                <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search by project code or title..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            {/* Status Filter */}
+            <div>
+              <div className="relative">
+                <Filter className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as ProjectStatus | 'all')}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent appearance-none"
+                >
+                  <option value="all">All Status</option>
+                  <option value="pre-lim">Preliminary</option>
+                  <option value="ongoing">Ongoing</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </div>
             </div>
           </div>
+        </Card>
 
-          {/* Status Filter */}
-          <div>
-            <div className="relative">
-              <Filter className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as ProjectStatus | 'all')}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent appearance-none"
-              >
-                <option value="all">All Status</option>
-                <option value="pre-lim">Preliminary</option>
-                <option value="ongoing">Ongoing</option>
-                <option value="completed">Completed</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats Cards - Clickable to filter */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <button
-          onClick={() => setStatusFilter('all')}
-          className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-left transition-all hover:shadow-md hover:scale-105 ${
-            statusFilter === 'all' ? 'ring-2 ring-primary-500 ring-offset-2' : ''
-          }`}
-        >
-          <div className="text-sm font-medium text-gray-600 mb-2">Total Projects</div>
-          <div className="text-3xl font-bold text-gray-900">{statusCounts.total}</div>
-        </button>
-        <button
-          onClick={() => setStatusFilter('pre-lim')}
-          className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-left transition-all hover:shadow-md hover:scale-105 ${
-            statusFilter === 'pre-lim' ? 'ring-2 ring-yellow-500 ring-offset-2' : ''
-          }`}
-        >
-          <div className="text-sm font-medium text-gray-600 mb-2">Preliminary</div>
-          <div className="text-3xl font-bold text-yellow-600">
-            {statusCounts.preLim}
-          </div>
-        </button>
-        <button
-          onClick={() => setStatusFilter('ongoing')}
-          className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-left transition-all hover:shadow-md hover:scale-105 ${
-            statusFilter === 'ongoing' ? 'ring-2 ring-green-500 ring-offset-2' : ''
-          }`}
-        >
-          <div className="text-sm font-medium text-gray-600 mb-2">Ongoing</div>
-          <div className="text-3xl font-bold text-green-600">
-            {statusCounts.ongoing}
-          </div>
-        </button>
-        <button
-          onClick={() => setStatusFilter('completed')}
-          className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-left transition-all hover:shadow-md hover:scale-105 ${
-            statusFilter === 'completed' ? 'ring-2 ring-gray-500 ring-offset-2' : ''
-          }`}
-        >
-          <div className="text-sm font-medium text-gray-600 mb-2">Completed</div>
-          <div className="text-3xl font-bold text-gray-600">
-            {statusCounts.completed}
-          </div>
-        </button>
-      </div>
-
-      {/* Projects List */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-5 border-b border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-900">
-            {statusFilter === 'all' && `All Projects (${filteredProjects.length})`}
-            {statusFilter === 'pre-lim' && `Preliminary Projects (${filteredProjects.length})`}
-            {statusFilter === 'ongoing' && `Ongoing Projects (${filteredProjects.length})`}
-            {statusFilter === 'completed' && `Completed Projects (${filteredProjects.length})`}
-          </h2>
+        {/* Stats Cards - Clickable to filter */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard
+            title="Total Projects"
+            value={statusCounts.total}
+            color="gray"
+            onClick={() => setStatusFilter('all')}
+            active={statusFilter === 'all'}
+          />
+          <StatCard
+            title="Preliminary"
+            value={statusCounts.preLim}
+            color="yellow"
+            onClick={() => setStatusFilter('pre-lim')}
+            active={statusFilter === 'pre-lim'}
+          />
+          <StatCard
+            title="Ongoing"
+            value={statusCounts.ongoing}
+            color="green"
+            onClick={() => setStatusFilter('ongoing')}
+            active={statusFilter === 'ongoing'}
+          />
+          <StatCard
+            title="Completed"
+            value={statusCounts.completed}
+            color="gray"
+            onClick={() => setStatusFilter('completed')}
+            active={statusFilter === 'completed'}
+          />
         </div>
 
-        {loading ? (
-          <div className="px-6 py-8">
-            <div className="space-y-4">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="animate-pulse">
-                  <div className="grid grid-cols-7 gap-4">
-                    <div className="h-4 bg-gray-200 rounded"></div>
-                    <div className="h-4 bg-gray-200 rounded col-span-2"></div>
-                    <div className="h-4 bg-gray-200 rounded"></div>
-                    <div className="h-4 bg-gray-200 rounded"></div>
-                    <div className="h-4 bg-gray-200 rounded"></div>
-                    <div className="h-4 bg-gray-200 rounded"></div>
+        {/* Projects List */}
+        <Card variant="stat" padding="none" className="overflow-hidden">
+          <div className="px-6 py-5 border-b border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-900">
+              {statusFilter === 'all' && `All Projects (${filteredProjects.length})`}
+              {statusFilter === 'pre-lim' && `Preliminary Projects (${filteredProjects.length})`}
+              {statusFilter === 'ongoing' && `Ongoing Projects (${filteredProjects.length})`}
+              {statusFilter === 'completed' && `Completed Projects (${filteredProjects.length})`}
+            </h2>
+          </div>
+
+          {loading ? (
+            <div className="px-6 py-8">
+              <div className="space-y-4">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="animate-pulse">
+                    <div className="grid grid-cols-7 gap-4">
+                      <div className="h-4 bg-gray-200 rounded"></div>
+                      <div className="h-4 bg-gray-200 rounded col-span-2"></div>
+                      <div className="h-4 bg-gray-200 rounded"></div>
+                      <div className="h-4 bg-gray-200 rounded"></div>
+                      <div className="h-4 bg-gray-200 rounded"></div>
+                      <div className="h-4 bg-gray-200 rounded"></div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        ) : filteredProjects.length === 0 ? (
-          <div className="px-6 py-16 text-center">
-            <div className="text-gray-400 mb-4">
-              <FolderOpen className="w-12 h-12 mx-auto opacity-50" />
+          ) : filteredProjects.length === 0 ? (
+            <div className="px-6 py-16 text-center">
+              <div className="text-gray-400 mb-4">
+                <FolderOpen className="w-12 h-12 mx-auto opacity-50" />
+              </div>
+              <p className="text-lg font-medium text-gray-700 mb-2">No projects found</p>
+              <p className="text-sm text-gray-500 mb-4">
+                {searchTerm || statusFilter !== 'all'
+                  ? 'Try adjusting your search or filters'
+                  : 'Get started by creating your first project'}
+              </p>
+              {canAdd && !searchTerm && statusFilter === 'all' && (
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Create First Project
+                </button>
+              )}
             </div>
-            <p className="text-lg font-medium text-gray-700 mb-2">No projects found</p>
-            <p className="text-sm text-gray-500 mb-4">
-              {searchTerm || statusFilter !== 'all'
-                ? 'Try adjusting your search or filters'
-                : 'Get started by creating your first project'}
-            </p>
-            {canAdd && !searchTerm && statusFilter === 'all' && (
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Create First Project
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Project Code
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Title
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Client
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Engineer
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Hours
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th
+                      onClick={() => handleSort('projectCode')}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    >
+                      Project Code {getSortIcon('projectCode')}
+                    </th>
+                    <th
+                      onClick={() => handleSort('title')}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    >
+                      Title {getSortIcon('title')}
+                    </th>
+                    <th
+                      onClick={() => handleSort('client')}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    >
+                      Client {getSortIcon('client')}
+                    </th>
+                    <th
+                      onClick={() => handleSort('engineer')}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    >
+                      Engineer {getSortIcon('engineer')}
+                    </th>
+                    <th
+                      onClick={() => handleSort('status')}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    >
+                      Status {getSortIcon('status')}
+                    </th>
+                    <th
+                      onClick={() => handleSort('hours')}
+                      className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    >
+                      Hours {getSortIcon('hours')}
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredProjects.map((project) => {
                 const client = clients.find((c) => c.id === project.clientId);
@@ -420,7 +488,7 @@ export const ProjectsScreen: React.FC = () => {
             </table>
           </div>
         )}
-      </div>
+        </Card>
 
       {/* Add Project Modal */}
       <AddProjectModal

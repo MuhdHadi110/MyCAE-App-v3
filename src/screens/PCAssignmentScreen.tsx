@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Monitor, UserPlus, MapPin, Clock, Plus, Edit2, Wrench, CheckCircle, XCircle, Trash2 } from 'lucide-react';
+import { Monitor, Clock, Plus, Edit2, Wrench, Trash2 } from 'lucide-react';
 import { usePCStore } from '../store/pcStore';
 import { getCurrentUser } from '../lib/auth';
 import { checkPermission } from '../lib/permissions';
 import { AddPCModal } from '../components/modals/AddPCModal';
 import { AssignPCModal } from '../components/modals/AssignPCModal';
 import { EditPCModal } from '../components/modals/EditPCModal';
+import { DropdownMenu, DropdownTrigger } from '../components/ui/DropdownMenu';
 import type { PC } from '../types/pc.types';
 
 export const PCAssignmentScreen: React.FC = () => {
@@ -14,6 +15,7 @@ export const PCAssignmentScreen: React.FC = () => {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedPC, setSelectedPC] = useState<PC | null>(null);
+  const [showDropdown, setShowDropdown] = useState<string | null>(null);
   const [currentUser] = useState(getCurrentUser());
 
   useEffect(() => {
@@ -43,16 +45,29 @@ export const PCAssignmentScreen: React.FC = () => {
   };
 
   const handleMaintenance = async (pcId: string, inMaintenance: boolean) => {
-    const message = inMaintenance
-      ? 'Mark this PC for maintenance? This will unassign the current user.'
-      : 'End maintenance for this PC?';
-    if (confirm(message)) {
-      try {
-        await setMaintenanceStatus(pcId, inMaintenance);
-      } catch (error) {
-        console.error('Failed to update maintenance status:', error);
+    try {
+      await setMaintenanceStatus(pcId, inMaintenance);
+    } catch (error) {
+      console.error('Failed to update maintenance status:', error);
+    }
+  };
+
+  const handleMaintenanceConfirmation = (pc: PC, inMaintenance: boolean): boolean => {
+    let message: string;
+
+    if (inMaintenance) {
+      // Ending maintenance - no assignment impact
+      message = 'End maintenance for this PC?';
+    } else {
+      // Starting maintenance - may unassign current user
+      if (pc.status === 'assigned' && pc.assignedTo) {
+        message = `Mark this PC for maintenance? This will unassign ${pc.assignedTo}.`;
+      } else {
+        message = 'Mark this PC for maintenance?';
       }
     }
+
+    return confirm(message);
   };
 
   // Sort PCs numerically by name (PC1, PC2, PC3... instead of PC1, PC10, PC11...)
@@ -84,7 +99,7 @@ export const PCAssignmentScreen: React.FC = () => {
 
   return (
     <div className="min-h-full bg-gray-50">
-      <div className="p-4 md:p-6  space-y-6">
+      <div className="p-4 md:p-6 space-y-6">
         {/* Header Container */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -127,9 +142,38 @@ export const PCAssignmentScreen: React.FC = () => {
         {/* PC List */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {sortedPCs.map((pc) => (
-          <div key={pc.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition-shadow">
+          <div key={pc.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition-shadow relative">
+            {canAddOrRemove && (
+              <div className="absolute top-4 right-4 z-10">
+                <DropdownTrigger
+                  isOpen={showDropdown === pc.id}
+                  onClick={() => setShowDropdown(showDropdown === pc.id ? null : pc.id)}
+                />
+                <DropdownMenu
+                  isOpen={showDropdown === pc.id}
+                  onClose={() => setShowDropdown(null)}
+                  items={[
+                    { icon: <Edit2 className="w-4 h-4" />, label: 'Edit PC', onClick: () => handleEdit(pc) },
+                    { icon: <Trash2 className="w-4 h-4" />, label: 'Delete PC', onClick: () => handleDelete(pc.id), variant: 'danger' },
+                    ...(pc.status === 'maintenance' ? [
+                      { icon: <Wrench className="w-4 h-4" />, label: 'End Maintenance', onClick: () => {
+                        if (handleMaintenanceConfirmation(pc, false)) {
+                          handleMaintenance(pc.id, false);
+                        }
+                      }}
+                    ] : [
+                      { icon: <Wrench className="w-4 h-4" />, label: 'Mark for Maintenance', onClick: () => {
+                        if (handleMaintenanceConfirmation(pc, true)) {
+                          handleMaintenance(pc.id, true);
+                        }
+                      }}
+                    ])
+                  ]}
+                />
+              </div>
+            )}
             <div className="p-6">
-              {/* Header */}
+              {/* Header with Status Badge */}
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <Monitor className={`w-8 h-8 ${
@@ -137,14 +181,23 @@ export const PCAssignmentScreen: React.FC = () => {
                     pc.status === 'assigned' ? 'text-blue-600' :
                     'text-yellow-600'
                   }`} />
-                  <div>
+                  <div className="flex items-center gap-2">
                     <h3 className="font-semibold text-lg text-gray-900">{pc.name}</h3>
+                    {pc.status === 'available' && (
+                      <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded">Available</span>
+                    )}
+                    {pc.status === 'assigned' && (
+                      <span className="px-2 py-1 bg-blue-600 text-white text-xs font-medium rounded">Assigned</span>
+                    )}
+                    {pc.status === 'maintenance' && (
+                      <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded">Maintenance</span>
+                    )}
                   </div>
                 </div>
               </div>
 
-              {/* Status Section */}
-              {pc.status === 'assigned' ? (
+              {/* Assigned User Section */}
+              {pc.status === 'assigned' && (
                 <div className="mb-4 p-4 bg-gray-50 rounded-lg">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
@@ -158,20 +211,6 @@ export const PCAssignmentScreen: React.FC = () => {
                         <p className="text-sm text-gray-600 truncate">{pc.assignedToEmail}</p>
                       )}
                     </div>
-                  </div>
-                </div>
-              ) : pc.status === 'available' ? (
-                <div className="mb-4 p-3 bg-green-50 rounded-lg border border-green-200">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-green-600" />
-                    <p className="text-sm font-medium text-green-800">Available for Assignment</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="mb-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                  <div className="flex items-center gap-2">
-                    <Wrench className="w-4 h-4 text-yellow-600" />
-                    <p className="text-sm font-medium text-yellow-800">Under Maintenance</p>
                   </div>
                 </div>
               )}
@@ -193,7 +232,6 @@ export const PCAssignmentScreen: React.FC = () => {
               {/* Details */}
               <div className="space-y-2 mb-6">
                 <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <MapPin className="w-4 h-4" />
                   <span>{pc.location}</span>
                 </div>
                 {pc.status === 'assigned' && pc.assignedDate && (
@@ -211,60 +249,35 @@ export const PCAssignmentScreen: React.FC = () => {
 
               {/* Action Buttons */}
               <div className="flex gap-2">
-                {canAssign && pc.status !== 'maintenance' && (
-                  <>
-                    {pc.status === 'available' ? (
-                      <button
-                        onClick={() => handleAssign(pc)}
-                        className="flex-1 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
-                      >
-                        Assign
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleRelease(pc.id)}
-                        className="flex-1 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
-                      >
-                        Release
-                      </button>
-                    )}
-                  </>
-                )}
-                {canAddOrRemove && (
+                {pc.status === 'available' && canAssign && (
                   <button
-                    onClick={() => handleEdit(pc)}
-                    className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors"
+                    onClick={() => handleAssign(pc)}
+                    className="flex-1 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
                   >
-                    Edit
+                    Assign
                   </button>
                 )}
-                {canAddOrRemove && (
+
+                {pc.status === 'assigned' && canAssign && (
                   <button
-                    onClick={() => handleDelete(pc.id)}
-                    className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
-                    title="Delete PC"
+                    onClick={() => handleRelease(pc.id)}
+                    className="flex-1 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    Release
                   </button>
                 )}
-                {canAddOrRemove && (
-                  <>
-                    {pc.status === 'maintenance' ? (
-                      <button
-                        onClick={() => handleMaintenance(pc.id, false)}
-                        className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
-                      >
-                        End Maint.
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleMaintenance(pc.id, true)}
-                        className="px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-lg hover:bg-yellow-700 transition-colors"
-                      >
-                        Maintenance
-                      </button>
-                    )}
-                  </>
+
+                {pc.status === 'maintenance' && canAddOrRemove && (
+                  <button
+                    onClick={() => {
+                      if (handleMaintenanceConfirmation(pc, false)) {
+                        handleMaintenance(pc.id, false);
+                      }
+                    }}
+                    className="flex-1 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    Mark Available
+                  </button>
                 )}
               </div>
             </div>
@@ -305,7 +318,6 @@ export const PCAssignmentScreen: React.FC = () => {
                 setSelectedPC(null);
                 fetchPCs();
               } catch (error: any) {
-                // Error is already handled in the store, but we can show a more specific message
                 const errorMsg = error?.response?.data?.error || error?.message || 'Failed to assign PC';
                 alert(`Assignment failed: ${errorMsg}`);
               }

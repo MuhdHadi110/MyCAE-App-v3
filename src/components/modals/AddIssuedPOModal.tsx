@@ -48,11 +48,13 @@ export const AddIssuedPOModal: React.FC<AddIssuedPOModalProps> = ({ isOpen, onCl
     try {
       const issuedPOData = {
         poNumber: formData.poNumber,
-        vendor: formData.vendorName,
+        recipient: formData.vendorName,
         items: formData.description,
         amount: parseFloat(formData.amount),
         currency: 'MYR',
         projectCode: formData.projectCode || null,
+        issueDate: new Date(formData.issueDate).toISOString(),
+        dueDate: formData.deliveryDate ? new Date(formData.deliveryDate).toISOString() : undefined,
         status: 'issued',
       };
 

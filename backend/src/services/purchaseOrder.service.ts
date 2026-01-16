@@ -167,42 +167,48 @@ export class PurchaseOrderService {
     return await this.poRepo.save(po);
   }
 
-  /**
-   * Get all active POs (default query for analytics)
-   */
-  async getAllActivePOs(filters?: {
-    project_code?: string;
-    status?: POStatus;
-    limit?: number;
-    offset?: number;
-  }): Promise<{ data: PurchaseOrder[]; total: number }> {
-    const query = this.poRepo
-      .createQueryBuilder('po')
-      .leftJoinAndSelect('po.project', 'project')
-      .where('po.is_active = :isActive', { isActive: true })
-      .orderBy('po.received_date', 'DESC');
+/**
+ * Get all active POs (default query for analytics)
+ */
+async getAllActivePOs(filters?: {
+  project_code?: string;
+  status?: POStatus;
+  limit?: number;
+  offset?: number;
+}): Promise<{ data: PurchaseOrder[]; total: number }> {
+  const query = this.poRepo
+    .createQueryBuilder('po')
+    .leftJoinAndSelect('po.project', 'project')
+    .leftJoinAndSelect('project.client', 'client')
+    .select([
+      'po',
+      'project',
+      'client',
+    ])
+    .where('po.is_active = :isActive', { isActive: true })
+    .orderBy('po.received_date', 'DESC');
 
-    if (filters?.project_code) {
-      query.andWhere('po.project_code = :project_code', {
-        project_code: filters.project_code,
-      });
-    }
-
-    if (filters?.status) {
-      query.andWhere('po.status = :status', { status: filters.status });
-    }
-
-    if (filters?.limit) {
-      query.take(filters.limit);
-    }
-
-    if (filters?.offset) {
-      query.skip(filters.offset);
-    }
-
-    const [data, total] = await query.getManyAndCount();
-    return { data, total };
+  if (filters?.project_code) {
+    query.andWhere('po.project_code = :project_code', {
+      project_code: filters.project_code,
+    });
   }
+
+  if (filters?.status) {
+    query.andWhere('po.status = :status', { status: filters.status });
+  }
+
+  if (filters?.limit) {
+    query.take(filters.limit);
+  }
+
+  if (filters?.offset) {
+    query.skip(filters.offset);
+  }
+
+  const [data, total] = await query.getManyAndCount();
+  return { data, total };
+}
 
   /**
    * Get PO by ID
@@ -210,7 +216,7 @@ export class PurchaseOrderService {
   async getById(id: string): Promise<PurchaseOrder | null> {
     return await this.poRepo.findOne({
       where: { id },
-      relations: ['project'],
+      relations: ['project', 'project.contact', 'project.client'],
     });
   }
 
@@ -228,6 +234,8 @@ export class PurchaseOrderService {
     description?: string;
     status?: POStatus;
     fileUrl?: string;
+    plannedHours?: number;
+    customExchangeRate?: number;
   }): Promise<PurchaseOrder> {
     const poRepo = AppDataSource.getRepository(PurchaseOrder);
     const projectRepo = AppDataSource.getRepository(require('../entities/Project').Project);
@@ -247,14 +255,24 @@ export class PurchaseOrderService {
     // Convert to MYR if not already
     let amountMYR = data.amount;
     let exchangeRate = 1.0;
+    let rateSource: 'auto' | 'manual' | null = null;
 
     if (data.currency && data.currency !== 'MYR') {
-      try {
-        const conversion = await CurrencyService.convertToMYR(data.amount, data.currency);
-        amountMYR = conversion.amountMYR;
-        exchangeRate = conversion.rate;
-      } catch (error: any) {
-        throw new Error(`Currency conversion failed: ${error.message}`);
+      if (data.customExchangeRate) {
+        // Use custom rate
+        exchangeRate = data.customExchangeRate;
+        amountMYR = data.amount * exchangeRate;
+        rateSource = 'manual';
+      } else {
+        // Auto-fetch rate
+        try {
+          const conversion = await CurrencyService.convertToMYR(data.amount, data.currency);
+          amountMYR = conversion.amountMYR;
+          exchangeRate = conversion.rate;
+          rateSource = 'auto';
+        } catch (error: any) {
+          throw new Error(`Currency conversion failed: ${error.message}`);
+        }
       }
     }
 
@@ -267,6 +285,7 @@ export class PurchaseOrderService {
       currency: (data.currency || 'MYR').toUpperCase(),
       amount_myr: amountMYR,
       exchange_rate: exchangeRate,
+      exchange_rate_source: rateSource,
       received_date: data.receivedDate,
       due_date: data.dueDate,
       description: data.description,
@@ -282,6 +301,10 @@ export class PurchaseOrderService {
       console.log(`📋 Updating project ${data.projectCode} status from pre-lim to ongoing`);
       project.status = ProjectStatus.ONGOING;
       project.po_received_date = data.receivedDate;
+      if (data.plannedHours !== undefined && data.plannedHours > 0) {
+        console.log(`📊 Updating project ${data.projectCode} planned hours from ${project.planned_hours} to ${data.plannedHours}`);
+        project.planned_hours = data.plannedHours;
+      }
       await projectRepo.save(project);
       console.log(`✅ Project ${data.projectCode} status updated to ongoing`);
     }
@@ -292,15 +315,49 @@ export class PurchaseOrderService {
   /**
    * Update PO
    */
-  async updatePO(id: string, updates: Partial<PurchaseOrder>): Promise<PurchaseOrder> {
+  async updatePO(id: string, updates: any): Promise<PurchaseOrder> {
     const po = await this.poRepo.findOne({ where: { id } });
 
     if (!po) {
       throw new Error('Purchase order not found');
     }
 
-    // Apply updates
-    Object.assign(po, updates);
+    // Apply basic updates
+    const basicUpdates = { ...updates };
+    delete basicUpdates.currency;
+    delete basicUpdates.customExchangeRate;
+    Object.assign(po, basicUpdates);
+
+    // Handle currency and exchange rate updates
+    if (updates.currency || updates.customExchangeRate !== undefined) {
+      const currency = updates.currency || po.currency;
+      const amount = po.amount;
+
+      if (currency !== 'MYR') {
+        if (updates.customExchangeRate !== undefined && updates.customExchangeRate !== null) {
+          // Use custom rate
+          po.currency = currency;
+          po.exchange_rate = updates.customExchangeRate;
+          po.amount_myr = amount * updates.customExchangeRate;
+          po.exchange_rate_source = 'manual';
+        } else if (po.exchange_rate_source !== 'manual') {
+          // Keep existing rate if not manual, don't auto-refetch
+          po.currency = currency;
+        }
+      } else {
+        // Switching to MYR
+        po.currency = 'MYR';
+        po.exchange_rate = 1.0;
+        po.amount_myr = amount;
+        po.exchange_rate_source = null;
+      }
+    } else if (updates.currency === 'MYR') {
+      // Explicitly switching to MYR
+      po.currency = 'MYR';
+      po.exchange_rate = 1.0;
+      po.amount_myr = po.amount;
+      po.exchange_rate_source = null;
+    }
 
     const updatedPO = await this.poRepo.save(po);
 

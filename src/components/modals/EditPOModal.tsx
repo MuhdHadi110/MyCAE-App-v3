@@ -24,6 +24,7 @@ export const EditPOModal: React.FC<EditPOModalProps> = ({ isOpen, po, onClose, o
     clientId: '',
     clientName: po?.client_name || '',
     amount: po?.amount?.toString() || '',
+    currency: po?.currency || 'MYR',
     receivedDate: po?.received_date || '',
     dueDate: po?.due_date || '',
     description: po?.description || '',
@@ -32,6 +33,10 @@ export const EditPOModal: React.FC<EditPOModalProps> = ({ isOpen, po, onClose, o
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [useCustomRate, setUseCustomRate] = useState(false);
+  const [customRateValue, setCustomRateValue] = useState('');
+  const [exchangeRate, setExchangeRate] = useState(po?.exchange_rate || 1.0);
+  const [convertedAmount, setConvertedAmount] = useState(po?.amount_myr || 0);
 
   useEffect(() => {
     if (isOpen) {
@@ -39,6 +44,24 @@ export const EditPOModal: React.FC<EditPOModalProps> = ({ isOpen, po, onClose, o
       fetchProjects();
     }
   }, [isOpen, fetchClients, fetchProjects]);
+
+  // Calculate converted amount when currency, amount, or rate changes
+  useEffect(() => {
+    if (formData.currency === 'MYR') {
+      setExchangeRate(1.0);
+      setConvertedAmount(parseFloat(formData.amount) || 0);
+      return;
+    }
+
+    if (useCustomRate && customRateValue) {
+      const rate = parseFloat(customRateValue);
+      setExchangeRate(rate);
+      setConvertedAmount(parseFloat(formData.amount) * rate);
+    } else if (!useCustomRate) {
+      setExchangeRate(po?.exchange_rate || 1.0);
+      setConvertedAmount(po?.amount_myr || (parseFloat(formData.amount) || 0));
+    }
+  }, [formData.currency, formData.amount, useCustomRate, customRateValue, po]);
 
   if (!isOpen) return null;
 
@@ -62,6 +85,8 @@ export const EditPOModal: React.FC<EditPOModalProps> = ({ isOpen, po, onClose, o
         client_id: formData.clientId,
         client_name: formData.clientName,
         amount: parseFloat(formData.amount),
+        currency: formData.currency,
+        customExchangeRate: useCustomRate ? parseFloat(customRateValue) : undefined,
         received_date: formData.receivedDate,
         due_date: formData.dueDate,
         description: formData.description,
@@ -144,14 +169,72 @@ export const EditPOModal: React.FC<EditPOModalProps> = ({ isOpen, po, onClose, o
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.amount}
-                onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.amount}
+                  onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+                <select
+                  value={formData.currency}
+                  onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="MYR">MYR</option>
+                  <option value="SGD">SGD</option>
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="THB">THB</option>
+                  <option value="INR">INR</option>
+                  <option value="CNY">CNY</option>
+                  <option value="JPY">JPY</option>
+                  <option value="KRW">KRW</option>
+                  <option value="HKD">HKD</option>
+                  <option value="TWD">TWD</option>
+                  <option value="AUD">AUD</option>
+                  <option value="NZD">NZD</option>
+                  <option value="CAD">CAD</option>
+                  <option value="GBP">GBP</option>
+                </select>
+              </div>
+
+              {formData.currency !== 'MYR' && (
+                <div className="mt-2 space-y-2">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={useCustomRate}
+                      onChange={(e) => setUseCustomRate(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Use custom exchange rate</span>
+                  </label>
+
+                  {useCustomRate && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        step="0.000001"
+                        min="0"
+                        value={customRateValue}
+                        onChange={(e) => setCustomRateValue(e.target.value)}
+                        placeholder="e.g., 3.45"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                      />
+                      <span className="text-sm text-gray-600">→ RM {convertedAmount.toFixed(2)}</span>
+                    </div>
+                  )}
+
+                  {!useCustomRate && (
+                    <p className="text-xs text-gray-600">
+                      Current rate: {exchangeRate.toFixed(6)} → RM {convertedAmount.toFixed(2)}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

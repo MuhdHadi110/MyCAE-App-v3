@@ -58,16 +58,16 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ isOpen, onCl
   useEffect(() => {
     if (invoice) {
       setFormData({
-        invoiceNumber: invoice.invoice_number || '',
-        projectId: invoice.project_id || '',
-        projectName: invoice.project_name || '',
-        projectCode: invoice.project_code || '',
-        clientId: invoice.client_id || '',
-        clientName: invoice.client_name || '',
+        invoiceNumber: invoice.invoiceNumber || '',
+        projectId: invoice.projectId || '',
+        projectName: invoice.projectName || '',
+        projectCode: invoice.projectCode || '',
+        clientId: invoice.clientId || '',
+        clientName: invoice.clientName || '',
         amount: invoice.amount?.toString() || '',
-        percentageOfTotal: invoice.percentage_of_total?.toString() || '',
-        issueDate: invoice.invoice_date ? new Date(invoice.invoice_date).toISOString().split('T')[0] : '',
-        dueDate: invoice.due_date ? new Date(invoice.due_date).toISOString().split('T')[0] : '',
+        percentageOfTotal: invoice.percentageOfTotal?.toString() || '',
+        issueDate: invoice.invoiceDate ? new Date(invoice.invoiceDate).toISOString().split('T')[0] : '',
+        dueDate: invoice.dueDate ? new Date(invoice.dueDate).toISOString().split('T')[0] : '',
         description: invoice.description || '',
         remark: invoice.remark || '',
         status: (invoice.status as InvoiceStatus) || 'sent',
@@ -216,10 +216,10 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ isOpen, onCl
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setFormData({
-      ...formData,
+    setFormData(prev => ({
+      ...prev,
       [e.target.name]: e.target.value,
-    });
+    }));
 
     // Track which field was edited for auto-calculation
     if (e.target.name === 'amount') {
@@ -329,12 +329,14 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ isOpen, onCl
                 value={formData.invoiceNumber}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-gray-50"
-                readOnly
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
               {errors.invoiceNumber && (
                 <p className="text-red-500 text-xs mt-1">{errors.invoiceNumber}</p>
               )}
+              <p className="text-xs text-gray-500 mt-1">
+                Can be edited manually
+              </p>
             </div>
 
             {/* Status */}
@@ -440,6 +442,7 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ isOpen, onCl
               {projectTotalValue > 0 && (
                 <p className="text-xs text-gray-500 mt-1">
                   Project Total: RM {projectTotalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {lastEditedField === 'percentage' && <span className="text-blue-600 ml-1">Auto-calculated from percentage</span>}
                 </p>
               )}
             </div>
@@ -467,6 +470,7 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ isOpen, onCl
               {projectContext && (
                 <p className="text-xs text-gray-500 mt-1">
                   Suggested: {projectContext.remainingPercentage}% remaining
+                  {lastEditedField === 'amount' && <span className="text-blue-600 ml-1">Auto-calculated from amount</span>}
                 </p>
               )}
             </div>

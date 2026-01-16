@@ -40,6 +40,16 @@ class ProjectService {
     return transformKeysToCAmelCase(response.data);
   }
 
+  async getNextProjectCode(): Promise<{
+    latestCode: string | null;
+    nextSuggestion: string;
+    yearPrefix: string;
+    year: number;
+  }> {
+    const response = await api.get('/projects/next-code');
+    return transformKeysToCAmelCase(response.data);
+  }
+
   async createProject(project: any): Promise<any> {
     const response = await api.post('/projects', project);
     return transformKeysToCAmelCase(response.data);

@@ -30,44 +30,6 @@ export const AddResearchModal: React.FC<AddResearchModalProps> = ({ isOpen, onCl
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Generate research code when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      const code = generateResearchCode();
-      setFormData(prev => ({ ...prev, researchCode: code }));
-    }
-  }, [isOpen, researchProjects]);
-
-  const generateResearchCode = (): string => {
-    const currentYear = new Date().getFullYear();
-    const yearSuffix = currentYear.toString().slice(-2); // Get last 2 digits (e.g., "25" for 2025)
-
-    // Filter research projects for current year
-    const currentYearProjects = researchProjects.filter(p => {
-      const code = p.researchCode || '';
-      return code.startsWith(`R${yearSuffix}`);
-    });
-
-    // Get the highest number for current year
-    let maxNumber = 0;
-    currentYearProjects.forEach(p => {
-      const code = p.researchCode || '';
-      const match = code.match(/^R\d{2}(\d{3})$/);
-      if (match) {
-        const num = parseInt(match[1], 10);
-        if (num > maxNumber) {
-          maxNumber = num;
-        }
-      }
-    });
-
-    // Increment and format
-    const nextNumber = maxNumber + 1;
-    const numberStr = nextNumber.toString().padStart(3, '0');
-
-    return `R${yearSuffix}${numberStr}`;
-  };
-
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
@@ -155,15 +117,19 @@ export const AddResearchModal: React.FC<AddResearchModalProps> = ({ isOpen, onCl
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Research Code (Auto-generated, read-only) */}
+          {/* Research Code */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Research Code
             </label>
-            <div className="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-700 font-mono font-semibold">
-              {formData.researchCode || 'Generating...'}
-            </div>
-            <p className="text-xs text-gray-500 mt-1">Auto-generated code (Format: RYYXXX - R=Research, YY=Year, XXX=Number)</p>
+            <input
+              type="text"
+              value={formData.researchCode}
+              onChange={(e) => handleInputChange('researchCode', e.target.value.toUpperCase())}
+              placeholder="e.g., R26001"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 font-mono"
+            />
+            <p className="text-xs text-gray-500 mt-1">Format: RYYXXX (R=Research, YY=Year, XXX=Number)</p>
           </div>
 
           {/* Title */}

@@ -4,6 +4,7 @@ import {
   Target,
   CheckCircle2,
   FolderOpen,
+  Calendar,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useProjectStore } from '../../store/projectStore';
@@ -30,6 +31,7 @@ export const TasklyDashboard: React.FC = () => {
   const { clients, fetchClients } = useClientStore();
   const [timeFilter, setTimeFilter] = React.useState<'daily' | 'weekly' | 'monthly'>('monthly');
   const [projectStatusFilter, setProjectStatusFilter] = React.useState<string>('all');
+  const [selectedYear, setSelectedYear] = React.useState<number | 'all'>(new Date().getFullYear());
   const roleInfo = getRoleInfo((user?.role || 'engineer') as UserRole);
 
   useEffect(() => {
@@ -38,17 +40,29 @@ export const TasklyDashboard: React.FC = () => {
     fetchClients();
   }, []);
 
+  // Filter timesheets by selected year
+  const filteredTimesheets = useMemo(() => {
+    if (!user) return [];
+    const myTimesheets = (Array.isArray(timesheets) ? timesheets : []).filter((ts) => ts.engineerId === user.id);
+
+    if (selectedYear === 'all') return myTimesheets;
+
+    return myTimesheets.filter((ts) => {
+      const year = new Date(ts.date).getFullYear();
+      return year === selectedYear;
+    });
+  }, [timesheets, user?.id, selectedYear]);
+
   // Calculate personal KPIs
   const kpis = useMemo(() => {
     if (!user) return { myActiveProjects: 0, myTotalProjects: 0, prelimProjects: 0, completedProjects: 0, thisMonthHours: 0, completionRate: 0 };
     const myProjects = projects.filter((p) => p.engineerId === user.id);
-    const myTimesheets = (Array.isArray(timesheets) ? timesheets : []).filter((ts) => ts.engineerId === user.id);
 
     const activeProjects = myProjects.filter((p) => p.status === 'ongoing').length;
     const completedProjects = myProjects.filter((p) => p.status === 'completed').length;
     const prelimProjects = myProjects.filter((p) => p.status === 'pre-lim').length;
 
-    const thisMonthHours = myTimesheets.reduce((sum, ts) => sum + parseFloat(ts.hours.toString() || '0'), 0);
+    const thisMonthHours = filteredTimesheets.reduce((sum, ts) => sum + parseFloat(ts.hours.toString() || '0'), 0);
     const completionRate = myProjects.length > 0 ? (completedProjects / myProjects.length) * 100 : 0;
 
     return {
@@ -59,7 +73,7 @@ export const TasklyDashboard: React.FC = () => {
       thisMonthHours,
       completionRate,
     };
-  }, [projects, timesheets, user?.id]);
+  }, [projects, filteredTimesheets, user?.id]);
 
   // Project color mapping for stacked bar chart
   const projectColors = useMemo(() => {
@@ -89,9 +103,7 @@ export const TasklyDashboard: React.FC = () => {
     if (!user) return [];
     const dataMap: Record<string, Record<string, string | number>> = {};
 
-    const myTimesheets = (Array.isArray(timesheets) ? timesheets : []).filter((ts) => ts.engineerId === user.id);
-
-    myTimesheets.forEach((ts) => {
+    filteredTimesheets.forEach((ts) => {
       const date = new Date(ts.date);
       let key: string;
       let label: string;
@@ -121,15 +133,14 @@ export const TasklyDashboard: React.FC = () => {
     });
 
     return Object.values(dataMap).sort((a, b) => String(a.label).localeCompare(String(b.label)));
-  }, [timesheets, user?.id, timeFilter]);
+  }, [filteredTimesheets, timeFilter]);
 
   // Get unique projects from the data for creating Bar elements
   const uniqueProjects = useMemo(() => {
     if (!user) return [];
     const projectIds = new Set<string>();
-    const myTimesheets = (Array.isArray(timesheets) ? timesheets : []).filter((ts) => ts.engineerId === user.id);
 
-    myTimesheets.forEach(ts => projectIds.add(ts.projectId));
+    filteredTimesheets.forEach(ts => projectIds.add(ts.projectId));
 
     return Array.from(projectIds).map(id => {
       const project = projects.find(p => p.id === id);
@@ -139,7 +150,7 @@ export const TasklyDashboard: React.FC = () => {
         title: project?.title || 'Unknown Project'
       };
     });
-  }, [timesheets, projects, user?.id]);
+  }, [filteredTimesheets, projects]);
 
   // Work category distribution
   const workCategoryData = useMemo(() => {
@@ -151,9 +162,7 @@ export const TasklyDashboard: React.FC = () => {
       'measurement-office': 0,
     };
 
-    const myTimesheets = (Array.isArray(timesheets) ? timesheets : []).filter((ts) => ts.engineerId === user.id);
-
-    myTimesheets.forEach((ts) => {
+    filteredTimesheets.forEach((ts) => {
       categoryTotals[ts.workCategory] += parseFloat(ts.hours.toString() || '0');
     });
 
@@ -185,7 +194,7 @@ export const TasklyDashboard: React.FC = () => {
         color: '#ea4335',
       },
     ].filter((item) => item.value > 0);
-  }, [timesheets, user?.id]);
+  }, [filteredTimesheets]);
 
   // Filter projects for this engineer
   const filteredProjects = useMemo(() => {
@@ -197,19 +206,41 @@ export const TasklyDashboard: React.FC = () => {
     return myProjects.filter((p) => p.status === projectStatusFilter);
   }, [projects, user?.id, projectStatusFilter]);
 
+  const years = [
+    new Date().getFullYear() - 2,
+    new Date().getFullYear() - 1,
+    new Date().getFullYear(),
+  ];
+
   return (
-    <div className="min-h-full bg-gray-50 p-4 md:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-full bg-gray-50 p-4 md:p-6 space-y-6">
         {/* Header Container */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Welcome back, {user?.name}!</h1>
               <p className="text-gray-600 text-sm mt-1">Your project assignments and progress overview.</p>
             </div>
-            <span className="px-4 py-2 bg-cyan-50 text-primary-600 rounded-lg text-xs font-semibold border border-cyan-200">
-              {roleInfo.label} Dashboard
-            </span>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+              <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1 px-2">
+                <Calendar className="w-4 h-4 text-gray-600" />
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+                  className="px-2 py-1.5 bg-transparent border-0 rounded font-medium text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer"
+                >
+                  {years.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                  <option value="all">All Time</option>
+                </select>
+              </div>
+              <span className="px-4 py-2 bg-cyan-50 text-primary-600 rounded-lg text-xs font-semibold border border-cyan-200 whitespace-nowrap">
+                {roleInfo.label} Dashboard
+              </span>
+            </div>
           </div>
         </div>
 
@@ -489,7 +520,6 @@ export const TasklyDashboard: React.FC = () => {
             </div>
           )}
         </div>
-      </div>
     </div>
   );
 };

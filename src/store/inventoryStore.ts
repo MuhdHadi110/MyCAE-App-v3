@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { InventoryItem, InventoryFilters, InventoryStats } from '../types/inventory.types';
-import inventoryService from '../services/api.service';
+import inventoryService from '../services/inventory.service';
 import toast from 'react-hot-toast';
 
 interface InventoryStore {

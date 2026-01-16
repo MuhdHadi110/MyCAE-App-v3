@@ -7,8 +7,8 @@ import type { TeamMember } from '../types/team.types';
  */
 interface InvoiceData {
   id: string;
-  project_code: string;
-  amount_myr: number;
+  projectCode: string;
+  amountMyr: number;
   status: string;
 }
 
@@ -35,10 +35,19 @@ export function calculateProjectFinances(
     let manHourCost = 0;
     projectTimesheets.forEach(ts => {
       const engineer = teamMembers.find(tm => tm.id === ts.engineerId.toString());
-      // Use project-specific rate if available, otherwise use team member's rate, fallback to 75
-      const projectRate = projectRates[project.id]?.[ts.engineerId.toString()];
-      const rate = projectRate ?? engineer?.hourlyRate ?? 75;
-      manHourCost += parseFloat(ts.hours.toString() || '0') * rate;
+
+      // Priority 1: Project daily rate (if set) - convert to hourly
+      const hourlyRate = project.dailyRate
+        ? (project.dailyRate as number) / 8 // Convert daily to hourly
+        : (
+          // Priority 2: Engineer hourly rate (if set)
+          projectRates[project.id]?.[ts.engineerId.toString()]
+          ?? engineer?.hourlyRate
+          // Priority 3: Global rate: RM 437.50/hr
+          ?? 437.50
+        );
+
+      manHourCost += parseFloat(ts.hours.toString() || '0') * hourlyRate;
     });
 
     // Total cost is ONLY man-hour cost (based on actual timesheets)
@@ -48,23 +57,23 @@ export function calculateProjectFinances(
     const projectPOList = projectPOs[project.projectCode] || [];
     const receivedPOs = projectPOList.reduce((sum, po) => {
       // Use effective amount (adjusted if present, else calculated)
-      const effectiveAmount = po.amount_myr_adjusted
-        ? parseFloat(po.amount_myr_adjusted.toString())
-        : parseFloat(po.amount_myr.toString());
+      const effectiveAmount = po.amountMyrAdjusted
+        ? parseFloat(po.amountMyrAdjusted.toString())
+        : parseFloat(po.amountMyr.toString());
       return sum + effectiveAmount;
     }, 0);
     const totalRevenue = receivedPOs;
 
     // Calculate invoiced amount from invoices
-    const projectInvoices = safeInvoices.filter(inv => inv.project_code === project.projectCode);
+    const projectInvoices = safeInvoices.filter(inv => inv.projectCode === project.projectCode);
     const invoiced = projectInvoices.reduce((sum, inv) => {
-      return sum + parseFloat((inv.amount_myr || 0).toString());
+      return sum + parseFloat((inv.amountMyr || 0).toString());
     }, 0);
 
     // Calculate paid amount (invoices with 'paid' status)
     const paid = projectInvoices
       .filter(inv => inv.status === 'paid')
-      .reduce((sum, inv) => sum + parseFloat((inv.amount_myr || 0).toString()), 0);
+      .reduce((sum, inv) => sum + parseFloat((inv.amountMyr || 0).toString()), 0);
 
     const grossProfit = totalRevenue - totalCost;
     const profitMargin = totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100) : 0;

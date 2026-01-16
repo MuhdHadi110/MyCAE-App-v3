@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { DollarSign, RefreshCw, Calendar, Globe, AlertCircle, TrendingUp } from 'lucide-react';
+import { DollarSign, RefreshCw, Calendar, Globe, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { Card, PageHeader } from '../components/ui/Card';
 
 interface ExchangeRate {
   currency: string;
@@ -126,23 +127,13 @@ export const ExchangeRatesScreen: React.FC = () => {
   return (
     <div className="p-4 md:p-6 space-y-6">
       {/* Header */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Exchange Rates</h1>
-            <p className="text-gray-600 mt-1">
-              Live currency conversion rates to MYR (Malaysian Ringgit)
-            </p>
-          </div>
-          <div className="hidden md:flex items-center gap-2 text-emerald-600">
-            <TrendingUp className="w-8 h-8" />
-            <DollarSign className="w-8 h-8" />
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Exchange Rates"
+        description="Live currency conversion rates to MYR (Malaysian Ringgit)"
+      />
 
       {/* Controls */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+      <Card padding="sm">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
             <Globe className="w-5 h-5 text-blue-600" />
@@ -172,11 +163,11 @@ export const ExchangeRatesScreen: React.FC = () => {
             </button>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Error State */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <Card className="bg-red-50 border-red-200">
           <div className="flex items-center gap-2 text-red-800">
             <AlertCircle className="w-5 h-5 flex-shrink-0" />
             <span>{error}</span>
@@ -190,11 +181,11 @@ export const ExchangeRatesScreen: React.FC = () => {
               Retry
             </button>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Rates Grid */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <Card>
         <h2 className="text-lg font-semibold text-gray-900 mb-4">
           Current Exchange Rates to MYR
         </h2>
@@ -248,10 +239,10 @@ export const ExchangeRatesScreen: React.FC = () => {
             ))}
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Info Footer */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <Card className="bg-blue-50 border-blue-200">
         <p className="text-sm text-blue-800">
           <strong>Note:</strong> Exchange rates are from the{' '}
           <a
@@ -264,7 +255,7 @@ export const ExchangeRatesScreen: React.FC = () => {
           </a>
           {' '}(European Central Bank data). Rates are updated daily on business days.
         </p>
-      </div>
+      </Card>
     </div>
   );
 };

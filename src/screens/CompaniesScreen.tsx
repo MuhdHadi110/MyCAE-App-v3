@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Building2, UserPlus, Plus, Mail, Phone, Briefcase, Trash2 } from 'lucide-react';
+import { UserPlus, Plus, Mail, Phone, Briefcase, Trash2 } from 'lucide-react';
 import { useCompanyStore } from '../store/companyStore';
 import { Button } from '../components/ui/Button';
 import { AddCompanyModal } from '../components/modals/AddCompanyModal';
@@ -61,17 +61,14 @@ export const CompaniesScreen: React.FC = () => {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
+    <div className="min-h-full bg-gray-50">
+      <div className="p-4 md:p-6 space-y-6">
+        {/* Header Container */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                <Building2 className="w-8 h-8 text-primary-600" />
-                Companies & Contacts
-              </h1>
-              <p className="text-gray-600 mt-2">
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Companies & Contacts</h1>
+              <p className="text-gray-600 mt-1">
                 Manage your business contacts and company information
               </p>
             </div>
@@ -83,23 +80,22 @@ export const CompaniesScreen: React.FC = () => {
               Add Company
             </Button>
           </div>
+        </div>
 
-          {/* Search Bar */}
-          <div className="mt-6">
-            <input
-              type="text"
-              placeholder="Search companies or contacts..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
-          </div>
+        {/* Search Bar */}
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <input
+            type="text"
+            placeholder="Search companies or contacts..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          />
         </div>
 
         {/* Companies List */}
         {filteredCompanies.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
-            <Building2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
               {searchQuery ? 'No companies found' : 'No companies yet'}
             </h3>
@@ -130,7 +126,6 @@ export const CompaniesScreen: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <Building2 className="w-5 h-5 text-primary-600" />
                         <h3 className="text-xl font-semibold text-gray-900">{company.name}</h3>
                         <span className="px-2 py-1 bg-primary-100 text-primary-700 text-xs font-medium rounded-full">
                           {company.contacts.length} {company.contacts.length === 1 ? 'contact' : 'contacts'}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Mail, Lock, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, CheckCircle, AlertCircle, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { httpClient } from '../services/http-client';
@@ -15,9 +15,44 @@ export const ResetPasswordScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [tokenValid, setTokenValid] = useState(false);
   const [verifyingToken, setVerifyingToken] = useState(false);
+
+  const validatePassword = (password: string): boolean => {
+    return (
+      password.length >= 12 &&
+      /[A-Z]/.test(password) &&
+      /[a-z]/.test(password) &&
+      /\d/.test(password) &&
+      /[!@#$%^&*(),.?":{}|<>]/.test(password)
+    );
+  };
+
+  const getPasswordStrength = (password: string) => {
+    if (password.length === 0) return { score: 0, label: '', color: '' };
+
+    let score = 0;
+    const checks = [
+      password.length >= 12,
+      /[A-Z]/.test(password),
+      /[a-z]/.test(password),
+      /\d/.test(password),
+      /[!@#$%^&*(),.?":{}|<>]/.test(password),
+    ];
+
+    score = checks.filter(Boolean).length;
+
+    if (score <= 2) return { score, label: 'Weak', color: 'bg-red-500' };
+    if (score <= 3) return { score, label: 'Medium', color: 'bg-yellow-500' };
+    return { score, label: 'Strong', color: 'bg-green-500' };
+  };
+
+  const passwordStrength = getPasswordStrength(newPassword);
+  const isPasswordValid = validatePassword(newPassword);
+  const isPasswordMatching = newPassword === confirmPassword && newPassword.length > 0;
 
   // Verify token if present in URL
   useEffect(() => {
@@ -80,13 +115,13 @@ export const ResetPasswordScreen: React.FC = () => {
       return;
     }
 
-    if (newPassword !== confirmPassword) {
-      toast.error('Passwords do not match');
+    if (!isPasswordValid) {
+      toast.error('Password does not meet requirements');
       return;
     }
 
-    if (newPassword.length < 12) {
-      toast.error('Password must be at least 12 characters');
+    if (!isPasswordMatching) {
+      toast.error('Passwords do not match');
       return;
     }
 
@@ -203,17 +238,80 @@ export const ResetPasswordScreen: React.FC = () => {
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <Input
-                    type="password"
+                    type={showNewPassword ? 'text' : 'password'}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="Enter new password"
-                    className="pl-10"
+                    className="pl-10 pr-10"
                     required
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  >
+                    {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
                 </div>
-                <p className="mt-1 text-xs text-gray-500">
-                  Must be at least 12 characters with uppercase, lowercase, number, and special character
-                </p>
+
+                {/* Password Strength Indicator */}
+                {newPassword && (
+                  <div className="mt-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium text-gray-600">Strength:</span>
+                      <span
+                        className={`text-xs font-medium capitalize ${
+                          passwordStrength.score <= 2
+                            ? 'text-red-600'
+                            : passwordStrength.score <= 3
+                            ? 'text-yellow-600'
+                            : 'text-green-600'
+                        }`}
+                      >
+                        {passwordStrength.label}
+                      </span>
+                    </div>
+                    <div className="flex gap-1 h-1.5">
+                      <div
+                        className={`flex-1 rounded-full ${
+                          passwordStrength.score >= 1 ? passwordStrength.color : 'bg-gray-200'
+                        }`}
+                      />
+                      <div
+                        className={`flex-1 rounded-full ${
+                          passwordStrength.score >= 2 ? passwordStrength.color : 'bg-gray-200'
+                        }`}
+                      />
+                      <div
+                        className={`flex-1 rounded-full ${
+                          passwordStrength.score >= 3 ? passwordStrength.color : 'bg-gray-200'
+                        }`}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Requirements Checklist */}
+                <div className="mt-3 p-3 bg-gray-50 rounded-lg text-xs text-gray-600 space-y-1">
+                  <p className="font-medium text-gray-700">Password must contain:</p>
+                  <div className="space-y-1">
+                    <p className={newPassword.length >= 12 ? 'text-green-600' : ''}>
+                      {newPassword.length >= 12 ? '✓' : '○'} At least 12 characters
+                    </p>
+                    <p className={/[A-Z]/.test(newPassword) ? 'text-green-600' : ''}>
+                      {/[A-Z]/.test(newPassword) ? '✓' : '○'} Uppercase letter
+                    </p>
+                    <p className={/[a-z]/.test(newPassword) ? 'text-green-600' : ''}>
+                      {/[a-z]/.test(newPassword) ? '✓' : '○'} Lowercase letter
+                    </p>
+                    <p className={/\d/.test(newPassword) ? 'text-green-600' : ''}>
+                      {/\d/.test(newPassword) ? '✓' : '○'} Number
+                    </p>
+                    <p className={/[!@#$%^&*(),.?":{}|<>]/.test(newPassword) ? 'text-green-600' : ''}>
+                      {/[!@#$%^&*(),.?":{}|<>]/.test(newPassword) ? '✓' : '○'} Special character
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div>
@@ -223,13 +321,30 @@ export const ResetPasswordScreen: React.FC = () => {
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <Input
-                    type="password"
+                    type={showConfirmPassword ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Confirm new password"
-                    className="pl-10"
+                    className="pl-10 pr-10"
                     required
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                  {newPassword && confirmPassword && newPassword === confirmPassword && (
+                    <div className="absolute right-12 top-1/2 -translate-y-1/2">
+                      <CheckCircle className="w-5 h-5 text-green-500" />
+                    </div>
+                  )}
+                  {newPassword && confirmPassword && newPassword !== confirmPassword && (
+                    <div className="absolute right-12 top-1/2 -translate-y-1/2">
+                      <AlertCircle className="w-5 h-5 text-red-500" />
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -237,7 +352,7 @@ export const ResetPasswordScreen: React.FC = () => {
                 type="submit"
                 variant="primary"
                 className="w-full"
-                disabled={isLoading}
+                disabled={!isPasswordValid || !isPasswordMatching || isLoading}
               >
                 {isLoading ? 'Resetting...' : 'Reset Password'}
               </Button>

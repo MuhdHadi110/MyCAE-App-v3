@@ -7,7 +7,9 @@ export interface Notification {
   message: string;
   timestamp: Date;
   read: boolean;
-  category?: 'inventory' | 'maintenance' | 'project' | 'team' | 'system' | 'project-assignment' | 'po-received' | 'pc-assignment';
+  category?: 'inventory' | 'maintenance' | 'project' | 'team' | 'system' | 
+             'project-assignment' | 'po-received' | 'pc-assignment' | 
+             'invoice-approval' | 'invoice-approved' | 'invoice-withdrawn';
 }
 
 interface NotificationStore {

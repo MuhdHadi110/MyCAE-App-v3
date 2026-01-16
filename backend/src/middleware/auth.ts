@@ -93,6 +93,9 @@ export const generateToken = (userId: string, email: string, name: string, roles
 
   const primaryRole = roles[0] || UserRole.ENGINEER;
 
+  // Use shorter expiration in production for security
+  const expiresIn = process.env.NODE_ENV === 'production' ? '24h' : '7d';
+
   return jwt.sign(
     {
       id: userId,
@@ -102,6 +105,6 @@ export const generateToken = (userId: string, email: string, name: string, roles
       roles, // All roles
     },
     secret,
-    { expiresIn: '7d' }
+    { expiresIn }
   );
 };

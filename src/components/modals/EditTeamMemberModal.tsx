@@ -76,7 +76,8 @@ export const EditTeamMemberModal: React.FC<EditTeamMemberModalProps> = ({
       } else {
         // Check if user has permission to edit other team members
         // Only Manager, Managing Director, and Admin can edit team members
-        const canEditTeamMember = checkPermission(user?.role || 'engineer', 'canEditTeamMember');
+        const userRoles = (user?.roles || [user?.role || 'engineer']) as UserRole[];
+        const canEditTeamMember = checkPermission(userRoles, 'canEditTeamMember');
 
         if (!canEditTeamMember) {
           setCanEdit(false);

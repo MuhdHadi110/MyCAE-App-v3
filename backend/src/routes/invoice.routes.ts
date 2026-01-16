@@ -1,6 +1,8 @@
 import { Router, Response } from 'express';
 import { AppDataSource } from '../config/database';
+import { Raw } from 'typeorm';
 import { Invoice, InvoiceStatus } from '../entities/Invoice';
+import { ActivityType } from '../entities/Activity';
 import { Project, ProjectStatus } from '../entities/Project';
 import { User, UserRole } from '../entities/User';
 import { PurchaseOrder } from '../entities/PurchaseOrder';
@@ -8,6 +10,7 @@ import { authenticate, AuthRequest, authorize } from '../middleware/auth';
 import { body, validationResult } from 'express-validator';
 import { InvoicePDFService } from '../services/invoice-pdf.service';
 import { ActivityService } from '../services/activity.service';
+import emailService from '../services/email.service';
 
 const router = Router();
 
@@ -387,8 +390,11 @@ router.put('/:id',
 /**
  * DELETE /api/invoices/:id
  * Delete invoice
+ * Authorization: Senior Engineer and above
  */
-router.delete('/:id', async (req: AuthRequest, res: Response) => {
+router.delete('/:id',
+  authorize(UserRole.SENIOR_ENGINEER, UserRole.PRINCIPAL_ENGINEER, UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN),
+  async (req: AuthRequest, res: Response) => {
   try {
     const invoiceRepo = AppDataSource.getRepository(Invoice);
     const invoice = await invoiceRepo.findOne({ where: { id: req.params.id } });
@@ -446,10 +452,46 @@ router.post('/:id/submit-for-approval',
           { status: InvoiceStatus.PENDING_APPROVAL },
           updatedInvoice
         );
-      } catch (activityError) {
+       } catch (activityError) {
         console.error('Activity logging failed:', activityError);
         // Don't fail the request if activity logging fails
       }
+
+      // Fetch all Managing Directors
+      const userRepo = AppDataSource.getRepository(User);
+      const mds = await userRepo.find({
+        where: {
+          roles: Raw((alias) => `JSON_CONTAINS(${alias}.roles, '"managing-director"')`)
+        }
+      });
+
+      // Format date/time
+      const submittedDate = invoice.submitted_for_approval_at!.toLocaleDateString('en-MY', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      const submittedTime = invoice.submitted_for_approval_at!.toLocaleTimeString('en-MY', {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      // Send approval request email to all MDs
+      await emailService.sendInvoiceApprovalRequest(
+        invoice.id,
+        mds,
+        invoice.invoice_number,
+        invoice.amount,
+        invoice.currency,
+        invoice.project_code,
+        invoice.project_name,
+        req.user!.name,
+        req.user!.email,
+        submittedDate,
+        submittedTime
+      ).catch(err => {
+        console.error('Failed to send invoice approval notification:', err.message);
+      });
 
       res.json({
         message: 'Invoice submitted for approval',
@@ -508,6 +550,38 @@ router.post('/:id/approve',
         console.error('Activity logging failed:', activityError);
         // Don't fail the request if activity logging fails
       }
+
+      // Fetch creator
+      const userRepo = AppDataSource.getRepository(User);
+      const creator = await userRepo.findOne({ where: { id: invoice.created_by } });
+
+      // Format date/time
+      const approvedDate = invoice.approved_at!.toLocaleDateString('en-MY', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      const approvedTime = invoice.approved_at!.toLocaleTimeString('en-MY', {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      // Send approval confirmation to creator
+      await emailService.sendInvoiceApprovalConfirmation(
+        invoice.id,
+        creator!.email,
+        creator!.name,
+        invoice.invoice_number,
+        invoice.amount,
+        invoice.currency,
+        invoice.project_code,
+        invoice.project_name,
+        req.user!.name,
+        approvedDate,
+        approvedTime
+      ).catch(err => {
+        console.error('Failed to send approval confirmation email:', err.message);
+      });
 
       res.json({
         message: 'Invoice approved successfully',
@@ -572,6 +646,41 @@ router.post('/:id/withdraw',
         // Don't fail the request if activity logging fails
       }
 
+      // Fetch all Managing Directors
+      const userRepo = AppDataSource.getRepository(User);
+      const mds = await userRepo.find({
+        where: {
+          roles: Raw((alias) => `JSON_CONTAINS(${alias}.roles, '"managing-director"')`)
+        }
+      });
+
+      // Format date/time
+      const withdrawnDate = new Date().toLocaleDateString('en-MY', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      const withdrawnTime = new Date().toLocaleTimeString('en-MY', {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      // Send withdrawal notification to all MDs
+      await emailService.sendInvoiceWithdrawnNotification(
+        invoice.id,
+        mds,
+        invoice.invoice_number,
+        invoice.amount,
+        invoice.currency,
+        invoice.project_code,
+        invoice.project_name,
+        req.user!.name,
+        withdrawnDate,
+        withdrawnTime
+      ).catch(err => {
+        console.error('Failed to send invoice withdrawal notification:', err.message);
+      });
+
       res.json({
         message: 'Invoice withdrawn from approval',
         data: updatedInvoice,
@@ -633,6 +742,58 @@ router.post('/:id/mark-as-sent',
 );
 
 /**
+ * POST /api/invoices/:id/mark-as-paid
+ * Mark invoice as paid (Sent → Paid)
+ */
+router.post('/:id/mark-as-paid',
+  authorize(UserRole.ADMIN, UserRole.MANAGING_DIRECTOR, UserRole.MANAGER, UserRole.PRINCIPAL_ENGINEER),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const invoiceRepo = AppDataSource.getRepository(Invoice);
+      const invoice = await invoiceRepo.findOne({ where: { id: req.params.id } });
+
+      if (!invoice) {
+        return res.status(404).json({ error: 'Invoice not found' });
+      }
+
+      // Only sent invoices can be marked as paid
+      if (invoice.status !== InvoiceStatus.SENT) {
+        return res.status(400).json({
+          error: `Invoice must be sent to mark as paid. Current status: ${invoice.status}`
+        });
+      }
+
+      // Update status to paid
+      invoice.status = InvoiceStatus.PAID;
+      const updatedInvoice = await invoiceRepo.save(invoice);
+
+      // Log activity
+      await ActivityService.log({
+        userId: req.user!.id,
+        type: ActivityType.INVOICE_STATUS_CHANGE,
+        description: `Invoice ${invoice.invoice_number} marked as paid`,
+        entityType: 'invoice',
+        entityId: invoice.id,
+        module: 'finance',
+        details: JSON.stringify({
+          invoiceNumber: invoice.invoice_number,
+          from: invoice.status,
+          to: 'paid',
+        }),
+      });
+
+      res.json({
+        message: 'Invoice marked as paid',
+        data: updatedInvoice,
+      });
+    } catch (error: any) {
+      console.error('Error marking invoice as paid:', error);
+      res.status(500).json({ error: 'Failed to mark invoice as paid' });
+    }
+  }
+);
+
+/**
  * GET /api/invoices/:id/pdf
  * Generate and download invoice PDF
  */
@@ -689,23 +850,6 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response) => {
   }
 });
 
-/**
- * Test PDF generation endpoint for debugging
- */
-router.get('/test-pdf', async (req: AuthRequest, res: Response) => {
-  try {
-    const { testPDFGeneration } = await import('../test-pdf.service');
-    const pdfBuffer = await testPDFGeneration();
-    
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename="test.pdf"');
-    res.setHeader('Content-Length', pdfBuffer.length);
-    res.send(pdfBuffer);
-  } catch (error: any) {
-    console.error('Test PDF generation failed:', error);
-    res.status(500).json({ error: `Test PDF generation failed: ${error.message}` });
-  }
-});
 
 /**
  * Debug endpoint to check company settings
@@ -744,118 +888,6 @@ router.get('/test-invoice-size/:invoiceId', async (req: AuthRequest, res: Respon
     }
 
     console.log('Testing PDF size for invoice:', {
-      id: invoice.id,
-      invoiceNumber: invoice.invoice_number,
-      amount: invoice.amount
-    });
-
-    const pdfBuffer = await InvoicePDFService.generateInvoicePDF(invoice);
-
-    if (!pdfBuffer) {
-      return res.status(500).json({ error: 'Failed to generate PDF' });
-    }
-
-    const sizeKB = pdfBuffer.length / 1024;
-    const sizeMB = (pdfBuffer.length / (1024 * 1024)).toFixed(2);
-
-    console.log('PDF Size Analysis:', {
-      invoiceId: invoice.id,
-      invoiceNumber: invoice.invoice_number,
-      amount: invoice.amount,
-      sizeBytes: pdfBuffer.length,
-      sizeKB: sizeKB.toFixed(2),
-      sizeMB: sizeMB,
-      recommendedViewer: parseFloat(sizeMB) > 1.0 ? 'Browser Viewer Recommended' : 'React-PDF Should Work'
-    });
-
-    res.json({
-      success: true,
-      analysis: {
-        invoiceId: invoice.id,
-        invoiceNumber: invoice.invoice_number,
-        amount: invoice.amount,
-        sizeBytes: pdfBuffer.length,
-        sizeKB: sizeKB.toFixed(2),
-        sizeMB: sizeMB,
-        recommendedViewer: parseFloat(sizeMB) > 1.0 ? 'Browser Viewer Recommended' : 'React-PDF Should Work'
-      }
-    });
-
-  } catch (error: any) {
-    console.error('Invoice size test failed:', error);
-    res.status(500).json({ error: `Failed to test invoice: ${error.message}` });
-  }
-});
-
-/**
- * Test specific invoice PDF generation with size reporting
- */
-router.get('/test-invoice-size/:invoiceId', async (req: AuthRequest, res: Response) => {
-  try {
-    const invoiceRepo = AppDataSource.getRepository(Invoice);
-    const invoice = await invoiceRepo.findOne({ where: { id: req.params.invoiceId } });
-
-    if (!invoice) {
-      return res.status(404).json({ error: 'Invoice not found' });
-    }
-
-    console.log('Testing PDF size for:', {
-      id: invoice.id,
-      invoiceNumber: invoice.invoice_number,
-      amount: invoice.amount
-    });
-
-    const pdfBuffer = await InvoicePDFService.generateInvoicePDF(invoice);
-
-    if (!pdfBuffer) {
-      return res.status(500).json({ error: 'Failed to generate PDF' });
-    }
-
-    const sizeKB = pdfBuffer.length / 1024;
-    const sizeMB = (pdfBuffer.length / (1024 * 1024)).toFixed(2);
-
-    console.log('PDF Size Analysis:', {
-      invoiceId: invoice.id,
-      invoiceNumber: invoice.invoice_number,
-      amount: invoice.amount,
-      sizeBytes: pdfBuffer.length,
-      sizeKB: sizeKB.toFixed(2),
-      sizeMB: sizeMB,
-      recommendedViewer: parseFloat(sizeMB) > 1.0 ? 'Browser Viewer Recommended' : 'React-PDF Should Work'
-    });
-
-    res.json({
-      success: true,
-      analysis: {
-        invoiceId: invoice.id,
-        invoiceNumber: invoice.invoice_number,
-        amount: invoice.amount,
-        sizeBytes: pdfBuffer.length,
-        sizeKB: sizeKB.toFixed(2),
-        sizeMB: sizeMB,
-        recommendedViewer: parseFloat(sizeMB) > 1.0 ? 'Browser Viewer Recommended' : 'React-PDF Should Work'
-      }
-    });
-
-  } catch (error: any) {
-    console.error('Invoice size test failed:', error);
-    res.status(500).json({ error: `Failed to test invoice: ${error.message}` });
-  }
-});
-
-/**
- * Test specific invoice PDF generation with size reporting
- */
-router.get('/test-invoice-size/:invoiceId', async (req: AuthRequest, res: Response) => {
-  try {
-    const invoiceRepo = AppDataSource.getRepository(Invoice);
-    const invoice = await invoiceRepo.findOne({ where: { id: req.params.invoiceId } });
-
-    if (!invoice) {
-      return res.status(404).json({ error: 'Invoice not found' });
-    }
-
-    console.log('Testing PDF size for:', {
       id: invoice.id,
       invoiceNumber: invoice.invoice_number,
       amount: invoice.amount

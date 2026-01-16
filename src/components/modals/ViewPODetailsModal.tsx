@@ -30,26 +30,32 @@ export const ViewPODetailsModal: React.FC<ViewPODetailsModalProps> = ({ isOpen, 
         {/* Body */}
         <div className="p-6 space-y-4">
           {/* Project Info */}
-          {(po.project_code || po.projectCode) && (
+          {po.projectCode && (
             <div className="bg-primary-50 p-4 rounded-lg">
               <h3 className="text-sm font-medium text-gray-700 mb-2">Project</h3>
               <p className="text-lg font-semibold text-primary-600">
-                {po.project_code || po.projectCode} - {po.project?.title || 'No project'}
+                {po.projectCode} - {po.project?.title || 'No project'}
               </p>
             </div>
           )}
 
           {/* Client & Amount */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <div>
               <label className="text-sm font-medium text-gray-700">Client</label>
-              <p className="text-base text-gray-900 mt-1">{po.client_name || po.clientName || po.vendor}</p>
+              <p className="text-base text-gray-900 mt-1">{po.clientName || po.vendor}</p>
             </div>
             <div>
               <label className="text-sm font-medium text-gray-700">Amount</label>
               <p className="text-base font-semibold text-gray-900 mt-1">
                 {po.currency} {po.amount?.toLocaleString() || '0.00'}
               </p>
+              {po.currency !== 'MYR' && (
+                <p className="text-sm text-green-600 mt-1">
+                  ≈ RM {po.amount_myr?.toLocaleString() || '0.00'} 
+                  (Rate: {po.exchange_rate?.toFixed(6) || 'N/A'})
+                </p>
+              )}
             </div>
           </div>
 

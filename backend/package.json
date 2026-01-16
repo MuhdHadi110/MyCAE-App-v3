@@ -11,7 +11,10 @@
     "seed:admin": "ts-node src/scripts/seed-admin.ts",
     "seed:data": "ts-node src/scripts/seed-data.ts",
     "clear:projects": "ts-node src/scripts/clear-projects.ts",
-    "migrate:projects": "ts-node src/scripts/migrate-old-projects.ts"
+    "migrate:projects": "ts-node src/scripts/migrate-old-projects.ts",
+    "check:users": "ts-node src/scripts/check-database-users.ts",
+    "backup": "ts-node scripts/backup-database.ts",
+    "restore": "ts-node scripts/restore-database.ts"
   },
   "dependencies": {
     "@types/multer": "^2.0.0",
@@ -28,11 +31,12 @@
     "multer": "^2.0.2",
     "mysql2": "^3.6.5",
     "node-cron": "^4.2.1",
-    "nodemailer": "^6.9.7",
+    "nodemailer": "^7.0.12",
     "pdfkit": "^0.17.2",
     "reflect-metadata": "^0.1.13",
     "typeorm": "^0.3.17",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "winston": "^3.19.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

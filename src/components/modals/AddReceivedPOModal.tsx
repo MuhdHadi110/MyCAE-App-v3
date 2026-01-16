@@ -24,12 +24,16 @@ export const AddReceivedPOModal: React.FC<AddReceivedPOModalProps> = ({ isOpen, 
     receivedDate: new Date().toISOString().split('T')[0],
     dueDate: '',
     description: '',
+    plannedHours: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [exchangeRate, setExchangeRate] = useState<number>(1.0);
   const [convertedAmount, setConvertedAmount] = useState<number>(0);
+  const [selectedProject, setSelectedProject] = useState<any>(null);
+  const [useCustomRate, setUseCustomRate] = useState(false);
+  const [customRateValue, setCustomRateValue] = useState('');
   const { projects, fetchProjects } = useProjectStore();
-  const { clients, fetchClients} = useClientStore();
+  const { clients, fetchClients } = useClientStore();
 
   useEffect(() => {
     if (isOpen) {
@@ -41,44 +45,62 @@ export const AddReceivedPOModal: React.FC<AddReceivedPOModalProps> = ({ isOpen, 
   // Fetch exchange rate when currency or amount changes
   useEffect(() => {
     const fetchRate = async () => {
-      if (formData.currency !== 'MYR' && formData.amount) {
-        try {
-          const result = await financeService.convertCurrency(
-            parseFloat(formData.amount),
-            formData.currency
-          );
-          setExchangeRate(result.rate);
-          setConvertedAmount(result.amountMYR);
-        } catch (error) {
-          logger.error('Failed to fetch exchange rate:', error);
+      if (formData.currency === 'MYR') {
+        setExchangeRate(1.0);
+        setConvertedAmount(parseFloat(formData.amount) || 0);
+        return;
+      }
+
+      if (useCustomRate && customRateValue) {
+        // Use custom rate
+        const rate = parseFloat(customRateValue);
+        setExchangeRate(rate);
+        setConvertedAmount(parseFloat(formData.amount) * rate);
+      } else if (!useCustomRate) {
+        // Auto-fetch rate
+        if (formData.currency !== 'MYR' && formData.amount) {
+          try {
+            const result = await financeService.convertCurrency(
+              parseFloat(formData.amount),
+              formData.currency
+            );
+            setExchangeRate(result.rate);
+            setConvertedAmount(result.amountMYR);
+          } catch (error) {
+            logger.error('Failed to fetch exchange rate:', error);
+            setExchangeRate(1.0);
+            setConvertedAmount(parseFloat(formData.amount) || 0);
+          }
+        } else {
           setExchangeRate(1.0);
           setConvertedAmount(parseFloat(formData.amount) || 0);
         }
-      } else {
-        setExchangeRate(1.0);
-        setConvertedAmount(parseFloat(formData.amount) || 0);
       }
     };
     fetchRate();
-  }, [formData.currency, formData.amount]);
+  }, [formData.currency, formData.amount, useCustomRate, customRateValue]);
 
   // Auto-populate client when project is selected
   useEffect(() => {
     if (formData.projectId && projects.length > 0 && clients.length > 0) {
-      const selectedProject = projects.find(p => p.id === formData.projectId);
-      if (selectedProject && selectedProject.clientId) {
-        // Find the matching client
-        const matchingClient = clients.find(c => c.id === selectedProject.clientId);
+      const project = projects.find(p => p.id === formData.projectId);
+      setSelectedProject(project);
+
+      if (project && project.clientId) {
+        // Find matching client
+        const matchingClient = clients.find(c => c.id === project.clientId);
 
         // Only auto-populate if client isn't already set or is different
-        if (matchingClient && formData.clientId !== selectedProject.clientId) {
+        if (matchingClient && formData.clientId !== project.clientId) {
           setFormData(prev => ({
             ...prev,
-            clientId: selectedProject.clientId,
+            clientId: project.clientId,
             clientName: matchingClient.name || ''
           }));
         }
       }
+    } else {
+      setSelectedProject(null);
     }
   }, [formData.projectId, projects, clients]);
 
@@ -104,6 +126,8 @@ export const AddReceivedPOModal: React.FC<AddReceivedPOModalProps> = ({ isOpen, 
         receivedDate: formData.receivedDate,
         dueDate: formData.dueDate || undefined,
         description: formData.description || undefined,
+        plannedHours: formData.plannedHours ? parseFloat(formData.plannedHours) : undefined,
+        customExchangeRate: useCustomRate ? parseFloat(customRateValue) : undefined,
       });
 
       logger.debug('PO created successfully:', response);
@@ -135,7 +159,9 @@ export const AddReceivedPOModal: React.FC<AddReceivedPOModalProps> = ({ isOpen, 
         receivedDate: new Date().toISOString().split('T')[0],
         dueDate: '',
         description: '',
+        plannedHours: '',
       });
+      setSelectedProject(null);
     } catch (error: any) {
       logger.error('Failed to create PO:', error);
       const errorMessage = error?.response?.data?.error || 'Failed to create purchase order';
@@ -154,7 +180,7 @@ export const AddReceivedPOModal: React.FC<AddReceivedPOModalProps> = ({ isOpen, 
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white">
           <h2 className="text-2xl font-bold text-gray-900">Add Received PO</h2>
@@ -201,7 +227,7 @@ export const AddReceivedPOModal: React.FC<AddReceivedPOModalProps> = ({ isOpen, 
                 placeholder="Auto-filled from project"
               />
               <p className="text-xs text-gray-500 mt-1">
-                Client is automatically selected based on the project
+                Client is automatically selected based on project
               </p>
             </div>
 
@@ -215,7 +241,7 @@ export const AddReceivedPOModal: React.FC<AddReceivedPOModalProps> = ({ isOpen, 
                 name="projectId"
                 value={formData.projectId}
                 onChange={(e) => {
-                  const selectedProject = projects.find(p => p.id === e.target.value);
+                  const project = projects.find(p => p.id === e.target.value);
 
                   if (e.target.value === '') {
                     // If clearing project, also clear client
@@ -230,7 +256,7 @@ export const AddReceivedPOModal: React.FC<AddReceivedPOModalProps> = ({ isOpen, 
                     setFormData({
                       ...formData,
                       projectId: e.target.value,
-                      projectCode: selectedProject?.projectCode || ''
+                      projectCode: project?.projectCode || ''
                       // Client will be auto-populated by useEffect
                     });
                   }
@@ -269,13 +295,42 @@ export const AddReceivedPOModal: React.FC<AddReceivedPOModalProps> = ({ isOpen, 
                   value={formData.currency}
                   onChange={(currency) => setFormData({ ...formData, currency })}
                 />
-              </div>
-              {formData.currency !== 'MYR' && formData.amount && (
-                <p className="text-xs text-gray-600 mt-1">
-                  ≈ RM {convertedAmount.toFixed(2)} (Rate: {exchangeRate.toFixed(6)})
-                </p>
-              )}
-            </div>
+                </div>
+               {formData.currency !== 'MYR' && formData.amount && (
+                 <div className="mt-2 space-y-2">
+                   <label className="flex items-center gap-2">
+                     <input
+                       type="checkbox"
+                       checked={useCustomRate}
+                       onChange={(e) => setUseCustomRate(e.target.checked)}
+                       className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                     />
+                     <span className="text-sm font-medium text-gray-700">Use custom exchange rate</span>
+                   </label>
+
+                   {useCustomRate && (
+                     <div className="flex items-center gap-2">
+                       <input
+                         type="number"
+                         step="0.000001"
+                         min="0"
+                         value={customRateValue}
+                         onChange={(e) => setCustomRateValue(e.target.value)}
+                         placeholder="e.g., 3.45"
+                         className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                       />
+                       <span className="text-sm text-gray-600">→ RM {convertedAmount.toFixed(2)}</span>
+                     </div>
+                   )}
+
+                   {!useCustomRate && (
+                     <p className="text-xs text-gray-600">
+                       Using system rate: {exchangeRate.toFixed(6)} → RM {convertedAmount.toFixed(2)}
+                     </p>
+                   )}
+                 </div>
+               )}
+             </div>
 
             {/* Received Date */}
             <div>
@@ -307,6 +362,36 @@ export const AddReceivedPOModal: React.FC<AddReceivedPOModalProps> = ({ isOpen, 
             </div>
           </div>
 
+          {/* Update Planned Hours (Optional) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Update Project Planned Hours
+              <span className="text-xs text-gray-500 font-normal">(Optional)</span>
+            </label>
+            {selectedProject && selectedProject.plannedHours && (
+              <p className="text-xs text-blue-600 mb-2">
+                Current: {selectedProject.plannedHours} hrs
+              </p>
+            )}
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                name="plannedHours"
+                value={formData.plannedHours}
+                onChange={handleChange}
+                min="0"
+                step="1"
+                placeholder="Enter new planned hours (optional)"
+                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+              {formData.plannedHours && (
+                <p className="text-xs text-gray-500">
+                  Will overwrite current value
+                </p>
+              )}
+            </div>
+          </div>
+
           {/* Description */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -317,7 +402,7 @@ export const AddReceivedPOModal: React.FC<AddReceivedPOModalProps> = ({ isOpen, 
               value={formData.description}
               onChange={handleChange}
               rows={3}
-              placeholder="Brief description of the PO items/services..."
+              placeholder="Brief description of PO items/services..."
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
             />
           </div>

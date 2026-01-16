@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, Edit2 } from 'lucide-react';
+import { Eye, Edit2, Trash2 } from 'lucide-react';
 import { getStatusBadge, formatDate } from '../../lib/financeUtils';
 import { toast } from 'react-hot-toast';
 
@@ -8,12 +8,15 @@ interface InvoicesTabProps {
   searchQuery: string;
   onViewPDF: (invoiceId: string, invoiceNumber: string) => void;
   onEditInvoice?: (invoice: any) => void;
+  onDeleteInvoice?: (invoice: any) => void;
   canUpload?: boolean;
+  canDelete?: boolean;
   canApprove?: boolean;
   onSubmitForApproval?: (invoiceId: string) => void;
   onApprove?: (invoiceId: string) => void;
   onWithdraw?: (invoiceId: string) => void;
   onMarkAsSent?: (invoiceId: string) => void;
+  onMarkAsPaid?: (invoiceId: string) => void;
   currentUserId?: string;
 }
 
@@ -22,12 +25,15 @@ export const InvoicesTab: React.FC<InvoicesTabProps> = ({
   searchQuery,
   onViewPDF,
   onEditInvoice,
+  onDeleteInvoice,
   canUpload = false,
+  canDelete = false,
   canApprove = false,
   onSubmitForApproval,
   onApprove,
   onWithdraw,
   onMarkAsSent,
+  onMarkAsPaid,
   currentUserId,
 }) => {
   const filteredInvoices = invoices.filter((inv) => {
@@ -128,6 +134,17 @@ export const InvoicesTab: React.FC<InvoicesTabProps> = ({
                 </button>
               )}
 
+              {/* Delete - Senior Engineer and above */}
+              {canDelete && onDeleteInvoice && (
+                <button
+                  onClick={() => onDeleteInvoice(inv)}
+                  className="px-3 py-1.5 bg-red-100 text-red-700 text-sm rounded-lg hover:bg-red-200 flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </button>
+              )}
+
               {/* Submit for Approval - Draft only */}
               {inv.status === 'draft' && canUpload && onSubmitForApproval && (
                 <button
@@ -169,12 +186,11 @@ export const InvoicesTab: React.FC<InvoicesTabProps> = ({
                 </button>
               )}
 
-              {/* Mark as Paid - Sent only (placeholder) */}
-              {inv.status === 'sent' && (
+              {/* Mark as Paid - Sent only */}
+              {inv.status === 'sent' && onMarkAsPaid && canApprove && (
                 <button
-                  onClick={() => toast.success('Marked as Paid - Coming Soon')}
+                  onClick={() => onMarkAsPaid(inv.id)}
                   className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
-                  disabled
                 >
                   Mark as Paid
                 </button>

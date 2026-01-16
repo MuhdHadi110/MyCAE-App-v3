@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { Plus, Calendar, Clock, Download, Upload, Edit2, Trash2, Briefcase, FlaskConical, User, Search } from 'lucide-react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { Plus, Calendar, Clock, Download, Edit2, Trash2, Briefcase, FlaskConical, User, FileSpreadsheet, FileText, ChevronDown, Filter, X, ChevronUp, ChevronsUpDown } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { useProjectStore } from '../store/projectStore';
 import { useTeamStore } from '../store/teamStore';
 import { useResearchStore } from '../store/researchStore';
@@ -29,6 +30,16 @@ export const TimesheetsScreen: React.FC = () => {
     entryId?: string;
     entryType?: 'project' | 'research';
   }>({ isOpen: false });
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [projectSortColumn, setProjectSortColumn] = useState<string>('date');
+  const [projectSortDirection, setProjectSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [researchSortColumn, setResearchSortColumn] = useState<string>('date');
+  const [researchSortDirection, setResearchSortDirection] = useState<'asc' | 'desc'>('desc');
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  // Count active filters
+  const activeFilterCount = [selectedEngineer, startDate, endDate, selectedMonth].filter(Boolean).length;
 
   // Build filters and fetch timesheets
   const applyFilters = useCallback(() => {
@@ -64,21 +75,102 @@ export const TimesheetsScreen: React.FC = () => {
     applyFilters();
   }, [selectedEngineer, startDate, endDate]);
 
+  // Close export menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // Filter project timesheets by month
-  const filteredTimesheets = (Array.isArray(timesheets) ? timesheets : []).filter((ts) => {
-    if (!selectedMonth) return true;
-    const tsDate = new Date(ts.date);
-    const tsMonth = `${tsDate.getFullYear()}-${String(tsDate.getMonth() + 1).padStart(2, '0')}`;
-    return tsMonth === selectedMonth;
-  });
+  const filteredTimesheets = useMemo(() => {
+    return (Array.isArray(timesheets) ? timesheets : []).filter((ts) => {
+      if (!selectedMonth) return true;
+      const tsDate = new Date(ts.date);
+      const tsMonth = `${tsDate.getFullYear()}-${String(tsDate.getMonth() + 1).padStart(2, '0')}`;
+      return tsMonth === selectedMonth;
+    }).sort((a, b) => {
+      const getSortValue = (entry: Timesheet) => {
+        switch (projectSortColumn) {
+          case 'date':
+            return new Date(entry.date).getTime();
+          case 'engineer':
+            return (entry.engineerName || '').toLowerCase();
+          case 'projectCode':
+            return ((entry as any).projectCode || '').toLowerCase();
+          case 'projectName':
+            const project = projects.find(p => p.id === entry.projectId);
+            return (project?.title || (entry as any).projectTitle || '').toLowerCase();
+          case 'category':
+            return getWorkCategoryLabel(entry.workCategory).toLowerCase();
+          case 'hours':
+            return entry.hours || 0;
+          default:
+            return new Date(entry.date).getTime();
+        }
+      };
+
+      const aValue = getSortValue(a);
+      const bValue = getSortValue(b);
+
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return projectSortDirection === 'asc'
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      } else {
+        return projectSortDirection === 'asc'
+          ? aValue - bValue
+          : bValue - aValue;
+      }
+    });
+  }, [timesheets, selectedMonth, projects, projectSortColumn, projectSortDirection]);
 
   // Filter research timesheets by month
-  const filteredResearchTimesheets = (Array.isArray(researchTimesheets) ? researchTimesheets : []).filter((ts) => {
-    if (!selectedMonth) return true;
-    const tsDate = new Date(ts.date);
-    const tsMonth = `${tsDate.getFullYear()}-${String(tsDate.getMonth() + 1).padStart(2, '0')}`;
-    return tsMonth === selectedMonth;
-  });
+  const filteredResearchTimesheets = useMemo(() => {
+    return (Array.isArray(researchTimesheets) ? researchTimesheets : []).filter((ts) => {
+      if (!selectedMonth) return true;
+      const tsDate = new Date(ts.date);
+      const tsMonth = `${tsDate.getFullYear()}-${String(tsDate.getMonth() + 1).padStart(2, '0')}`;
+      return tsMonth === selectedMonth;
+    }).sort((a, b) => {
+      const getSortValue = (entry: any) => {
+        switch (researchSortColumn) {
+          case 'date':
+            return new Date(entry.date).getTime();
+          case 'researcher':
+            return (entry.teamMemberName || entry.researcherName || '').toLowerCase();
+          case 'project':
+            return (entry.projectTitle || entry.researchProjectTitle || '').toLowerCase();
+          case 'category':
+            return (entry.researchCategory || '').toLowerCase();
+          case 'hours':
+            return entry.hoursLogged || entry.hours || 0;
+          case 'status':
+            const statusOrder = { 'completed': 0, 'in-progress': 1, 'planning': 2, 'on-hold': 3, 'archived': 4 };
+            return statusOrder[entry.status] ?? 5;
+          default:
+            return new Date(entry.date).getTime();
+        }
+      };
+
+      const aValue = getSortValue(a);
+      const bValue = getSortValue(b);
+
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return researchSortDirection === 'asc'
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      } else {
+        return researchSortDirection === 'asc'
+          ? aValue - bValue
+          : bValue - aValue;
+      }
+    });
+  }, [researchTimesheets, selectedMonth, researchSortColumn, researchSortDirection]);
 
   // Calculate stats based on active tab
   const projectTotalHours = filteredTimesheets.reduce((sum, ts) => sum + parseFloat(ts.hours as any || 0), 0);
@@ -94,7 +186,7 @@ export const TimesheetsScreen: React.FC = () => {
       case 'engineering':
         return 'Engineering';
       case 'project-management':
-        return 'Project Management (E.g.: Business/Site Discussion, Proposal Preparation or Quotations)';
+        return 'Project Management';
       case 'measurement-site':
         return 'Measurement (Site)';
       case 'measurement-office':
@@ -102,6 +194,44 @@ export const TimesheetsScreen: React.FC = () => {
       default:
         return category;
     }
+  };
+
+  // Sort handlers for projects tab
+  const handleProjectSort = useCallback((column: string) => {
+    if (projectSortColumn === column) {
+      setProjectSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setProjectSortColumn(column);
+      setProjectSortDirection('asc');
+    }
+  }, [projectSortColumn]);
+
+  const getProjectSortIcon = (column: string) => {
+    if (projectSortColumn !== column) {
+      return <ChevronsUpDown className="w-4 h-4 ml-1 inline-block" />;
+    }
+    return projectSortDirection === 'asc'
+      ? <ChevronUp className="w-4 h-4 ml-1 inline-block" />
+      : <ChevronDown className="w-4 h-4 ml-1 inline-block" />;
+  };
+
+  // Sort handlers for research tab
+  const handleResearchSort = useCallback((column: string) => {
+    if (researchSortColumn === column) {
+      setResearchSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setResearchSortColumn(column);
+      setResearchSortDirection('asc');
+    }
+  }, [researchSortColumn]);
+
+  const getResearchSortIcon = (column: string) => {
+    if (researchSortColumn !== column) {
+      return <ChevronsUpDown className="w-4 h-4 ml-1 inline-block" />;
+    }
+    return researchSortDirection === 'asc'
+      ? <ChevronUp className="w-4 h-4 ml-1 inline-block" />
+      : <ChevronDown className="w-4 h-4 ml-1 inline-block" />;
   };
 
   const handleAddEntry = () => {
@@ -165,12 +295,123 @@ export const TimesheetsScreen: React.FC = () => {
     });
   };
 
-  const handleExport = () => {
-    toast.success('Export to Excel - Coming Soon');
+  // Generate filename based on active filters
+  const getExportFilename = (extension: string) => {
+    let suffix = 'all';
+    if (selectedMonth) {
+      suffix = selectedMonth;
+    } else if (startDate && endDate) {
+      suffix = `${startDate}-to-${endDate}`;
+    } else if (startDate) {
+      suffix = `from-${startDate}`;
+    } else if (endDate) {
+      suffix = `until-${endDate}`;
+    }
+    const type = activeTab === 'projects' ? 'project' : 'research';
+    return `timesheets-${type}-${suffix}.${extension}`;
   };
 
-  const handleImport = () => {
-    toast.success('Import from Excel - Coming Soon');
+  // Prepare export data from filtered timesheets
+  const prepareExportData = () => {
+    if (activeTab === 'projects') {
+      return filteredTimesheets.map((entry) => {
+        const project = projects.find((p) => p.id === entry.projectId);
+        const formattedDate = new Date(entry.date).toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric'
+        });
+        return {
+          'Date': formattedDate,
+          'Engineer Name': entry.engineerName || 'Unassigned',
+          'Project Code': (entry as any).projectCode || 'N/A',
+          'Project Name': project?.title || (entry as any).projectTitle || 'N/A',
+          'Type': 'Project',
+          'Work Category': getWorkCategoryLabel(entry.workCategory),
+          'Hours': entry.hours,
+          'Description': entry.description || ''
+        };
+      });
+    } else {
+      return filteredResearchTimesheets.map((entry: any) => {
+        const formattedDate = new Date(entry.date).toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric'
+        });
+        const hours = entry.hoursLogged || entry.hours || 0;
+        return {
+          'Date': formattedDate,
+          'Researcher': entry.teamMemberName || entry.researcherName || 'Unknown',
+          'Research Project': entry.projectTitle || entry.researchProjectTitle || 'N/A',
+          'Type': 'Research',
+          'Category': entry.researchCategory || '-',
+          'Hours': hours,
+          'Status': entry.status?.replace('-', ' ') || 'N/A',
+          'Description': entry.description || ''
+        };
+      });
+    }
+  };
+
+  // Export to Excel
+  const handleExportExcel = () => {
+    const data = prepareExportData();
+    if (data.length === 0) {
+      toast.error('No data to export');
+      setShowExportMenu(false);
+      return;
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Timesheets');
+
+    // Auto-size columns
+    const colWidths = Object.keys(data[0]).map(key => ({
+      wch: Math.max(key.length, ...data.map(row => String((row as any)[key] || '').length))
+    }));
+    worksheet['!cols'] = colWidths;
+
+    XLSX.writeFile(workbook, getExportFilename('xlsx'));
+    toast.success(`Exported ${data.length} entries to Excel`);
+    setShowExportMenu(false);
+  };
+
+  // Export to CSV
+  const handleExportCSV = () => {
+    const data = prepareExportData();
+    if (data.length === 0) {
+      toast.error('No data to export');
+      setShowExportMenu(false);
+      return;
+    }
+
+    const headers = Object.keys(data[0]);
+    const csvContent = [
+      headers.join(','),
+      ...data.map(row =>
+        headers.map(header => {
+          const value = (row as any)[header];
+          // Escape quotes and wrap in quotes if contains comma or newline
+          const stringValue = String(value || '');
+          if (stringValue.includes(',') || stringValue.includes('\n') || stringValue.includes('"')) {
+            return `"${stringValue.replace(/"/g, '""')}"`;
+          }
+          return stringValue;
+        }).join(',')
+      )
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = getExportFilename('csv');
+    link.click();
+    URL.revokeObjectURL(link.href);
+
+    toast.success(`Exported ${data.length} entries to CSV`);
+    setShowExportMenu(false);
   };
 
   // Format time from date string
@@ -184,51 +425,82 @@ export const TimesheetsScreen: React.FC = () => {
 
   return (
     <div className="min-h-full bg-gray-50">
-      <div className="p-4 md:p-6 space-y-6">
-        {/* Header Container */}
+      <div className="p-4 md:p-6 space-y-4">
+        {/* Header Container - Standardized */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Timesheets</h1>
-              <p className="text-sm text-gray-600 mt-1">
-                Track work hours and activities across projects
-              </p>
+              <p className="text-gray-600 mt-1">Track and manage time entries for projects and research</p>
             </div>
             <div className="flex gap-2">
+              {/* Filters Toggle */}
               <button
-                onClick={handleImport}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                onClick={() => setShowFilters(!showFilters)}
+                className={`inline-flex items-center justify-center gap-2 px-3 py-2 border rounded-lg transition-colors ${
+                  showFilters || activeFilterCount > 0
+                    ? 'bg-primary-50 border-primary-300 text-primary-700'
+                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                }`}
               >
-                <Upload className="w-4 h-4" />
-                <span className="hidden sm:inline">Import</span>
+                <Filter className="w-4 h-4" />
+                <span className="hidden sm:inline">Filters</span>
+                {activeFilterCount > 0 && (
+                  <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-medium bg-primary-600 text-white rounded-full">
+                    {activeFilterCount}
+                  </span>
+                )}
               </button>
-              <button
-                onClick={handleExport}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                <span className="hidden sm:inline">Export</span>
-              </button>
+              {/* Export Dropdown */}
+              <div className="relative" ref={exportMenuRef}>
+                <button
+                  onClick={() => setShowExportMenu(!showExportMenu)}
+                  className="inline-flex items-center justify-center gap-2 px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  <span className="hidden sm:inline">Export</span>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />
+                </button>
+                {showExportMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                    <button
+                      onClick={handleExportExcel}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                    >
+                      <FileSpreadsheet className="w-4 h-4 text-green-600" />
+                      Export to Excel
+                    </button>
+                    <button
+                      onClick={handleExportCSV}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                    >
+                      <FileText className="w-4 h-4 text-blue-600" />
+                      Export to CSV
+                    </button>
+                  </div>
+                )}
+              </div>
               <button
                 onClick={handleAddEntry}
                 className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
               >
                 <Plus className="w-4 h-4" />
-                Add Entry
+                <span className="hidden sm:inline">Add Entry</span>
               </button>
             </div>
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
-          <div className="flex gap-4 border-b border-gray-200 dark:border-gray-700 px-6 pt-4">
+        {/* Tab Navigation + Inline Stats */}
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex gap-4">
             <button
               onClick={() => setActiveTab('projects')}
-              className={`pb-3 px-4 font-semibold transition-all flex items-center gap-2 ${
+              className={`pb-2 font-medium transition-all flex items-center gap-2 ${
                 activeTab === 'projects'
-                  ? 'border-b-2 border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                  ? 'border-b-2 border-primary-600 text-primary-600'
+                  : 'text-gray-500 hover:text-gray-900'
               }`}
             >
               <Briefcase className="w-4 h-4" />
@@ -236,160 +508,120 @@ export const TimesheetsScreen: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveTab('research')}
-              className={`pb-3 px-4 font-semibold transition-all flex items-center gap-2 ${
+              className={`pb-2 font-medium transition-all flex items-center gap-2 ${
                 activeTab === 'research'
-                  ? 'border-b-2 border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                  ? 'border-b-2 border-purple-600 text-purple-600'
+                  : 'text-gray-500 hover:text-gray-900'
               }`}
             >
               <FlaskConical className="w-4 h-4" />
               Research
             </button>
           </div>
-        </div>
+          {/* Inline Stats */}
+          <div className="flex items-center gap-4 text-sm">
+            <span className="text-gray-600">
+              <span className="font-semibold text-gray-900">{displayedEntries.length}</span> entries
+            </span>
+            <span className="text-gray-300">•</span>
+            <span className={activeTab === 'projects' ? 'text-primary-600' : 'text-purple-600'}>
+              <span className="font-semibold">{displayedTotalHours.toFixed(1)}</span> hrs
+            </span>
+          </div>
+          </div>
 
-        {/* Filters */}
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex flex-wrap items-center gap-4">
-            {/* Engineer Filter */}
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                <User className="w-4 h-4" />
-                Engineer:
-              </label>
-              <select
-                value={selectedEngineer}
-                onChange={(e) => setSelectedEngineer(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent min-w-[200px]"
-              >
-                <option value="">All Engineers</option>
-                {(Array.isArray(teamMembers) ? teamMembers : []).map((member) => (
-                  <option key={member.userId || member.id} value={member.userId || member.id}>
-                    {member.name}
-                  </option>
-                ))}
-              </select>
+          {/* Collapsible Filters */}
+          {showFilters && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Engineer Filter */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600">Engineer:</label>
+                <select
+                  value={selectedEngineer}
+                  onChange={(e) => setSelectedEngineer(e.target.value)}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                >
+                  <option value="">All</option>
+                  {(Array.isArray(teamMembers) ? teamMembers : []).map((member) => (
+                    <option key={member.userId || member.id} value={member.userId || member.id}>
+                      {member.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Date Range */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600">From:</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600">To:</label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Month Filter */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600">Month:</label>
+                <input
+                  type="month"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Clear Filters */}
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={() => {
+                    setSelectedEngineer('');
+                    setStartDate('');
+                    setEndDate('');
+                    setSelectedMonth('');
+                  }}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                  Clear all
+                </button>
+              )}
             </div>
-
-            {/* Start Date Filter */}
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                From:
-              </label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
             </div>
-
-            {/* End Date Filter */}
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700">
-                To:
-              </label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* Month Filter (for local filtering) */}
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                Month:
-              </label>
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* Clear Filters Button */}
-            {(selectedEngineer || startDate || endDate) && (
-              <button
-                onClick={() => {
-                  setSelectedEngineer('');
-                  setStartDate('');
-                  setEndDate('');
-                }}
-                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                Clear Filters
-              </button>
-            )}
-          </div>
+          )}
         </div>
 
-      {/* Stats - Separate for Projects and Research */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="text-sm font-medium text-gray-600">
-            {activeTab === 'projects' ? 'Project' : 'Research'} Entries
-          </div>
-          <div className="text-3xl font-bold text-gray-900 mt-2">{displayedEntries.length}</div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="text-sm font-medium text-gray-600">
-            {activeTab === 'projects' ? 'Project' : 'Research'} Hours
-          </div>
-          <div className={`text-3xl font-bold mt-2 ${activeTab === 'projects' ? 'text-primary-600' : 'text-purple-600'}`}>
-            {displayedTotalHours.toFixed(1)}
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="text-sm font-medium text-gray-600">Avg Hours/Entry</div>
-          <div className="text-3xl font-bold text-gray-900 mt-2">
-            {displayedAvgHours.toFixed(1)}
-          </div>
-        </div>
-      </div>
-
-      {/* Timesheets Table - Excel Style */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">
-            {activeTab === 'projects' ? 'Project ' : 'Research '}Timesheet Entries ({displayedEntries.length})
-          </h2>
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <Clock className="w-4 h-4" />
-            <span>Total: {displayedTotalHours.toFixed(1)} hours</span>
-          </div>
-        </div>
-
+        {/* Timesheets Table */}
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         {activeTab === 'projects' ? (
           <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Date</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Start time</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">End time</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Email</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Name</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Project Code</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Project Name</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Work Category</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700">Time spent</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700">Actions</th>
+                <th onClick={() => handleProjectSort('date')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Date {getProjectSortIcon('date')}</th>
+                <th onClick={() => handleProjectSort('engineer')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Name {getProjectSortIcon('engineer')}</th>
+                <th onClick={() => handleProjectSort('projectCode')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Project Code {getProjectSortIcon('projectCode')}</th>
+                <th onClick={() => handleProjectSort('projectName')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Project Name {getProjectSortIcon('projectName')}</th>
+                <th onClick={() => handleProjectSort('category')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Work Category {getProjectSortIcon('category')}</th>
+                <th onClick={() => handleProjectSort('hours')} className="px-3 py-2 text-right text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Hours {getProjectSortIcon('hours')}</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-700">Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredTimesheets
-                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                .map((entry) => {
+            <tbody className="bg-white divide-y divide-gray-100">
+              {filteredTimesheets.map((entry) => {
                   const project = projects.find((p) => p.id === entry.projectId);
-
-                  // Calculate end time (start + hours)
-                  const startDate = new Date(entry.date);
-                  const endDate = new Date(startDate.getTime() + entry.hours * 60 * 60 * 1000);
 
                   // Format date for display
                   const formattedDate = new Date(entry.date).toLocaleDateString('en-GB', {
@@ -400,32 +632,24 @@ export const TimesheetsScreen: React.FC = () => {
 
                   return (
                     <tr key={entry.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{formattedDate}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{formatTime(entry.date)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{formatTime(endDate.toISOString())}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{(entry as any).engineerEmail || 'N/A'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900 font-medium">{entry.engineerName || 'Unassigned'}</td>
-                      <td className="px-4 py-3 text-sm font-medium text-primary-600">{(entry as any).projectCode || 'N/A'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{project?.title || 'N/A'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{getWorkCategoryLabel(entry.workCategory)}</td>
-                      <td className="px-4 py-3 text-sm text-right text-primary-600 font-medium">
-                        <span className="inline-flex items-center gap-1">
-                          <Clock className="w-4 h-4" />
-                          {entry.hours} hrs
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right">
-                        <div className="flex gap-2 justify-end">
+                      <td className="px-3 py-2 text-sm text-gray-900">{formattedDate}</td>
+                      <td className="px-3 py-2 text-sm font-medium text-gray-900">{entry.engineerName || 'Unassigned'}</td>
+                      <td className="px-3 py-2 text-sm font-medium text-primary-600">{(entry as any).projectCode || 'N/A'}</td>
+                      <td className="px-3 py-2 text-sm text-gray-700">{project?.title || 'N/A'}</td>
+                      <td className="px-3 py-2 text-sm text-gray-600">{getWorkCategoryLabel(entry.workCategory)}</td>
+                      <td className="px-3 py-2 text-sm text-right font-medium text-primary-600">{entry.hours} hrs</td>
+                      <td className="px-3 py-2 text-sm text-right">
+                        <div className="flex gap-1 justify-end">
                           <button
                             onClick={() => handleEditEntry(entry)}
-                            className="p-2 hover:bg-blue-100 text-blue-600 rounded transition-colors"
+                            className="p-1.5 hover:bg-blue-100 text-blue-600 rounded transition-colors"
                             title="Edit entry"
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDeleteEntry(entry.id)}
-                            className="p-2 hover:bg-red-100 text-red-600 rounded transition-colors"
+                            className="p-1.5 hover:bg-red-100 text-red-600 rounded transition-colors"
                             title="Delete entry"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -437,18 +661,15 @@ export const TimesheetsScreen: React.FC = () => {
                 })}
             </tbody>
             {/* Total Row */}
-            <tfoot className="bg-gray-50 border-t-2 border-gray-300">
+            <tfoot className="bg-gray-50 border-t border-gray-200">
               <tr>
-                <td colSpan={8} className="px-4 py-3 text-right font-bold text-gray-900">
-                  Total Hours:
+                <td colSpan={5} className="px-3 py-2 text-right text-sm font-medium text-gray-700">
+                  Total:
                 </td>
-                <td className="px-4 py-3 text-right">
-                  <span className="inline-flex items-center gap-1 font-bold text-primary-700">
-                    <Clock className="w-4 h-4" />
-                    {projectTotalHours.toFixed(1)} hrs
-                  </span>
+                <td className="px-3 py-2 text-right text-sm font-bold text-primary-700">
+                  {projectTotalHours.toFixed(1)} hrs
                 </td>
-                <td className="px-4 py-3"></td>
+                <td className="px-3 py-2"></td>
               </tr>
             </tfoot>
           </table>
@@ -459,20 +680,19 @@ export const TimesheetsScreen: React.FC = () => {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Date</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Researcher</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Research Project</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Category</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Description</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700">Hours</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700">Status</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700">Actions</th>
+                  <th onClick={() => handleResearchSort('date')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Date {getResearchSortIcon('date')}</th>
+                  <th onClick={() => handleResearchSort('researcher')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Researcher {getResearchSortIcon('researcher')}</th>
+                  <th onClick={() => handleResearchSort('project')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Research Project {getResearchSortIcon('project')}</th>
+                  <th onClick={() => handleResearchSort('category')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Category {getResearchSortIcon('category')}</th>
+                  <th onClick={() => handleResearchSort('hours')} className="px-3 py-2 text-right text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Hours {getResearchSortIcon('hours')}</th>
+                  <th onClick={() => handleResearchSort('status')} className="px-3 py-2 text-center text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Status {getResearchSortIcon('status')}</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold text-gray-700">Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-gray-100">
                 {filteredResearchTimesheets.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-12 text-center">
+                    <td colSpan={7} className="px-3 py-12 text-center">
                       <FlaskConical className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                       <h3 className="text-lg font-medium text-gray-900 mb-2">No research timesheet entries</h3>
                       <p className="text-gray-600">
@@ -482,7 +702,6 @@ export const TimesheetsScreen: React.FC = () => {
                   </tr>
                 ) : (
                   filteredResearchTimesheets
-                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                     .map((entry: any) => {
                       const formattedDate = new Date(entry.date).toLocaleDateString('en-GB', {
                         day: '2-digit',
@@ -493,19 +712,13 @@ export const TimesheetsScreen: React.FC = () => {
 
                       return (
                         <tr key={entry.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900">{formattedDate}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900">{entry.teamMemberName || entry.researcherName || 'Unknown'}</td>
-                          <td className="px-4 py-3 text-sm font-medium text-primary-600">{entry.projectTitle || entry.researchProjectTitle || 'N/A'}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{entry.researchCategory || '-'}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">{entry.description || '-'}</td>
-                          <td className="px-4 py-3 text-sm text-right text-primary-600 font-medium">
-                            <span className="inline-flex items-center gap-1">
-                              <Clock className="w-4 h-4" />
-                              {hours} hrs
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-center">
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium capitalize ${
+                          <td className="px-3 py-2 text-sm text-gray-900">{formattedDate}</td>
+                          <td className="px-3 py-2 text-sm font-medium text-gray-900">{entry.teamMemberName || entry.researcherName || 'Unknown'}</td>
+                          <td className="px-3 py-2 text-sm font-medium text-purple-600">{entry.projectTitle || entry.researchProjectTitle || 'N/A'}</td>
+                          <td className="px-3 py-2 text-sm text-gray-600">{entry.researchCategory || '-'}</td>
+                          <td className="px-3 py-2 text-sm text-right font-medium text-purple-600">{hours} hrs</td>
+                          <td className="px-3 py-2 text-sm text-center">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
                               entry.status === 'completed'
                                 ? 'bg-green-100 text-green-800'
                                 : entry.status === 'in-progress'
@@ -521,11 +734,11 @@ export const TimesheetsScreen: React.FC = () => {
                               {entry.status?.replace('-', ' ') || 'N/A'}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-sm text-right">
-                            <div className="flex gap-2 justify-end">
+                          <td className="px-3 py-2 text-sm text-right">
+                            <div className="flex gap-1 justify-end">
                               <button
                                 onClick={() => _handleDeleteResearchEntry(entry.id)}
-                                className="p-2 hover:bg-red-100 text-red-600 rounded transition-colors"
+                                className="p-1.5 hover:bg-red-100 text-red-600 rounded transition-colors"
                                 title="Delete entry"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -539,18 +752,15 @@ export const TimesheetsScreen: React.FC = () => {
               </tbody>
               {/* Total Row */}
               {filteredResearchTimesheets.length > 0 && (
-                <tfoot className="bg-gray-50 border-t-2 border-gray-300">
+                <tfoot className="bg-gray-50 border-t border-gray-200">
                   <tr>
-                    <td colSpan={5} className="px-4 py-3 text-right font-bold text-gray-900">
-                      Total Hours:
+                    <td colSpan={4} className="px-3 py-2 text-right text-sm font-medium text-gray-700">
+                      Total:
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <span className="inline-flex items-center gap-1 font-bold text-primary-700">
-                        <Clock className="w-4 h-4" />
-                        {researchTotalHours.toFixed(1)} hrs
-                      </span>
+                    <td className="px-3 py-2 text-right text-sm font-bold text-purple-700">
+                      {researchTotalHours.toFixed(1)} hrs
                     </td>
-                    <td colSpan={2} className="px-4 py-3"></td>
+                    <td colSpan={2} className="px-3 py-2"></td>
                   </tr>
                 </tfoot>
               )}

@@ -128,21 +128,21 @@ function calculateProjectSummaries(
   const safeTimesheets = Array.isArray(timesheets) ? timesheets : [];
 
   return projects.map((project) => {
-    // Get POs for this project (by project_code)
+    // Get POs for this project (by projectCode)
     const projectPOs = purchaseOrders.filter(
-      (po) => po.project_code === project.projectCode && po.is_active
+      (po) => po.projectCode === project.projectCode && po.isActive
     );
 
     // Get invoices for this project
     const projectInvoices = invoices.filter(
-      (inv) => inv.project_code === project.projectCode
+      (inv) => inv.projectCode === project.projectCode
     );
 
     // Calculate PO received (MYR)
     const poReceived = projectPOs.reduce((sum, po) => {
-      const effectiveAmount = po.amount_myr_adjusted
-        ? parseFloat(po.amount_myr_adjusted.toString())
-        : parseFloat((po.amount_myr || 0).toString());
+      const effectiveAmount = po.amountMyrAdjusted
+        ? parseFloat(po.amountMyrAdjusted.toString())
+        : parseFloat((po.amountMyr || 0).toString());
       return sum + effectiveAmount;
     }, 0);
 
@@ -150,21 +150,21 @@ function calculateProjectSummaries(
     const poReceivedOriginal: OriginalCurrencyAmount[] = projectPOs.map((po) => ({
       amount: parseFloat(po.amount.toString()),
       currency: po.currency || 'MYR',
-      amountMyr: po.amount_myr_adjusted
-        ? parseFloat(po.amount_myr_adjusted.toString())
-        : parseFloat((po.amount_myr || 0).toString()),
+      amountMyr: po.amountMyrAdjusted
+        ? parseFloat(po.amountMyrAdjusted.toString())
+        : parseFloat((po.amountMyr || 0).toString()),
     }));
 
     // Calculate invoiced (MYR)
     const invoiced = projectInvoices.reduce((sum, inv) => {
-      return sum + parseFloat((inv.amount_myr || 0).toString());
+      return sum + parseFloat((inv.amountMyr || 0).toString());
     }, 0);
 
     // Original currency breakdown for invoices
     const invoicedOriginal: OriginalCurrencyAmount[] = projectInvoices.map((inv) => ({
       amount: parseFloat(inv.amount.toString()),
       currency: inv.currency || 'MYR',
-      amountMyr: parseFloat((inv.amount_myr || 0).toString()),
+      amountMyr: parseFloat((inv.amountMyr || 0).toString()),
     }));
 
     // Calculate outstanding
@@ -247,7 +247,7 @@ function calculateTotals(
   // Group PO amounts by currency (original amounts)
   const poReceivedByCurrency: Record<string, number> = {};
   purchaseOrders
-    .filter((po) => po.is_active)
+    .filter((po) => po.isActive)
     .forEach((po) => {
       const currency = po.currency || 'MYR';
       const amount = parseFloat(po.amount.toString());

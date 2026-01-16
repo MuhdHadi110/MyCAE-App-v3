@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye } from 'lucide-react';
+import { Eye, Trash2 } from 'lucide-react';
 import { getStatusBadge, formatDate } from '../../lib/financeUtils';
 import { toast } from 'react-hot-toast';
 
@@ -7,14 +7,18 @@ interface IssuedPOsTabProps {
   issuedPOs: any[];
   searchQuery: string;
   canApprove: boolean;
+  canDeletePO: boolean;
   onViewPDF: (poId: string, poNumber: string) => void;
+  onDeletePO: (po: any) => void;
 }
 
 export const IssuedPOsTab: React.FC<IssuedPOsTabProps> = ({
   issuedPOs,
   searchQuery,
   canApprove,
+  canDeletePO,
   onViewPDF,
+  onDeletePO,
 }) => {
   const filteredPOs = issuedPOs.filter((po) => {
     const query = searchQuery.toLowerCase();
@@ -54,7 +58,7 @@ export const IssuedPOsTab: React.FC<IssuedPOsTabProps> = ({
                     {statusBadge.label}
                   </span>
                 </div>
-                <p className="text-2xl font-bold text-gray-900">{po.currency} {po.amount.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-gray-900">{po.currency} {(po.amount || 0).toLocaleString()}</p>
               </div>
 
               {/* Project code and title as subheading */}
@@ -90,25 +94,16 @@ export const IssuedPOsTab: React.FC<IssuedPOsTabProps> = ({
                   <Eye className="w-4 h-4" />
                   View PDF
                 </button>
-                {po.status === 'pending' && canApprove && (
-                  <>
-                    <button
-                      onClick={() => toast.success(`PO ${po.poNumber} - Coming Soon`)}
-                      className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
-                      disabled
-                    >
-                      Approve
-                    </button>
-                    <button
-                      onClick={() => toast.error(`PO ${po.poNumber} - Coming Soon`)}
-                      className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
-                      disabled
-                    >
-                      Reject
-                    </button>
-                  </>
+                {canDeletePO && (
+                  <button
+                    onClick={() => onDeletePO(po)}
+                    className="px-3 py-1.5 bg-red-100 text-red-700 text-sm rounded-lg hover:bg-red-200 flex items-center gap-1.5"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete
+                  </button>
                 )}
-              </div>
+                              </div>
             </div>
           </div>
         );

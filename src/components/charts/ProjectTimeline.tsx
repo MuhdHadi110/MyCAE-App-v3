@@ -172,7 +172,14 @@ export const ProjectTimeline: React.FC<ProjectTimelineProps> = ({
                 </div>
 
                 {/* Expand/collapse icon */}
-                <button className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleExpanded(milestone.id);
+                  }}
+                  className={`text-gray-400 hover:text-gray-600 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                  aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
+                >
                   <ChevronRight className="w-5 h-5" />
                 </button>
               </div>

@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from 'react';
-import { Search, Plus, Filter, Package, Upload, QrCode, LogIn, ChevronDown, Box, Edit2, Trash2 } from 'lucide-react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import { Search, Plus, Filter, Package, Upload, QrCode, LogIn, ChevronDown, ChevronUp, Box, Edit2, Trash2, X, ChevronsUpDown } from 'lucide-react';
 import { Badge } from '../components/ui/Badge';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { BulkUploadModal } from '../components/modals/BulkUploadModal';
@@ -25,6 +25,12 @@ export const InventoryScreen: React.FC = () => {
   const currentUser = getCurrentUser();
   const canAdd = currentUser && checkPermission(currentUser.role as any, 'canAddOrRemoveInventory');
   const [searchTerm, setSearchTerm] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [stockFilter, setStockFilter] = useState('');
+  const [sortColumn, setSortColumn] = useState<string>('title');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [showBulkCheckout, setShowBulkCheckout] = useState(false);
   const [showBulkCheckIn, setShowBulkCheckIn] = useState(false);
@@ -40,6 +46,103 @@ export const InventoryScreen: React.FC = () => {
     itemId?: string;
     itemTitle?: string;
   }>({ isOpen: false });
+
+  // Categories for filter dropdown
+  const categories = [
+    'Chassis',
+    'Consumables',
+    'Data Acquisition Module',
+    'Dytran Impact Hammer',
+    'Electronics',
+    'Furniture',
+    'Impulse Force Hammer',
+    'IT Equipment',
+    'Laptop',
+    'Microphone',
+    'Office Supplies',
+    'Safety Equipment',
+    'Sound Level Meter',
+    'Tools & Equipment',
+    'Triaxial Vibration Sensor',
+    'Vibration Sensor',
+    'Other',
+  ];
+
+  // Count active filters
+  const activeFilterCount = [categoryFilter, statusFilter, stockFilter].filter(Boolean).length;
+
+  // Apply local filters to items
+  const displayedItems = useMemo(() => {
+    const filtered = filteredItems.filter(item => {
+      if (categoryFilter && item.category !== categoryFilter) return false;
+      if (statusFilter && item.status !== statusFilter) return false;
+      if (stockFilter === 'low' && item.quantity > item.minimumStock) return false;
+      if (stockFilter === 'out' && item.quantity !== 0) return false;
+      if (stockFilter === 'in' && item.quantity <= item.minimumStock) return false;
+      return true;
+    });
+
+    return [...filtered].sort((a, b) => {
+      const getSortValue = (item: InventoryItem) => {
+        switch (sortColumn) {
+          case 'title':
+            return item.title.toLowerCase();
+          case 'sku':
+            return (item.sku || '').toLowerCase();
+          case 'category':
+            return item.category.toLowerCase();
+          case 'quantity':
+            return item.quantity || 0;
+          case 'price':
+            return item.price || 0;
+          case 'location':
+            return (item.location || '').toLowerCase();
+          case 'status':
+            const statusOrder = { 'active': 0, 'inactive': 1, 'discontinued': 2 };
+            return statusOrder[item.status as keyof typeof statusOrder] ?? 3;
+          default:
+            return item.title.toLowerCase();
+        }
+      };
+
+      const aValue = getSortValue(a);
+      const bValue = getSortValue(b);
+
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return sortDirection === 'asc'
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      } else {
+        return sortDirection === 'asc'
+          ? aValue - bValue
+          : bValue - aValue;
+      }
+    });
+  }, [filteredItems, categoryFilter, statusFilter, stockFilter, sortColumn, sortDirection]);
+
+  const clearFilters = () => {
+    setCategoryFilter('');
+    setStatusFilter('');
+    setStockFilter('');
+  };
+
+  const handleSort = useCallback((column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  }, [sortColumn]);
+
+  const getSortIcon = (column: string) => {
+    if (sortColumn !== column) {
+      return <ChevronsUpDown className="w-4 h-4 ml-1 inline-block" />;
+    }
+    return sortDirection === 'asc'
+      ? <ChevronUp className="w-4 h-4 ml-1 inline-block" />
+      : <ChevronDown className="w-4 h-4 ml-1 inline-block" />;
+  };
 
   useEffect(() => {
     fetchInventory();
@@ -417,7 +520,7 @@ export const InventoryScreen: React.FC = () => {
         </div>
 
         {/* Search and Filters */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Search */}
             <div className="md:col-span-3">
@@ -435,12 +538,89 @@ export const InventoryScreen: React.FC = () => {
 
             {/* Filter Button */}
             <div>
-              <button className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors">
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 border rounded-xl transition-colors ${
+                  activeFilterCount > 0
+                    ? 'border-primary-500 bg-primary-50 text-primary-700'
+                    : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+                }`}
+              >
                 <Filter className="w-5 h-5" />
                 Filters
+                {activeFilterCount > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 text-xs font-medium bg-primary-600 text-white rounded-full">
+                    {activeFilterCount}
+                  </span>
+                )}
+                {showFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </button>
             </div>
           </div>
+
+          {/* Collapsible Filter Panel */}
+          {showFilters && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {/* Category Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                  <select
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                  >
+                    <option value="">All Categories</option>
+                    {categories.map((cat) => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Status Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                    <option value="Discontinued">Discontinued</option>
+                  </select>
+                </div>
+
+                {/* Stock Level Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Stock Level</label>
+                  <select
+                    value={stockFilter}
+                    onChange={(e) => setStockFilter(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                  >
+                    <option value="">All Stock Levels</option>
+                    <option value="in">In Stock</option>
+                    <option value="low">Low Stock</option>
+                    <option value="out">Out of Stock</option>
+                  </select>
+                </div>
+
+                {/* Clear Filters Button */}
+                <div className="flex items-end">
+                  <button
+                    onClick={clearFilters}
+                    disabled={activeFilterCount === 0}
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    <X className="w-4 h-4" />
+                    Clear Filters
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
       {/* Loading State */}
@@ -453,7 +633,7 @@ export const InventoryScreen: React.FC = () => {
       {/* Inventory Items - Mobile Cards */}
       {!loading && isMobile && (
         <div className="space-y-3">
-          {filteredItems.map((item) => (
+          {displayedItems.map((item) => (
             <div key={item.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
               <div className="flex justify-between items-start mb-3">
                 <div className="flex-1">
@@ -512,68 +692,68 @@ export const InventoryScreen: React.FC = () => {
 
       {/* Inventory Items - Desktop Table */}
       {!loading && !isMobile && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-6 py-5 border-b border-gray-100">
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-200">
             <h2 className="text-lg font-semibold text-gray-900">
-              All Items ({filteredItems.length})
+              All Items ({displayedItems.length})
             </h2>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  {canAdd && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>}
+                  <th onClick={() => handleSort('title')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Item {getSortIcon('title')}</th>
+                  <th onClick={() => handleSort('sku')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">SKU {getSortIcon('sku')}</th>
+                  <th onClick={() => handleSort('category')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Category {getSortIcon('category')}</th>
+                  <th onClick={() => handleSort('quantity')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Quantity {getSortIcon('quantity')}</th>
+                  <th onClick={() => handleSort('price')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Price {getSortIcon('price')}</th>
+                  <th onClick={() => handleSort('location')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Location {getSortIcon('location')}</th>
+                  <th onClick={() => handleSort('status')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Status {getSortIcon('status')}</th>
+                  {canAdd && <th className="px-3 py-2 text-right text-xs font-semibold text-gray-700">Actions</th>}
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredItems.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50 cursor-pointer transition-colors">
-                    <td className="px-6 py-4">
+              <tbody className="bg-white divide-y divide-gray-100">
+                {displayedItems.map((item) => (
+                  <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-3 py-2">
                       <div>
                         <p className="font-medium text-gray-900">{item.title}</p>
-                        <p className="text-sm text-gray-500">{item.supplier}</p>
+                        <p className="text-xs text-gray-500">{item.supplier}</p>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{item.sku}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{item.category}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-2 text-gray-900">{item.sku}</td>
+                    <td className="px-3 py-2 text-gray-600">{item.category}</td>
+                    <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-900">{item.quantity}</span>
+                        <span className="text-gray-900">{item.quantity}</span>
                         {getStockStatus(item.quantity, item.minimumStock)}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{formatCurrency(item.price)}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{item.location}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-2 text-gray-900">{formatCurrency(item.price)}</td>
+                    <td className="px-3 py-2 text-gray-600">{item.location}</td>
+                    <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
                         {getStatusBadge(item.status)}
                         {getLastActionBadge(item.lastAction)}
                       </div>
                     </td>
                     {canAdd && (
-                      <td className="px-6 py-4">
-                        <div className="flex gap-2">
+                      <td className="px-3 py-2 text-right">
+                        <div className="flex gap-1 justify-end">
                           <button
                             onClick={() => handleEditItem(item)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
+                            className="p-1.5 hover:bg-blue-100 text-blue-600 rounded transition-colors"
+                            title="Edit item"
                           >
-                            <Edit2 className="w-3.5 h-3.5" />
-                            Edit
+                            <Edit2 className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDeleteItem(item.id)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded transition-colors"
+                            className="p-1.5 hover:bg-red-100 text-red-600 rounded transition-colors"
+                            title="Delete item"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            Delete
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -587,7 +767,7 @@ export const InventoryScreen: React.FC = () => {
       )}
 
       {/* Empty State */}
-      {!loading && filteredItems.length === 0 && (
+      {!loading && displayedItems.length === 0 && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
           <div className="flex flex-col items-center justify-center py-12 text-gray-500">
             <Package className="w-16 h-16 mb-4 opacity-50" />

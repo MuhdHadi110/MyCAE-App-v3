@@ -1,6 +1,6 @@
-import { FileText, Receipt, ShoppingCart } from 'lucide-react';
+import { FileText, Receipt, ShoppingCart, FileInput } from 'lucide-react';
 
-export type FinanceTab = 'received-pos' | 'invoices' | 'issued-pos';
+export type FinanceTab = 'received-pos' | 'invoices' | 'issued-pos' | 'received-invoices';
 
 interface FinanceDocumentTabsProps {
   activeTab: FinanceTab;
@@ -8,6 +8,7 @@ interface FinanceDocumentTabsProps {
   receivedPOCount?: number;
   invoiceCount?: number;
   issuedPOCount?: number;
+  receivedInvoiceCount?: number;
 }
 
 export const FinanceDocumentTabs: React.FC<FinanceDocumentTabsProps> = ({
@@ -16,6 +17,7 @@ export const FinanceDocumentTabs: React.FC<FinanceDocumentTabsProps> = ({
   receivedPOCount = 0,
   invoiceCount = 0,
   issuedPOCount = 0,
+  receivedInvoiceCount = 0,
 }) => {
   const tabs = [
     {
@@ -35,6 +37,12 @@ export const FinanceDocumentTabs: React.FC<FinanceDocumentTabsProps> = ({
       label: 'Issued POs',
       icon: ShoppingCart,
       count: issuedPOCount,
+    },
+    {
+      id: 'received-invoices' as FinanceTab,
+      label: 'Received Invoices',
+      icon: FileInput,
+      count: receivedInvoiceCount,
     },
   ];
 

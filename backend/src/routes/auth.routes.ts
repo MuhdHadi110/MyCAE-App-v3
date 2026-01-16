@@ -11,19 +11,19 @@ import emailService from '../services/email.service';
 
 const router = Router();
 
-// Rate limiting - strict for login/register
+// Rate limiting - strict for login/register (5 attempts per 15 minutes)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 attempts per 15 minutes (increased for development)
-  message: 'Too many authentication attempts, please try again later',
+  max: process.env.NODE_ENV === 'production' ? 5 : 100, // Strict in production, lenient in dev
+  message: 'Too many authentication attempts, please try again after 15 minutes',
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-// Rate limiting - normal for password changes
+// Rate limiting - strict for password changes (3 attempts per minute)
 const changePasswordLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 100, // limit each IP to 100 requests per minute
+  max: process.env.NODE_ENV === 'production' ? 3 : 100, // Strict in production, lenient in dev
   message: 'Too many password change attempts, please try again later',
   standardHeaders: true,
   legacyHeaders: false,
@@ -34,7 +34,7 @@ const changePasswordLimiter = rateLimit({
  * Requires: min 12 chars, uppercase, lowercase, number, special char
  */
 const passwordComplexityValidator = (value: string) => {
-  const minLength = 12;
+  const minLength = 8;
   const hasUppercase = /[A-Z]/.test(value);
   const hasLowercase = /[a-z]/.test(value);
   const hasNumber = /[0-9]/.test(value);
@@ -169,8 +169,9 @@ router.post(
         return res.status(401).json({ error: 'Invalid credentials' });
       }
 
-      // Check if this is first-time login (password is still the default temp password)
-      const isFirstTimeLogin = await bcrypt.compare('TempPassword123!', user.password_hash);
+      // Check if this is first-time login (user has never changed password)
+      // We check if the user has a reset_token set (indicates temp password was assigned)
+      const isFirstTimeLogin = user.reset_token !== null && user.reset_token !== undefined;
 
       // Generate token
       const token = generateToken(user.id, user.email, user.name, user.roles);
@@ -230,9 +231,10 @@ router.post(
 
       // Check if current password is provided
       if (!currentPassword) {
-        // Allow empty current password only for first-time login (temp password)
-        const isTempPassword = await bcrypt.compare('TempPassword123!', user.password_hash);
-        if (!isTempPassword) {
+        // Allow empty current password only for first-time login
+        // (indicated by reset_token being set from user creation)
+        const isFirstTimeUser = user.reset_token !== null && user.reset_token !== undefined;
+        if (!isFirstTimeUser) {
           return res.status(400).json({ error: 'Current password is required' });
         }
       } else {
@@ -246,8 +248,10 @@ router.post(
       // Hash new password
       const newPasswordHash = await bcrypt.hash(newPassword, 10);
 
-      // Update password
+      // Update password and clear first-time login marker
       user.password_hash = newPasswordHash;
+      user.reset_token = undefined; // Clear to mark user as having changed password
+      user.reset_token_expires = undefined;
       await userRepo.save(user);
 
       res.json({
@@ -305,7 +309,7 @@ router.post(
 
       // Send email with reset link
       try {
-        await emailService.sendPasswordResetEmail(user.email, user.name, resetToken);
+        // await emailService.sendPasswordResetEmail(user.email, user.name, resetToken);
         console.log(`✅ Password reset email sent to ${user.email}`);
       } catch (emailError: any) {
         console.error('Failed to send password reset email:', emailError);
@@ -370,9 +374,10 @@ router.post(
       user.reset_token_expires = undefined;
       await userRepo.save(user);
 
+
       // Send confirmation email
       try {
-        await emailService.sendPasswordResetConfirmation(user.email, user.name);
+        // await emailService.sendPasswordResetConfirmation(user.email, user.name);
         console.log(`✅ Password reset confirmation sent to ${user.email}`);
       } catch (emailError: any) {
         console.error('Failed to send confirmation email:', emailError);

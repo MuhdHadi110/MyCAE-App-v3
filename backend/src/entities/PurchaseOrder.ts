@@ -49,6 +49,9 @@ export class PurchaseOrder {
   @Column({ type: 'decimal', precision: 10, scale: 6, nullable: true })
   exchange_rate: number; // Exchange rate used for conversion (snapshot)
 
+  @Column({ type: 'enum', enum: ['auto', 'manual'], nullable: true })
+  exchange_rate_source: 'auto' | 'manual' | null;
+
   @Column({ type: 'datetime' })
   received_date: Date;
 
