@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { IssuedPO } from './IssuedPO';
 import { User } from './User';
+import { Company } from './Company';
 
 export enum ReceivedInvoiceStatus {
   PENDING = 'pending',
@@ -86,4 +87,11 @@ export class ReceivedInvoice {
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'verified_by' })
   verifier: User;
+
+  @Column({ name: 'company_id', type: 'varchar', length: 36, nullable: true })
+  companyId: string;
+
+  @ManyToOne(() => Company, { nullable: true })
+  @JoinColumn({ name: 'company_id' })
+  company: Company;
 }

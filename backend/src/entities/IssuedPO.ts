@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
 import { Project } from './Project';
 import { ReceivedInvoice } from './ReceivedInvoice';
+import { Company } from './Company';
 
 export enum IssuedPOStatus {
   ISSUED = 'issued',
@@ -52,6 +53,13 @@ export class IssuedPO {
 
   @Column({ type: 'varchar', length: 500, nullable: true })
   file_url: string;
+
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  company_id: string;
+
+  @ManyToOne(() => Company, { nullable: true })
+  @JoinColumn({ name: 'company_id' })
+  company: Company;
 
   @CreateDateColumn()
   created_at: Date;

@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { IssuedPO, IssuedPOStatus } from '../entities/IssuedPO';
+import { Company } from '../entities/Company';
 import { User, UserRole } from '../entities/User';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { body, validationResult } from 'express-validator';
@@ -110,12 +111,13 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
  * POST /api/issued-pos
  * Create new issued PO
  */
-router.post(
+ router.post(
   '/',
   [
     body('poNumber').notEmpty().withMessage('PO number is required'),
     body('items').notEmpty().withMessage('Items description is required'),
-    body('recipient').notEmpty().withMessage('Recipient/vendor name is required'),
+    body('recipient').optional().withMessage('Recipient/vendor name is required'),
+    body('companyId').optional().withMessage('Company ID is required'),
     body('amount').isNumeric().withMessage('Amount must be a number'),
     body('issueDate').isISO8601().withMessage('Valid issue date is required'),
   ],
@@ -130,6 +132,7 @@ router.post(
         poNumber,
         items,
         recipient,
+        companyId,
         projectCode,
         amount,
         issueDate,
@@ -139,6 +142,7 @@ router.post(
       } = req.body;
 
       const issuedPORepo = AppDataSource.getRepository(IssuedPO);
+      const companyRepo = AppDataSource.getRepository(Company);
 
       // Check if PO number already exists
       const existingPO = await issuedPORepo.findOne({ where: { po_number: poNumber } });
@@ -146,11 +150,22 @@ router.post(
         return res.status(400).json({ error: 'Issued PO with this number already exists' });
       }
 
+      // If companyId is provided, fetch company and get its name for recipient field
+      let recipientName = recipient;
+      if (companyId) {
+        const company = await companyRepo.findOne({ where: { id: companyId } });
+        if (!company) {
+          return res.status(400).json({ error: 'Company not found' });
+        }
+        recipientName = company.name;
+      }
+
       // Create the issued PO
       const po = issuedPORepo.create({
         po_number: poNumber,
         items,
-        recipient,
+        recipient: recipientName,
+        company_id: companyId || null,
         project_code: projectCode || null,
         amount: parseFloat(amount),
         issue_date: new Date(issueDate),
@@ -189,6 +204,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
       poNumber,
       items,
       recipient,
+      companyId,
       projectCode,
       amount,
       issueDate,
@@ -197,10 +213,21 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
       fileUrl,
     } = req.body;
 
+    // If companyId is provided, fetch company and get its name for recipient field
+    let recipientName = recipient;
+    if (companyId) {
+      const company = await companyRepo.findOne({ where: { id: companyId } });
+      if (!company) {
+        return res.status(400).json({ error: 'Company not found' });
+      }
+      recipientName = company.name;
+    }
+
     // Update fields if provided
     if (poNumber !== undefined) po.po_number = poNumber;
     if (items !== undefined) po.items = items;
     if (recipient !== undefined) po.recipient = recipient;
+    if (companyId !== undefined) po.company_id = companyId || null;
     if (projectCode !== undefined) po.project_code = projectCode || null;
     if (amount !== undefined) po.amount = parseFloat(amount);
     if (issueDate !== undefined) po.issue_date = new Date(issueDate);

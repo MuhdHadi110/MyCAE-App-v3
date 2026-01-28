@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { Project } from './Project';
 import { User } from './User';
+import { Company } from './Company';
 
 export enum InvoiceStatus {
   DRAFT = 'draft',
@@ -67,6 +68,13 @@ export class Invoice {
 
   @Column({ type: 'varchar', length: 36, nullable: true })
   approved_by: string;
+
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  company_id: string;
+
+  @ManyToOne(() => Company, { nullable: true })
+  @JoinColumn({ name: 'company_id' })
+  company: Company;
 
   @Column({ type: 'datetime', nullable: true })
   approved_at: Date;

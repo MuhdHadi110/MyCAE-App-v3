@@ -11,6 +11,7 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import { Project } from './Project';
 import { User } from './User';
+import { Company } from './Company';
 
 export enum POStatus {
   RECEIVED = 'received',
@@ -119,6 +120,13 @@ export class PurchaseOrder {
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'adjusted_by' })
   adjustedByUser?: User;
+
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  company_id: string;
+
+  @ManyToOne(() => Company, { nullable: true })
+  @JoinColumn({ name: 'company_id' })
+  company: Company;
 
   @CreateDateColumn()
   created_at: Date;
