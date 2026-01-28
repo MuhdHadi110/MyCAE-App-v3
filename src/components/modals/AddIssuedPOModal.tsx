@@ -13,7 +13,7 @@ interface AddIssuedPOModalProps {
 
 export const AddIssuedPOModal: React.FC<AddIssuedPOModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const { projects, fetchProjects } = useProjectStore();
-  const { clients, fetchClients } = useClientStore();
+  const { companies, fetchCompanies } = useClientStore();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +49,7 @@ export const AddIssuedPOModal: React.FC<AddIssuedPOModalProps> = ({ isOpen, onCl
       const issuedPOData = {
         poNumber: formData.poNumber,
         recipient: formData.vendorName,
+        companyId: formData.vendorId,
         items: formData.description,
         amount: parseFloat(formData.amount),
         currency: 'MYR',
@@ -127,26 +128,26 @@ export const AddIssuedPOModal: React.FC<AddIssuedPOModalProps> = ({ isOpen, onCl
             </div>
 
             {/* Vendor Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Vendor Name <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="vendorId"
-                value={formData.vendorId}
-                onChange={(e) => {
-                  const selectedVendor = clients.find(c => c.id === e.target.value);
-                  setFormData({
-                    ...formData,
-                    vendorId: e.target.value,
-                    vendorName: selectedVendor?.name || ''
-                  });
-                }}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Vendor Name <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="companyId"
+                  value={formData.vendorId}
+                  onChange={(e) => {
+                    const selectedVendor = companies.find(c => c.id === e.target.value);
+                    setFormData({
+                      ...formData,
+                      vendorId: e.target.value,
+                      vendorName: selectedVendor?.name || ''
+                    });
+                  }}
                 required
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               >
                 <option value="">Select a vendor</option>
-                {clients.map((client) => (
+                {companies.map((client) => (
                   <option key={client.id} value={client.id}>
                     {client.name}
                   </option>
