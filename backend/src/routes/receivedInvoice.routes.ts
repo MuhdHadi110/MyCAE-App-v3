@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { ReceivedInvoice, ReceivedInvoiceStatus } from '../entities/ReceivedInvoice';
 import { IssuedPO, IssuedPOStatus } from '../entities/IssuedPO';
+import { Company } from '../entities/Company';
 import { UserRole } from '../entities/User';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { body, validationResult } from 'express-validator';
@@ -86,6 +87,7 @@ router.post(
   [
     body('invoiceNumber').notEmpty().withMessage('Invoice number is required'),
     body('issuedPoId').notEmpty().withMessage('Issued PO ID is required'),
+    body('companyId').optional().withMessage('Company ID is required'),
     body('amount').isNumeric().withMessage('Amount must be a number'),
     body('invoiceDate').isISO8601().withMessage('Valid invoice date is required'),
     body('receivedDate').isISO8601().withMessage('Valid received date is required'),
@@ -100,10 +102,8 @@ router.post(
       const {
         invoiceNumber,
         issuedPoId,
+        companyId,
         amount,
-        currency = 'MYR',
-        amountMyr,
-        exchangeRate,
         invoiceDate,
         receivedDate,
         dueDate,
@@ -113,6 +113,7 @@ router.post(
 
       const receivedInvoiceRepo = AppDataSource.getRepository(ReceivedInvoice);
       const issuedPORepo = AppDataSource.getRepository(IssuedPO);
+      const companyRepo = AppDataSource.getRepository(Company);
 
       // Verify the Issued PO exists
       const issuedPO = await issuedPORepo.findOne({ where: { id: issuedPoId } });
