@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FileText, AlertCircle, ToggleLeft, ToggleRight, Calendar } from 'lucide-react';
 import { getPermissionMessage } from '../lib/permissions';
 import { useNavigate } from 'react-router-dom';
@@ -42,6 +42,27 @@ export const FinanceOverviewScreen: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [selectedMonth, setSelectedMonth] = useState<number>(0); // 0 = All months
 
+  // Refetch data when screen becomes visible (e.g., when navigating back from Finance Documents)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refetch();
+      }
+    };
+
+    const handleFocus = () => {
+      refetch();
+    };
+
+    // Listen for visibility changes and window focus
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [refetch]);
 
   // Access check
   if (!canAccess) {

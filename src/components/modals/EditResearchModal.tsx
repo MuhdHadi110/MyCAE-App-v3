@@ -20,7 +20,7 @@ export const EditResearchModal: React.FC<EditResearchModalProps> = ({ isOpen, on
     status: project.status,
     plannedEndDate: project.plannedEndDate || '',
     leadResearcherId: project.leadResearcherId,
-    leadResearcherName: project.leadResearcher?.name || '',
+    leadResearcherName: project.leadResearcherName || '',
     budget: project.budget || 0,
     plannedHours: project.plannedHours || 0,
     researchCode: project.researchCode || '',
@@ -37,7 +37,7 @@ export const EditResearchModal: React.FC<EditResearchModalProps> = ({ isOpen, on
         status: project.status,
         plannedEndDate: project.plannedEndDate || '',
         leadResearcherId: project.leadResearcherId,
-        leadResearcherName: project.leadResearcher?.name || '',
+        leadResearcherName: project.leadResearcherName || '',
         budget: project.budget || 0,
         plannedHours: project.plannedHours || 0,
         researchCode: project.researchCode || '',
@@ -193,7 +193,7 @@ export const EditResearchModal: React.FC<EditResearchModalProps> = ({ isOpen, on
             >
               <option value="">Select a team member</option>
               {teamMembers.map((member) => (
-                <option key={member.id} value={member.id}>
+                <option key={member.id} value={member.userId || member.id}>
                   {member.name}
                 </option>
               ))}

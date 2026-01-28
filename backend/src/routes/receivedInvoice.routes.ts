@@ -23,7 +23,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     let query = receivedInvoiceRepo
       .createQueryBuilder('ri')
       .leftJoinAndSelect('ri.issuedPO', 'issuedPO')
-      .orderBy('ri.received_date', 'DESC');
+      .orderBy('ri.receivedDate', 'DESC');
 
     if (status) {
       query = query.andWhere('ri.status = :status', { status });

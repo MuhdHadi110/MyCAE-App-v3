@@ -54,7 +54,7 @@ export function useFormValidation<T extends z.ZodSchema>({
     (name: string, value: unknown): string | undefined => {
       // Create a partial schema for just this field
       try {
-        const partialData = { ...values, [name]: value };
+        const partialData = { ...(values as object), [name]: value };
         const result = schema.safeParse(partialData);
 
         if (result.success) {
@@ -66,7 +66,7 @@ export function useFormValidation<T extends z.ZodSchema>({
           return undefined;
         }
 
-        const fieldError = result.error.errors.find(
+        const fieldError = result.error.issues.find(
           (err) => err.path.join('.') === name
         );
 
@@ -91,7 +91,7 @@ export function useFormValidation<T extends z.ZodSchema>({
   // Set a single field value
   const setValue = useCallback(
     (name: keyof FormData, value: FormData[keyof FormData]) => {
-      setValues((prev) => ({ ...prev, [name]: value }));
+      setValues((prev) => ({ ...(prev as object), [name]: value }) as FormData);
       setFieldStates((prev) => ({
         ...prev,
         [name as string]: { ...prev[name as string], dirty: true },
@@ -106,7 +106,7 @@ export function useFormValidation<T extends z.ZodSchema>({
 
   // Set multiple field values at once
   const setFieldValues = useCallback((newValues: Partial<FormData>) => {
-    setValues((prev) => ({ ...prev, ...newValues }));
+    setValues((prev) => ({ ...(prev as object), ...(newValues as object) }) as FormData);
     const newFieldStates: Record<string, FieldState> = {};
     for (const key of Object.keys(newValues)) {
       newFieldStates[key] = { touched: true, dirty: true };
@@ -141,7 +141,7 @@ export function useFormValidation<T extends z.ZodSchema>({
 
       // Mark all fields as touched
       const allTouched: Record<string, FieldState> = {};
-      for (const key of Object.keys(values)) {
+      for (const key of Object.keys(values as object)) {
         allTouched[key] = { touched: true, dirty: fieldStates[key]?.dirty ?? false };
       }
       setFieldStates(allTouched);

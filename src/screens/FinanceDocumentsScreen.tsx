@@ -45,7 +45,7 @@ export const FinanceDocumentsScreen = () => {
   const [activeTab, setActiveTab] = useState<FinanceTab>('received-pos');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [selectedDocument, setSelectedDocument] = useState<string | null>(null);
+  const [selectedDocument, setSelectedDocument] = useState<{ type: string; id: string } | string | null>(null);
   const [showAddReceivedPOModal, setShowAddReceivedPOModal] = useState(false);
   const [showAddInvoiceModal, setShowAddInvoiceModal] = useState(false);
   const [showEditInvoiceModal, setShowEditInvoiceModal] = useState(false);
@@ -160,10 +160,52 @@ export const FinanceDocumentsScreen = () => {
     }
   };
 
-  const handleFileUpload = (_documentId: string, files: FileAttachment[]) => {
-    toast.success(`${files.length} file(s) uploaded successfully!`);
-    setShowUploadModal(false);
-    setSelectedDocument(null);
+  const handleFileUpload = async (documentId: string, files: FileAttachment[]) => {
+    if (files.length === 0) return;
+
+    const file = files[0];
+    const formData = new FormData();
+    formData.append('file', file.file);
+
+    try {
+      toast.loading('Uploading document...');
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        toast.error('Authentication required');
+        return;
+      }
+
+      // Determine endpoint based on selected document type
+      const documentType = (selectedDocument as any)?.type || 'invoice';
+      const endpoint = documentType === 'invoice'
+        ? `/api/invoices/${documentId}/upload`
+        : `/api/issued-pos/${documentId}/upload`;
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Upload failed');
+      }
+
+      toast.dismiss();
+      toast.success('Document uploaded successfully!');
+      setShowUploadModal(false);
+      setSelectedDocument(null);
+
+      // Refresh data
+      loadData();
+    } catch (error: any) {
+      toast.dismiss();
+      logger.error('Error uploading document:', error);
+      toast.error(error.message || 'Failed to upload document');
+    }
   };
 
   const handleFileRemove = (_documentId: string, _fileId: string) => {
@@ -212,6 +254,11 @@ export const FinanceDocumentsScreen = () => {
     }
   };
 
+  const handleUploadInvoiceDocument = (invoice: any) => {
+    setSelectedDocument({ type: 'invoice', id: invoice.id });
+    setShowUploadModal(true);
+  };
+
   const handleEditInvoice = (invoice: any) => {
     setSelectedInvoice(invoice);
     setShowEditInvoiceModal(true);
@@ -252,6 +299,11 @@ export const FinanceDocumentsScreen = () => {
       logger.error('Error deleting invoice:', error);
       toast.error(error.message || 'Failed to delete invoice');
     }
+  };
+
+  const handleUploadIssuedPODocument = (po: any) => {
+    setSelectedDocument({ type: 'issued-po', id: po.id });
+    setShowUploadModal(true);
   };
 
   const handleViewIssuedPOPDF = async (poId: string) => {
@@ -529,6 +581,7 @@ export const FinanceDocumentsScreen = () => {
                 invoices={invoices}
                 searchQuery={searchQuery}
                 onViewPDF={handleViewInvoicePDF}
+                onUploadDocument={handleUploadInvoiceDocument}
                 onEditInvoice={handleEditInvoice}
                 onDeleteInvoice={handleDeleteInvoice}
                 canUpload={canUpload}
@@ -548,7 +601,9 @@ export const FinanceDocumentsScreen = () => {
                 searchQuery={searchQuery}
                 canApprove={canApprove}
                 canDeletePO={canDeletePO || false}
+                canUpload={canUpload}
                 onViewPDF={handleViewIssuedPOPDF}
+                onUploadDocument={handleUploadIssuedPODocument}
                 onDeletePO={handleDeletePO}
               />
             )}
@@ -579,8 +634,8 @@ export const FinanceDocumentsScreen = () => {
               <div className="p-6">
                 <FileUploadZone
                   attachments={[]}
-                  onFilesAdded={(files) => handleFileUpload(selectedDocument, files)}
-                  onFileRemoved={(fileId) => handleFileRemove(selectedDocument, fileId)}
+                  onFilesAdded={(files) => handleFileUpload((selectedDocument as any).id, files)}
+                  onFileRemoved={(fileId) => handleFileRemove((selectedDocument as any).id, fileId)}
                 />
               </div>
               <div className="p-6 border-t border-gray-200 flex justify-end gap-3">

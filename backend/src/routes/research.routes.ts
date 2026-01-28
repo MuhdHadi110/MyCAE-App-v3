@@ -219,7 +219,20 @@ router.post('/projects', async (req: AuthRequest, res: Response) => {
 
     await projectRepo.save(project);
 
-    res.status(201).json(project);
+    // Fetch the created project with leadResearcher joined
+    const createdProject = await projectRepo
+      .createQueryBuilder('project')
+      .leftJoinAndSelect('project.leadResearcher', 'leadResearcher')
+      .where('project.id = :id', { id: project.id })
+      .getOne();
+
+    // Transform to include lead researcher name
+    const transformedProject = {
+      ...createdProject,
+      leadResearcherName: createdProject?.leadResearcher?.name || null,
+    };
+
+    res.status(201).json(transformedProject);
   } catch (error) {
     console.error('Error creating research project:', error);
     res.status(500).json({ error: 'Failed to create research project' });

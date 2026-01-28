@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { MapPin, Package, User, Search, Building2, TrendingUp, Box, Clock, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
@@ -127,9 +127,11 @@ export const EquipmentLocationDashboardScreen: React.FC = () => {
           ? aValue.localeCompare(bValue)
           : bValue.localeCompare(aValue);
       } else {
+        const aNum = typeof aValue === 'number' ? aValue : 0;
+        const bNum = typeof bValue === 'number' ? bValue : 0;
         return sortDirection === 'asc'
-          ? aValue - bValue
-          : bValue - aValue;
+          ? aNum - bNum
+          : bNum - aNum;
       }
     });
   }, [locationSummaries, searchTerm, sortColumn, sortDirection]);

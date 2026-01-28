@@ -260,9 +260,12 @@ export function DataTable<T>({
 
   const toggleRowSelection = useCallback(
     (rowId: string) => {
-      setSelectedRows((prev) => (prev.includes(rowId) ? prev.filter((id) => id !== rowId) : [...prev, rowId]));
+      const newSelectedRows = selectedRows.includes(rowId)
+        ? selectedRows.filter((id) => id !== rowId)
+        : [...selectedRows, rowId];
+      setSelectedRows(newSelectedRows);
     },
-    [setSelectedRows]
+    [selectedRows, setSelectedRows]
   );
 
   const toggleAllSelection = useCallback(() => {

@@ -138,9 +138,11 @@ export const ResearchScreen: React.FC = () => {
           ? aValue.localeCompare(bValue)
           : bValue.localeCompare(aValue);
       } else {
+        const aNum = typeof aValue === 'number' ? aValue : 0;
+        const bNum = typeof bValue === 'number' ? bValue : 0;
         return sortDirection === 'asc'
-          ? aValue - bValue
-          : bValue - aValue;
+          ? aNum - bNum
+          : bNum - aNum;
       }
     });
   }, [researchProjects, searchTerm, statusFilter, sortColumn, sortDirection]);

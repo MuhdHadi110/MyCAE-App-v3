@@ -4,7 +4,9 @@ import { IssuedPO, IssuedPOStatus } from '../entities/IssuedPO';
 import { User, UserRole } from '../entities/User';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { body, validationResult } from 'express-validator';
-import { IssuedPOPDFService } from '../services/issued-po-pdf.service';
+import { upload, generateFileUrl } from '../utils/fileUpload';
+import path from 'path';
+import fs from 'fs';
 
 const router = Router();
 
@@ -244,30 +246,96 @@ router.delete('/:id',
 });
 
 /**
+ * POST /api/issued-pos/:id/upload
+ * Upload issued PO document file
+ */
+router.post(
+  '/:id/upload',
+  authorize(UserRole.SENIOR_ENGINEER, UserRole.PRINCIPAL_ENGINEER, UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN),
+  upload.single('file'),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const issuedPORepo = AppDataSource.getRepository(IssuedPO);
+
+      // Check if issued PO exists
+      const po = await issuedPORepo.findOne({ where: { id } });
+      if (!po) {
+        return res.status(404).json({ error: 'Issued PO not found' });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+
+      // Generate file URL
+      const fileUrl = generateFileUrl(req.file.filename, req);
+
+      // Update issued PO with file URL
+      await issuedPORepo.update(id, { file_url: fileUrl });
+
+      res.status(200).json({
+        message: 'File uploaded successfully',
+        fileUrl,
+        filename: req.file.filename,
+      });
+    } catch (error: any) {
+      console.error('Error uploading issued PO file:', error);
+      res.status(500).json({ error: error.message || 'Failed to upload file' });
+    }
+  }
+);
+
+/**
  * GET /api/issued-pos/:id/pdf
- * Generate and download issued PO PDF
+ * View uploaded issued PO document
  */
 router.get('/:id/pdf', async (req: AuthRequest, res: Response) => {
   try {
+    console.log('Fetching document for issued PO:', req.params.id);
+
     const issuedPORepo = AppDataSource.getRepository(IssuedPO);
     const po = await issuedPORepo.findOne({ where: { id: req.params.id } });
 
     if (!po) {
+      console.log('Issued PO not found:', req.params.id);
       return res.status(404).json({ error: 'Issued PO not found' });
     }
 
-    // Generate PDF
-    const pdfBuffer = await IssuedPOPDFService.generateIssuedPOPDF(po);
+    // Check if uploaded file exists
+    if (po.file_url) {
+      console.log('Serving uploaded document:', po.file_url);
 
-    // Set headers for PDF download
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="po-${po.po_number}.pdf"`);
-    res.setHeader('Content-Length', pdfBuffer.length);
+      // Extract filename from URL
+      const filename = path.basename(po.file_url);
+      const uploadsDir = path.join(__dirname, '../../uploads');
+      const filePath = path.join(uploadsDir, filename);
 
-    res.send(pdfBuffer);
+      // Check if file exists
+      if (!fs.existsSync(filePath)) {
+        console.error('Uploaded file not found on disk:', filePath);
+        return res.status(404).json({ error: 'Document file not found' });
+      }
+
+      // Set headers and send file
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="po-${po.po_number}.pdf"`);
+
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.pipe(res);
+    } else {
+      // No file uploaded - return error message
+      console.log('No document uploaded for issued PO:', po.po_number);
+      return res.status(404).json({ error: 'No document uploaded for this issued PO' });
+    }
   } catch (error: any) {
-    console.error('Error generating issued PO PDF:', error);
-    res.status(500).json({ error: 'Failed to generate issued PO PDF' });
+    console.error('Error serving issued PO document:', {
+      message: error.message,
+      stack: error.stack,
+      issuedPOId: req.params.id
+    });
+
+    res.status(500).json({ error: `Failed to serve issued PO document: ${error.message}` });
   }
 });
 

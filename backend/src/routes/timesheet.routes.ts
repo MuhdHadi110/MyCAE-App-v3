@@ -2,7 +2,6 @@ import { Router, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { Project } from '../entities/Project';
 import { Timesheet } from '../entities/Timesheet';
-import { UserRole } from '../entities/User';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { body, validationResult } from 'express-validator';
 
@@ -20,7 +19,7 @@ const validatePagination = (limit: unknown, offset: unknown) => ({
 /**
  * GET /api/timesheets
  * Get all timesheets with optional filters
- * Authorization: Managers/Admins see all, others see only timesheets for their assigned projects
+ * Authorization: All engineers, managers, and admins can see all timesheets
  */
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
@@ -32,7 +31,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const userId = req.user?.id;
     const userRoles = req.user?.roles || [];
     const isPrivileged = userRoles.some((r: string) =>
-      ['admin', 'managing_director', 'manager'].includes(r)
+      ['admin', 'managing_director', 'manager', 'principal_engineer', 'senior_engineer', 'engineer'].includes(r)
     );
 
     let query = timesheetRepo.createQueryBuilder('timesheet')
@@ -182,7 +181,7 @@ router.post(
 
 /**
  * PUT /api/timesheets/:id
- * Update timesheet - Only the assigned Project Manager or Lead Engineer can update timesheets for their project
+ * Update timesheet - Only the engineer who created the timesheet can update it
  * Uses transaction to ensure atomicity of timesheet and project hours update
  */
 router.put('/:id', async (req: AuthRequest, res: Response) => {
@@ -208,14 +207,13 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: 'Project not found' });
     }
 
-    // Authorization check: Only Project Manager or Lead Engineer can update timesheets
+    // Authorization check: Only the engineer who created the timesheet can update it
     const userId = req.user?.id;
-    const isProjectManager = project.manager_id === userId;
-    const isLeadEngineer = project.lead_engineer_id === userId;
+    const isOwner = timesheet.engineer_id === userId;
 
-    if (!isProjectManager && !isLeadEngineer) {
+    if (!isOwner) {
       return res.status(403).json({
-        error: 'You do not have permission to update timesheets for this project. Only the assigned Project Manager or Lead Engineer can update timesheets.'
+        error: 'You do not have permission to update this timesheet. Only the engineer who created the timesheet can update it.'
       });
     }
 
@@ -257,7 +255,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 
 /**
  * DELETE /api/timesheets/:id
- * Delete timesheet - Only the assigned Project Manager or Lead Engineer can delete timesheets for their project
+ * Delete timesheet - Only the engineer who created the timesheet can delete it
  * Uses transaction to ensure atomicity of timesheet deletion and project hours update
  */
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
@@ -283,17 +281,13 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: 'Project not found' });
     }
 
-    // Authorization check: Admin, Managing Director, Project Manager or Lead Engineer can delete timesheets
+    // Authorization check: Only the engineer who created the timesheet can delete it
     const userId = req.user?.id;
-    const userRoles = req.user?.roles || [req.user?.role];
-    const isAdmin = userRoles.includes(UserRole.ADMIN);
-    const isManagingDirector = userRoles.includes(UserRole.MANAGING_DIRECTOR);
-    const isProjectManager = project.manager_id === userId;
-    const isLeadEngineer = project.lead_engineer_id === userId;
+    const isOwner = timesheet.engineer_id === userId;
 
-    if (!isAdmin && !isManagingDirector && !isProjectManager && !isLeadEngineer) {
+    if (!isOwner) {
       return res.status(403).json({
-        error: 'You do not have permission to delete timesheets for this project. Only Admin, Managing Director, Project Manager or Lead Engineer can delete timesheets.'
+        error: 'You do not have permission to delete this timesheet. Only the engineer who created the timesheet can delete it.'
       });
     }
 

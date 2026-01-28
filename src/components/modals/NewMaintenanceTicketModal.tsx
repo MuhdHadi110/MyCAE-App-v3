@@ -11,13 +11,6 @@ import {
   inventoryActionDescriptions,
 } from '../../types/scheduledMaintenance.types';
 
-const ticketStatusLabels = {
-  'open': 'Open',
-  'in-progress': 'In Progress',
-  'resolved': 'Resolved',
-  'closed': 'Closed',
-};
-
 interface NewMaintenanceTicketModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -33,8 +26,8 @@ export const NewMaintenanceTicketModal: React.FC<NewMaintenanceTicketModalProps>
     itemId: '',
     itemName: '',
     description: '',
-    status: 'open' as const,
-    priority: 'medium' as const,
+    status: 'open' as 'open' | 'in-progress' | 'resolved' | 'closed',
+    priority: 'medium' as 'low' | 'medium' | 'high' | 'critical',
     category: '',
     assignedTo: '',
     inventoryAction: 'none' as InventoryAction,

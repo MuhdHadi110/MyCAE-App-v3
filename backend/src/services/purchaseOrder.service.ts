@@ -179,11 +179,11 @@ async getAllActivePOs(filters?: {
   const query = this.poRepo
     .createQueryBuilder('po')
     .leftJoinAndSelect('po.project', 'project')
-    .leftJoinAndSelect('project.client', 'client')
+    .leftJoinAndSelect('project.company', 'company')
     .select([
       'po',
       'project',
-      'client',
+      'company',
     ])
     .where('po.is_active = :isActive', { isActive: true })
     .orderBy('po.received_date', 'DESC');
@@ -216,7 +216,7 @@ async getAllActivePOs(filters?: {
   async getById(id: string): Promise<PurchaseOrder | null> {
     return await this.poRepo.findOne({
       where: { id },
-      relations: ['project', 'project.contact', 'project.client'],
+      relations: ['project', 'project.contact', 'project.company'],
     });
   }
 

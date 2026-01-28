@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Plus, Search, Building2, Mail, Phone, Edit, Trash2, Grid3x3, List as ListIcon, Tag, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { useClientStore } from '../store/clientStore';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -173,9 +173,11 @@ export const ClientsScreen: React.FC = () => {
           ? aValue.localeCompare(bValue)
           : bValue.localeCompare(aValue);
       } else {
+        const aNum = typeof aValue === 'number' ? aValue : 0;
+        const bNum = typeof bValue === 'number' ? bValue : 0;
         return sortDirection === 'asc'
-          ? aValue - bValue
-          : bValue - aValue;
+          ? aNum - bNum
+          : bNum - aNum;
       }
     });
   }, [clients, searchTerm, categoryFilter, sortColumn, sortDirection]);

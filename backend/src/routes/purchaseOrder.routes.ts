@@ -32,12 +32,12 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       const poRepo = AppDataSource.getRepository(PurchaseOrder);
       let query = poRepo.createQueryBuilder('po')
         .leftJoinAndSelect('po.project', 'project')
-        .leftJoinAndSelect('project.client', 'client')
+        .leftJoinAndSelect('project.company', 'company')
         .select([
           'po',
           'project.project_code',
           'project.title',
-          'client.name',
+          'company.name',
         ])
         .orderBy('po.received_date', 'DESC');
 

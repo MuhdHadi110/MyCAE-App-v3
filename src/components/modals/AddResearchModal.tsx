@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { X, FlaskConical } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useTeamStore } from '../../store/teamStore';
-import { useResearchStore } from '../../store/researchStore';
 import type { ResearchProject } from '../../types/research.types';
 
 interface AddResearchModalProps {
@@ -13,7 +12,6 @@ interface AddResearchModalProps {
 
 export const AddResearchModal: React.FC<AddResearchModalProps> = ({ isOpen, onClose, onSubmit }) => {
   const { teamMembers } = useTeamStore();
-  const { researchProjects } = useResearchStore();
 
   const [formData, setFormData] = useState({
     researchCode: '',
@@ -135,31 +133,35 @@ export const AddResearchModal: React.FC<AddResearchModalProps> = ({ isOpen, onCl
           {/* Title */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Project Title
+              Project Title <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={formData.title}
               onChange={(e) => handleInputChange('title', e.target.value)}
               placeholder="Enter project title"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 ${
+                errors.title ? 'border-red-300 bg-red-50' : 'border-gray-300'
+              }`}
             />
-            {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
+            {errors.title && <p className="text-red-600 text-sm mt-1 font-medium">{errors.title}</p>}
           </div>
 
           {/* Description */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Description
+              Description <span className="text-red-500">*</span>
             </label>
             <textarea
               value={formData.description}
               onChange={(e) => handleInputChange('description', e.target.value)}
               placeholder="Enter project description"
               rows={3}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-none"
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-none ${
+                errors.description ? 'border-red-300 bg-red-50' : 'border-gray-300'
+              }`}
             />
-            {errors.description && <p className="text-red-500 text-xs mt-1">{errors.description}</p>}
+            {errors.description && <p className="text-red-600 text-sm mt-1 font-medium">{errors.description}</p>}
           </div>
 
           {/* Status */}
@@ -183,35 +185,41 @@ export const AddResearchModal: React.FC<AddResearchModalProps> = ({ isOpen, onCl
           {/* Lead Researcher */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Lead Researcher
+              Lead Researcher <span className="text-red-500">*</span>
             </label>
             <select
               value={formData.leadResearcherId}
               onChange={(e) => handleLeadResearcherChange(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 bg-white"
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 bg-white ${
+                errors.leadResearcherId ? 'border-red-300 bg-red-50' : 'border-gray-300'
+              }`}
             >
               <option value="">Select a team member</option>
               {teamMembers.map((member) => (
-                <option key={member.id} value={member.id}>
+                <option key={member.id} value={member.userId || member.id}>
                   {member.name}
                 </option>
               ))}
             </select>
-            {errors.leadResearcherId && <p className="text-red-500 text-xs mt-1">{errors.leadResearcherId}</p>}
+            {errors.leadResearcherId && (
+              <p className="text-red-600 text-sm mt-1 font-medium">{errors.leadResearcherId}</p>
+            )}
           </div>
 
           {/* Start Date */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Start Date
+              Start Date <span className="text-red-500">*</span>
             </label>
             <input
               type="date"
               value={formData.startDate}
               onChange={(e) => handleInputChange('startDate', e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 ${
+                errors.startDate ? 'border-red-300 bg-red-50' : 'border-gray-300'
+              }`}
             />
-            {errors.startDate && <p className="text-red-500 text-xs mt-1">{errors.startDate}</p>}
+            {errors.startDate && <p className="text-red-600 text-sm mt-1 font-medium">{errors.startDate}</p>}
           </div>
 
           {/* End Date */}

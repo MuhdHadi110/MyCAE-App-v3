@@ -4,6 +4,7 @@ import { toast } from 'react-hot-toast';
 import financeService from '../../services/api.service';
 import { useProjectStore } from '../../store/projectStore';
 import { useClientStore } from '../../store/clientStore';
+import { useCompanyStore } from '../../store/companyStore';
 import { CurrencySelector } from '../ui/CurrencySelector';
 import { logger } from '../../lib/logger';
 
@@ -34,13 +35,15 @@ export const AddReceivedPOModal: React.FC<AddReceivedPOModalProps> = ({ isOpen, 
   const [customRateValue, setCustomRateValue] = useState('');
   const { projects, fetchProjects } = useProjectStore();
   const { clients, fetchClients } = useClientStore();
+  const { companies, fetchCompanies } = useCompanyStore();
 
   useEffect(() => {
     if (isOpen) {
       fetchClients();
       fetchProjects();
+      fetchCompanies();
     }
-  }, [isOpen, fetchClients, fetchProjects]);
+  }, [isOpen, fetchClients, fetchProjects, fetchCompanies]);
 
   // Fetch exchange rate when currency or amount changes
   useEffect(() => {
@@ -80,37 +83,40 @@ export const AddReceivedPOModal: React.FC<AddReceivedPOModalProps> = ({ isOpen, 
     fetchRate();
   }, [formData.currency, formData.amount, useCustomRate, customRateValue]);
 
-  // Auto-populate client when project is selected
+  // Update selected project when projectId changes (for displaying current planned hours)
   useEffect(() => {
-    if (formData.projectId && projects.length > 0 && clients.length > 0) {
+    if (formData.projectId && projects.length > 0) {
       const project = projects.find(p => p.id === formData.projectId);
       setSelectedProject(project);
-
-      if (project && project.clientId) {
-        // Find matching client
-        const matchingClient = clients.find(c => c.id === project.clientId);
-
-        // Only auto-populate if client isn't already set or is different
-        if (matchingClient && formData.clientId !== project.clientId) {
-          setFormData(prev => ({
-            ...prev,
-            clientId: project.clientId,
-            clientName: matchingClient.name || ''
-          }));
-        }
-      }
     } else {
       setSelectedProject(null);
     }
-  }, [formData.projectId, projects, clients]);
+  }, [formData.projectId, projects]);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.poNumber || !formData.clientId || !formData.amount || !formData.receivedDate) {
-      toast.error('Please fill in all required fields');
+    // Debug: Log current form data
+    logger.debug('Form data on submit:', {
+      poNumber: formData.poNumber,
+      projectCode: formData.projectCode,
+      clientName: formData.clientName,
+      amount: formData.amount,
+      receivedDate: formData.receivedDate,
+    });
+
+    if (!formData.poNumber || !formData.amount || !formData.receivedDate || !formData.projectCode || !formData.clientName) {
+      const missingFields = [];
+      if (!formData.poNumber) missingFields.push('PO Number');
+      if (!formData.projectCode) missingFields.push('Project Code');
+      if (!formData.clientName) missingFields.push('Client Name');
+      if (!formData.amount) missingFields.push('Amount');
+      if (!formData.receivedDate) missingFields.push('Received Date');
+
+      logger.error('Missing required fields:', missingFields);
+      toast.error(`Please fill in all required fields. Missing: ${missingFields.join(', ')}`);
       return;
     }
 
@@ -211,23 +217,21 @@ export const AddReceivedPOModal: React.FC<AddReceivedPOModalProps> = ({ isOpen, 
               />
             </div>
 
-            {/* Client Name */}
+            {/* Company Name */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Client Name <span className="text-red-500">*</span>
+                Company Name <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 name="clientName"
                 value={formData.clientName}
-                readOnly
-                disabled
-                required
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed"
-                placeholder="Auto-filled from project"
+                onChange={handleChange}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                placeholder="Auto-filled from project or enter manually"
               />
               <p className="text-xs text-gray-500 mt-1">
-                Client is automatically selected based on project
+                Auto-filled from project or enter manually if needed
               </p>
             </div>
 
@@ -241,7 +245,9 @@ export const AddReceivedPOModal: React.FC<AddReceivedPOModalProps> = ({ isOpen, 
                 name="projectId"
                 value={formData.projectId}
                 onChange={(e) => {
+                  console.log('Project dropdown changed:', e.target.value);
                   const project = projects.find(p => p.id === e.target.value);
+                  console.log('Found project:', project);
 
                   if (e.target.value === '') {
                     // If clearing project, also clear client
@@ -253,22 +259,48 @@ export const AddReceivedPOModal: React.FC<AddReceivedPOModalProps> = ({ isOpen, 
                       clientName: ''
                     });
                   } else {
+                    // Try to find client in multiple places
+                    // 1. Try ClientStore (legacy)
+                    let matchingClient = project?.companyId
+                      ? clients.find(c => c.id === project.companyId)
+                      : null;
+
+                    // 2. Try CompanyStore (newer system)
+                    if (!matchingClient && project?.companyId) {
+                      matchingClient = companies.find(c => c.id === project.companyId);
+                    }
+
+                    console.log('Matching client from stores:', matchingClient);
+                    console.log('Project clientName:', project?.companyName);
+
+                    // Use client name from: 1) matching client/company, 2) project.clientName, 3) 'Unknown Client' as fallback
+                    const clientName = matchingClient?.name || project?.companyName || 'Unknown Client';
+
+                    console.log('Final client name:', clientName);
+
                     setFormData({
                       ...formData,
                       projectId: e.target.value,
-                      projectCode: project?.projectCode || ''
-                      // Client will be auto-populated by useEffect
+                      projectCode: project?.projectCode || '',
+                      clientId: project?.companyId || '',
+                      clientName: clientName
                     });
+
+                    if (clientName && clientName !== 'Unknown Client') {
+                      logger.debug('Auto-populated client:', clientName, 'from', matchingClient ? 'store lookup' : 'project data');
+                    } else {
+                      logger.warn('No client name available for project:', project?.projectCode, '- clientId:', project?.companyId);
+                    }
                   }
                 }}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
               >
                 <option value="">Select a project</option>
                 {projects
-                  .filter(p => p.status === 'pre-lim')
+                  .filter(p => p.status === 'pre-lim' || p.status === 'ongoing')
                   .map((project) => (
                     <option key={project.id} value={project.id}>
-                      {project.projectCode} - {project.title}
+                      {project.projectCode} - {project.title} ({project.status === 'pre-lim' ? 'Pre-lim' : 'Ongoing'})
                     </option>
                   ))}
               </select>

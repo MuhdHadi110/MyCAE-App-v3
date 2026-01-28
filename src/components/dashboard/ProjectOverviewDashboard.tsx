@@ -369,7 +369,7 @@ export const ProjectOverviewDashboard: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {filteredProjects.map((project) => {
-                    const client = clients.find((c) => c.id === project.clientId);
+                    const client = clients.find((c) => c.id === project.companyId);
                     // Display lead engineer's name, fallback to manager's name
                     const engineerName = (project as any).leadEngineer?.name || (project as any).manager?.name || 'Unassigned';
                     const progress = project.plannedHours > 0 ? ((project.actualHours || 0) / project.plannedHours) * 100 : 0;

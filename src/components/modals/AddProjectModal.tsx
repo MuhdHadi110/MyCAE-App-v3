@@ -26,8 +26,8 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
   const [formData, setFormData] = useState({
     projectCode: '',
     title: '',
-    clientId: '', // Keep for backward compatibility
-    contactId: '', // New field for contact selection
+    companyId: '',
+    contactId: '', // For contact selection
     leadEngineerId: '',
     managerId: '',
     plannedHours: '',
@@ -90,8 +90,8 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
     e.preventDefault();
 
     // Validation
-    if (!formData.projectCode || !formData.title || !formData.clientId || !formData.managerId) {
-      toast.error('Please fill in all required fields (Project Code, Title, Client, and Project Manager)');
+    if (!formData.projectCode || !formData.title || !formData.companyId || !formData.managerId) {
+      toast.error('Please fill in all required fields (Project Code, Title, Company, and Project Manager)');
       return;
     }
 
@@ -104,17 +104,20 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
 
     setIsLoading(true);
     try {
+      // Find the selected company to include company name in the payload
+      const selectedCompany = companies.find(c => c.id === formData.companyId);
+
       const projectPayload = {
         ...formData,
         engineerId: formData.leadEngineerId,
         plannedHours: parseFloat(formData.plannedHours) || 0,
         hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
+        companyName: selectedCompany?.name || '', // Include company name so it's stored in the project
       };
       const result = await addProject(projectPayload);
 
       // Create in-app notifications for assigned team members
       const addNotification = useNotificationStore.getState().addNotification;
-      const selectedClient = clients.find(c => c.id === formData.clientId);
 
       // Add notification for project creation
       addNotification({
@@ -155,7 +158,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
       setFormData({
         projectCode: '',
         title: '',
-        clientId: '',
+        companyId: '',
         contactId: '',
         leadEngineerId: '',
         managerId: '',
@@ -287,8 +290,17 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
                   </label>
                   <select
                     id="contact"
-                    value={formData.contactId || formData.clientId}
-                    onChange={(e) => setFormData({ ...formData, contactId: e.target.value, clientId: e.target.value })}
+                    value={formData.contactId}
+                    onChange={(e) => {
+                      const contactId = e.target.value;
+                      // Find the company that has this contact
+                      const company = companies.find(c => c.contacts.some(contact => contact.id === contactId));
+                      setFormData({
+                        ...formData,
+                        contactId: contactId,
+                        companyId: company?.id || ''
+                      });
+                    }}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white grouped-select"
                     disabled={companiesLoading}
                     required

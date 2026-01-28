@@ -11,8 +11,8 @@ export interface Project {
   id: string;
   projectCode: string;
   title: string;
-  clientId: string;
-  clientName?: string;
+  companyId: string;
+  companyName?: string;
   contactId?: string;
   contact?: Contact; // populated with company data
   status: ProjectStatus;

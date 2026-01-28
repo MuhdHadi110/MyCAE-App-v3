@@ -451,7 +451,7 @@ export const EngineerDashboard: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredProjects.map((project) => {
-                    const client = clients.find((c) => c.id === project.clientId);
+                    const client = clients.find((c) => c.id === project.companyId);
                     const progress = project.plannedHours > 0 ? ((project.actualHours || 0) / project.plannedHours) * 100 : 0;
 
                     return (

@@ -7,6 +7,10 @@
     <title>MyCAE Technologies App</title>
   </head>
   <body>
+    <script>
+      var u = localStorage.getItem('currentUser');
+      if (u === 'undefined' || u === 'null') localStorage.removeItem('currentUser');
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

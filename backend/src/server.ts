@@ -139,21 +139,13 @@ const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5, // limit each IP to 5 login attempts per 15 minutes
   message: 'Too many login attempts, please try again later',
-  standardHeaders: true,
-  legacyHeaders: false,
 });
 
 // Rate limiting - normal for API endpoints
 const apiLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
   max: 200, // increased from 100 to 200 requests per minute
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    error: 'Too many requests from this IP, please try again later.',
-    statusCode: 429,
-  },
+  message: 'Too many requests from this IP, please try again later.',
 });
 
 // Serve static files (for uploaded PO files) - no rate limiting

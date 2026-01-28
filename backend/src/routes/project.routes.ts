@@ -3,7 +3,7 @@ import { AppDataSource } from '../config/database';
 import { Project, ProjectStatus } from '../entities/Project';
 import { TeamMember } from '../entities/TeamMember';
 import { User } from '../entities/User';
-import { Client } from '../entities/Client';
+import { Company } from '../entities/Company';
 import { Contact } from '../entities/Contact';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { UserRole } from '../entities/User';
@@ -160,7 +160,7 @@ router.post(
   ),
   [
     body('title').notEmpty().withMessage('Title is required'),
-    body('clientId').notEmpty().withMessage('Client is required'),
+    body('companyId').notEmpty().withMessage('Company is required'),
     body('managerId').notEmpty().withMessage('Project Manager is required'),
   ],
   async (req: AuthRequest, res: Response) => {
@@ -173,17 +173,17 @@ router.post(
       const projectRepo = AppDataSource.getRepository(Project);
       const teamMemberRepo = AppDataSource.getRepository(TeamMember);
 
-      // Check for duplicate project with same title and client
+      // Check for duplicate project with same title and company
       const existingProject = await projectRepo.findOne({
         where: {
           title: req.body.title,
-          client_id: req.body.clientId,
+          company_id: req.body.companyId,
         },
       });
 
       if (existingProject) {
         return res.status(400).json({
-          error: 'A project with this title already exists for this client',
+          error: 'A project with this title already exists for this company',
         });
       }
 
@@ -245,7 +245,7 @@ router.post(
       const project = projectRepo.create({
         project_code: projectCode,
         title: req.body.title,
-        client_id: req.body.clientId,
+        company_id: req.body.companyId,
         contact_id: req.body.contactId || null,
         status: ProjectStatus.PRE_LIM, // Always start with pre-lim status
         planned_hours: req.body.plannedHours || 0,
@@ -262,16 +262,15 @@ router.post(
 
       // Fetch related data for notifications
       const userRepo = AppDataSource.getRepository(User);
-      const clientRepo = AppDataSource.getRepository(Client);
+      const companyRepo = AppDataSource.getRepository(Company);
       const contactRepo = AppDataSource.getRepository(Contact);
 
-      const client = await clientRepo.findOne({ where: { id: req.body.clientId } });
+      const company = await companyRepo.findOne({ where: { id: req.body.companyId } });
 
       const contact = await contactRepo.findOne({
         where: { id: req.body.contactId },
         relations: ['company']
       });
-      const company = contact?.company;
 
       const manager = await userRepo.findOne({ where: { id: managerUserId } });
 
@@ -309,7 +308,7 @@ router.post(
               assignedUserName: leadEngineer.name,
               assignedUserEmail: leadEngineer.email,
               role: 'Lead Engineer',
-              clientName: client?.name,
+              clientName: company?.name,
             }).catch(err => {
               console.error('Failed to trigger n8n webhook:', err.message);
             })
@@ -346,7 +345,7 @@ router.post(
               assignedUserName: manager.name,
               assignedUserEmail: manager.email,
               role: 'Project Manager',
-              clientName: client?.name,
+              clientName: company?.name,
             }).catch(err => {
               console.error('Failed to trigger n8n webhook:', err.message);
             })

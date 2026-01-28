@@ -11,6 +11,9 @@ import { body, validationResult } from 'express-validator';
 import { InvoicePDFService } from '../services/invoice-pdf.service';
 import { ActivityService } from '../services/activity.service';
 import emailService from '../services/email.service';
+import { upload, generateFileUrl } from '../utils/fileUpload';
+import path from 'path';
+import fs from 'fs';
 
 const router = Router();
 
@@ -177,7 +180,6 @@ router.post(
     body('invoice_number').notEmpty().withMessage('Invoice number is required'),
     body('project_code').notEmpty().withMessage('Project code is required'),
     body('project_name').notEmpty().withMessage('Project name is required'),
-    body('client_name').notEmpty().withMessage('Client name is required'),
     body('amount').isNumeric().withMessage('Amount must be a number'),
     body('issue_date').isISO8601().withMessage('Valid issue date is required'),
     body('percentage_of_total').isNumeric().withMessage('Percentage must be a number'),
@@ -193,7 +195,6 @@ router.post(
         invoice_number,
         project_code,
         project_name,
-        client_name,
         amount,
         issue_date,
         due_date,
@@ -248,8 +249,13 @@ router.post(
 
       const savedInvoice = await invoiceRepo.save(invoice);
 
-      // Log invoice creation
-      await ActivityService.logInvoiceCreate(req.user!.id, savedInvoice);
+      // Log invoice creation (wrapped in try-catch to prevent activity logging from breaking invoice creation)
+      try {
+        await ActivityService.logInvoiceCreate(req.user!.id, savedInvoice);
+      } catch (activityError) {
+        console.error('Failed to log invoice creation activity:', activityError);
+        // Continue with invoice creation even if activity logging fails
+      }
 
       // Check if project should be marked as completed (100% invoiced)
       let projectCompleted = false;
@@ -794,13 +800,54 @@ router.post('/:id/mark-as-paid',
 );
 
 /**
+ * POST /api/invoices/:id/upload
+ * Upload invoice document file
+ */
+router.post(
+  '/:id/upload',
+  authorize(UserRole.SENIOR_ENGINEER, UserRole.PRINCIPAL_ENGINEER, UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN),
+  upload.single('file'),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const invoiceRepo = AppDataSource.getRepository(Invoice);
+
+      // Check if invoice exists
+      const invoice = await invoiceRepo.findOne({ where: { id } });
+      if (!invoice) {
+        return res.status(404).json({ error: 'Invoice not found' });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+
+      // Generate file URL
+      const fileUrl = generateFileUrl(req.file.filename, req);
+
+      // Update invoice with file URL
+      await invoiceRepo.update(id, { file_url: fileUrl });
+
+      res.status(200).json({
+        message: 'File uploaded successfully',
+        fileUrl,
+        filename: req.file.filename,
+      });
+    } catch (error: any) {
+      console.error('Error uploading invoice file:', error);
+      res.status(500).json({ error: error.message || 'Failed to upload file' });
+    }
+  }
+);
+
+/**
  * GET /api/invoices/:id/pdf
- * Generate and download invoice PDF
+ * View uploaded invoice document (or generate PDF if no file uploaded)
  */
 router.get('/:id/pdf', async (req: AuthRequest, res: Response) => {
   try {
-    console.log('Starting PDF generation for invoice:', req.params.id);
-    
+    console.log('Fetching document for invoice:', req.params.id);
+
     const invoiceRepo = AppDataSource.getRepository(Invoice);
     const invoice = await invoiceRepo.findOne({ where: { id: req.params.id } });
 
@@ -809,44 +856,40 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: 'Invoice not found' });
     }
 
-    console.log('Invoice found, generating PDF for:', {
-      id: invoice.id,
-      invoiceNumber: invoice.invoice_number,
-      amount: invoice.amount
-    });
+    // Check if uploaded file exists
+    if (invoice.file_url) {
+      console.log('Serving uploaded document:', invoice.file_url);
 
-    // Generate PDF
-    const pdfBuffer = await InvoicePDFService.generateInvoicePDF(invoice);
+      // Extract filename from URL
+      const filename = path.basename(invoice.file_url);
+      const uploadsDir = path.join(__dirname, '../../uploads');
+      const filePath = path.join(uploadsDir, filename);
 
-    if (!pdfBuffer || pdfBuffer.length === 0) {
-      throw new Error('Generated PDF is empty');
+      // Check if file exists
+      if (!fs.existsSync(filePath)) {
+        console.error('Uploaded file not found on disk:', filePath);
+        return res.status(404).json({ error: 'Document file not found' });
+      }
+
+      // Set headers and send file
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="invoice-${invoice.invoice_number}.pdf"`);
+
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.pipe(res);
+    } else {
+      // No file uploaded - return error message
+      console.log('No document uploaded for invoice:', invoice.invoice_number);
+      return res.status(404).json({ error: 'No document uploaded for this invoice' });
     }
-
-    console.log('PDF generated successfully, size:', pdfBuffer.length, 'bytes');
-
-    // Set headers for PDF download
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="invoice-${invoice.invoice_number}.pdf"`);
-    res.setHeader('Content-Length', pdfBuffer.length);
-
-    res.send(pdfBuffer);
   } catch (error: any) {
-    console.error('Error generating invoice PDF:', {
+    console.error('Error serving invoice document:', {
       message: error.message,
       stack: error.stack,
       invoiceId: req.params.id
     });
-    
-    // More specific error messages
-    if (error.message.includes('Database')) {
-      res.status(500).json({ error: 'Database error accessing invoice data' });
-    } else if (error.message.includes('PDF generation failed')) {
-      res.status(500).json({ error: 'PDF generation failed. Please check invoice data.' });
-    } else if (error.message.includes('empty')) {
-      res.status(500).json({ error: 'Generated PDF is empty. Please check invoice content.' });
-    } else {
-      res.status(500).json({ error: `Failed to generate invoice PDF: ${error.message}` });
-    }
+
+    res.status(500).json({ error: `Failed to serve invoice document: ${error.message}` });
   }
 });
 

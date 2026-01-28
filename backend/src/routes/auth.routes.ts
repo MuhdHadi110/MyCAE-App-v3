@@ -16,8 +16,6 @@ const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: process.env.NODE_ENV === 'production' ? 5 : 100, // Strict in production, lenient in dev
   message: 'Too many authentication attempts, please try again after 15 minutes',
-  standardHeaders: true,
-  legacyHeaders: false,
 });
 
 // Rate limiting - strict for password changes (3 attempts per minute)
@@ -25,8 +23,6 @@ const changePasswordLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
   max: process.env.NODE_ENV === 'production' ? 3 : 100, // Strict in production, lenient in dev
   message: 'Too many password change attempts, please try again later',
-  standardHeaders: true,
-  legacyHeaders: false,
 });
 
 /**
@@ -70,6 +66,10 @@ router.post(
     body('email').isEmail().withMessage('Valid email is required'),
     body('password').custom(passwordComplexityValidator),
     body('role').optional().isIn(Object.values(UserRole)),
+    body('captchaToken')
+      .if(() => process.env.NODE_ENV === 'production')
+      .notEmpty()
+      .withMessage('CAPTCHA verification is required'),
   ],
   async (req: Request, res: Response) => {
     try {
@@ -78,7 +78,29 @@ router.post(
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { name, email, password, role, department, position } = req.body;
+      const { name, email, password, role, department, position, captchaToken } = req.body;
+
+      // Verify reCAPTCHA in production
+      if (process.env.NODE_ENV === 'production') {
+        if (!captchaToken) {
+          return res.status(400).json({ error: 'CAPTCHA verification is required.' });
+        }
+
+        const remoteIp = req.ip || req.socket.remoteAddress;
+        const isValidCaptcha = await verifyRecaptcha(captchaToken, remoteIp);
+
+        if (!isValidCaptcha) {
+          return res.status(400).json({ error: 'Invalid CAPTCHA. Please try again.' });
+        }
+      } else if (captchaToken) {
+        // In development, verify only if provided
+        const remoteIp = req.ip || req.socket.remoteAddress;
+        const isValidCaptcha = await verifyRecaptcha(captchaToken, remoteIp);
+
+        if (!isValidCaptcha) {
+          return res.status(400).json({ error: 'Invalid CAPTCHA. Please try again.' });
+        }
+      }
       const userRepo = AppDataSource.getRepository(User);
 
       // Check if user already exists
@@ -134,7 +156,10 @@ router.post(
   [
     body('email').isEmail().withMessage('Valid email is required'),
     body('password').notEmpty().withMessage('Password is required'),
-    body('captchaToken').optional().isString(),
+    body('captchaToken')
+      .if(() => process.env.NODE_ENV === 'production')
+      .notEmpty()
+      .withMessage('CAPTCHA verification is required'),
   ],
   async (req: Request, res: Response) => {
     try {
@@ -145,8 +170,20 @@ router.post(
 
       const { email, password, captchaToken } = req.body;
 
-      // Verify reCAPTCHA if token is provided
-      if (captchaToken) {
+      // Verify reCAPTCHA (required in production)
+      if (process.env.NODE_ENV === 'production') {
+        if (!captchaToken) {
+          return res.status(400).json({ error: 'CAPTCHA verification is required.' });
+        }
+
+        const remoteIp = req.ip || req.socket.remoteAddress;
+        const isValidCaptcha = await verifyRecaptcha(captchaToken, remoteIp);
+
+        if (!isValidCaptcha) {
+          return res.status(400).json({ error: 'Invalid CAPTCHA. Please try again.' });
+        }
+      } else if (captchaToken) {
+        // In development, verify only if provided
         const remoteIp = req.ip || req.socket.remoteAddress;
         const isValidCaptcha = await verifyRecaptcha(captchaToken, remoteIp);
 

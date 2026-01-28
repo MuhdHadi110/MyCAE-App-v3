@@ -21,9 +21,40 @@ export interface CurrentUser {
 export function getCurrentUser(): CurrentUser {
   // First try to read from AuthContext format (newer)
   const storedUserJson = localStorage.getItem('currentUser');
+  
+  // Validate before parsing - check for null, undefined, or "undefined" string
+  if (!storedUserJson || 
+      storedUserJson.trim() === 'undefined' || 
+      storedUserJson.trim() === 'null') {
+    console.warn('Invalid user data in localStorage (null/undefined), using default');
+    return {
+      displayName: 'User',
+      email: 'user@mycae.com.my',
+      userId: '1',
+      id: '1',
+      name: 'User',
+      role: 'engineer',
+    };
+  }
+
   if (storedUserJson) {
     try {
       const user = JSON.parse(storedUserJson);
+      
+      // Validate parsed data is a proper object
+      if (!user || typeof user !== 'object') {
+        console.error('Invalid user object after parsing:', storedUserJson);
+        localStorage.removeItem('currentUser');
+        return {
+          displayName: 'User',
+          email: 'user@mycae.com.my',
+          userId: '1',
+          id: '1',
+          name: 'User',
+          role: 'engineer',
+        };
+      }
+      
       const userId = user.id || user.userId || '1';
       const userName = user.name || user.displayName || 'User';
       return {
@@ -36,8 +67,9 @@ export function getCurrentUser(): CurrentUser {
         roles: user.roles || (user.role ? [user.role] : ['engineer']),
         department: user.department || 'engineering',
       };
-    } catch (e) {
-      // Fall through to old format if JSON parse fails
+    } catch (error) {
+      console.error('Error parsing user from localStorage:', error);
+      localStorage.removeItem('currentUser'); // Clean up corrupted data
     }
   }
 

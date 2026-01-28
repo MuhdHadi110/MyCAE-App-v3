@@ -8,12 +8,28 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(() => {
     const storedUser = localStorage.getItem('currentUser');
-    return storedUser ? JSON.parse(storedUser) : null;
+    // Validate before parsing - check for null, undefined, or invalid strings
+    if (!storedUser || storedUser === 'undefined' || storedUser === 'null') {
+      return null;
+    }
+    try {
+      return JSON.parse(storedUser);
+    } catch {
+      // Clean up corrupted data
+      localStorage.removeItem('currentUser');
+      return null;
+    }
   });
 
   const login = async (email: string, password: string, captchaToken?: string): Promise<User & { isFirstTimeLogin?: boolean }> => {
     try {
       const response = await authService.login(email, password, captchaToken);
+
+      // Add validation before using response data
+      if (!response?.user || !response?.token) {
+        throw new Error('Invalid response from server: user or token missing');
+      }
+
       const { user: loggedInUser, token, isFirstTimeLogin } = response;
 
       // Attach isFirstTimeLogin flag to user object for consumption by caller

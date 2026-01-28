@@ -38,12 +38,23 @@ class AuthService {
       console.log('🟢 AuthService: Login response received', response);
       console.log('🟢 AuthService: Response data', response.data);
 
-      if (response.data.token) {
-        console.log('🟢 AuthService: Token found, setting auth token');
-        httpClient.setAuthToken(response.data.token);
-      } else {
-        console.warn('⚠️ AuthService: No token in response!');
+      // Validate response structure
+      if (!response?.data) {
+        throw new Error('Invalid response from server: expected object');
       }
+
+      if (!response.data.token) {
+        console.warn('⚠️ AuthService: No token in response!');
+        throw new Error('Server did not return authentication token');
+      }
+
+      if (!response.data.user) {
+        console.warn('⚠️ AuthService: No user data in response!');
+        throw new Error('Server did not return user data');
+      }
+
+      console.log('🟢 AuthService: Token found, setting auth token');
+      httpClient.setAuthToken(response.data.token);
 
       return response.data;
     } catch (error) {

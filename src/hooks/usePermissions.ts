@@ -40,6 +40,8 @@ export function usePermissions() {
         canUploadPO: false,
         canApproveInvoices: false,
         canEditInvoices: false,
+        canDeletePO: false,
+        canDeleteInvoices: false,
         canViewManHourCost: false,
         canViewAnalytics: false,
         canManageProjectRates: false,

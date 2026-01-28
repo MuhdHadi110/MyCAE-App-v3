@@ -47,48 +47,34 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
           'dark:focus-visible:ring-offset-gray-900',
 
-          // Variant styles
-          {
-            // Primary
-            'bg-primary-600 text-white shadow-sm': variant === 'primary',
-            'hover:bg-primary-700 hover:shadow-md': variant === 'primary' && !isDisabled,
-            'focus-visible:ring-primary-500': variant === 'primary',
+          // Variant styles - base
+          variant === 'primary' && 'bg-primary-600 text-white shadow-sm focus-visible:ring-primary-500',
+          variant === 'primary' && !isDisabled && 'hover:bg-primary-700 hover:shadow-md',
 
-            // Secondary
-            'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100': variant === 'secondary',
-            'hover:bg-gray-200 dark:hover:bg-gray-600': variant === 'secondary' && !isDisabled,
-            'focus-visible:ring-gray-500': variant === 'secondary',
+          variant === 'secondary' && 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus-visible:ring-gray-500',
+          variant === 'secondary' && !isDisabled && 'hover:bg-gray-200 dark:hover:bg-gray-600',
 
-            // Outline
-            'border-2 border-primary-600 dark:border-primary-400 text-primary-600 dark:text-primary-400 bg-transparent': variant === 'outline',
-            'hover:bg-primary-50 dark:hover:bg-primary-900/20': variant === 'outline' && !isDisabled,
-            'focus-visible:ring-primary-500': variant === 'outline',
+          variant === 'outline' && 'border-2 border-primary-600 dark:border-primary-400 text-primary-600 dark:text-primary-400 bg-transparent focus-visible:ring-primary-500',
+          variant === 'outline' && !isDisabled && 'hover:bg-primary-50 dark:hover:bg-primary-900/20',
 
-            // Ghost
-            'text-gray-700 dark:text-gray-300 bg-transparent': variant === 'ghost',
-            'hover:bg-gray-100 dark:hover:bg-gray-800': variant === 'ghost' && !isDisabled,
-            'focus-visible:ring-gray-500': variant === 'ghost',
+          variant === 'ghost' && 'text-gray-700 dark:text-gray-300 bg-transparent focus-visible:ring-gray-500',
+          variant === 'ghost' && !isDisabled && 'hover:bg-gray-100 dark:hover:bg-gray-800',
 
-            // Danger
-            'bg-red-600 text-white shadow-sm': variant === 'danger',
-            'hover:bg-red-700 hover:shadow-md': variant === 'danger' && !isDisabled,
-            'focus-visible:ring-red-500': variant === 'danger',
+          variant === 'danger' && 'bg-red-600 text-white shadow-sm focus-visible:ring-red-500',
+          variant === 'danger' && !isDisabled && 'hover:bg-red-700 hover:shadow-md',
 
-            // Success
-            'bg-green-600 text-white shadow-sm': variant === 'success',
-            'hover:bg-green-700 hover:shadow-md': variant === 'success' && !isDisabled,
-            'focus-visible:ring-green-500': variant === 'success',
+          variant === 'success' && 'bg-green-600 text-white shadow-sm focus-visible:ring-green-500',
+          variant === 'success' && !isDisabled && 'hover:bg-green-700 hover:shadow-md',
 
-            // Sizes (all maintain 44px minimum for touch targets)
-            'px-2 py-2 text-xs': size === 'xs',
-            'px-3 py-2 text-sm': size === 'sm',
-            'px-4 py-2.5 text-base': size === 'md',
-            'px-6 py-3 text-lg min-h-[52px]': size === 'lg',
-            'px-8 py-4 text-xl min-h-[60px]': size === 'xl',
+          // Sizes (all maintain 44px minimum for touch targets)
+          size === 'xs' && 'px-2 py-2 text-xs',
+          size === 'sm' && 'px-3 py-2 text-sm',
+          size === 'md' && 'px-4 py-2.5 text-base',
+          size === 'lg' && 'px-6 py-3 text-lg min-h-[52px]',
+          size === 'xl' && 'px-8 py-4 text-xl min-h-[60px]',
 
-            // Full width
-            'w-full': fullWidth,
-          },
+          // Full width
+          fullWidth && 'w-full',
           className
         )}
         {...props}

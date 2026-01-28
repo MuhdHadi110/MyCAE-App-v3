@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, DollarSign, FileText, Trash2, Edit2, X, Download, Upload } from 'lucide-react';
+import { Plus, FileText, Trash2, Edit2, X, Download, Upload } from 'lucide-react';
 import { getCurrentUser } from '../lib/auth';
-import { checkPermission, getRoleInfo } from '../lib/permissions';
+import { checkPermission } from '../lib/permissions';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import toast from 'react-hot-toast';
-import { usePurchaseOrderStore, PurchaseOrder } from '../store/purchaseOrderStore';
+import { usePurchaseOrderStore } from '../store/purchaseOrderStore';
 import { useProjectStore } from '../store/projectStore';
 import { useClientStore } from '../store/clientStore';
 import financeService from '../services/api.service';
@@ -16,7 +16,6 @@ export const PurchaseOrdersScreen: React.FC = () => {
   const currentUser = getCurrentUser();
   const canAccess = currentUser && checkPermission((currentUser.role || 'engineer') as any, 'canAccessFinance');
   const canUpload = currentUser && checkPermission((currentUser.role || 'engineer') as any, 'canUploadPO');
-  const roleInfo = getRoleInfo(currentUser.role as any);
 
   const { purchaseOrders, fetchPurchaseOrders, createPurchaseOrder, updatePurchaseOrder, deletePurchaseOrder, loading } = usePurchaseOrderStore();
 
@@ -212,12 +211,12 @@ export const PurchaseOrdersScreen: React.FC = () => {
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <FileText className="w-5 h-5 text-gray-400" />
-                        <span className="font-semibold text-gray-900">{po.po_number}</span>
+                        <span className="font-semibold text-gray-900">{po.poNumber}</span>
                         <span className={`text-xs font-medium px-3 py-1 rounded-full ${getStatusColor(po.status)}`}>
                           {getStatusLabel(po.status)}
                         </span>
                         {/* Document uploaded indicator */}
-                        {po.file_url && (
+                        {po.fileUrl && (
                           <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 bg-green-100 text-green-800 rounded-full">
                             <FileText className="w-3 h-3" />
                             Document
@@ -246,15 +245,15 @@ export const PurchaseOrdersScreen: React.FC = () => {
                       )}
 
                       <div className="flex flex-wrap gap-4 mt-3 text-xs text-gray-500">
-                        <span>Received: {new Date(po.received_date).toLocaleDateString()}</span>
-                        {po.due_date && <span>Due: {new Date(po.due_date).toLocaleDateString()}</span>}
+                        <span>Received: {new Date(po.receivedDate).toLocaleDateString()}</span>
+                        {po.dueDate && <span>Due: {new Date(po.dueDate).toLocaleDateString()}</span>}
                       </div>
 
                       {/* Document download button */}
-                      {po.file_url && (
+                      {po.fileUrl && (
                         <div className="mt-3">
                           <a
-                            href={po.file_url}
+                            href={po.fileUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 hover:underline"
@@ -279,7 +278,7 @@ export const PurchaseOrdersScreen: React.FC = () => {
                             <Edit2 className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => handleDeleteClick(po.id, po.po_number)}
+                            onClick={() => handleDeleteClick(po.id, po.poNumber)}
                             className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
                             title="Delete"
                           >
@@ -352,17 +351,17 @@ const CreateEditPOModal: React.FC<CreateEditPOModalProps> = ({ isOpen, po, onClo
   const { clients, fetchClients } = useClientStore();
 
   const [formData, setFormData] = useState({
-    poNumber: po?.po_number || '',
+    poNumber: po?.poNumber || '',
     projectId: '',
-    projectCode: po?.project_code || '',
+    projectCode: po?.projectCode || '',
     clientId: '',
-    clientName: po?.client_name || '',
+    clientName: po?.clientName || '',
     amount: po?.amount?.toString() || '',
-    receivedDate: po?.received_date || '',
-    dueDate: po?.due_date || '',
+    receivedDate: po?.receivedDate || '',
+    dueDate: po?.dueDate || '',
     description: po?.description || '',
     status: po?.status || 'received',
-    fileUrl: po?.file_url || '',
+    fileUrl: po?.fileUrl || '',
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);

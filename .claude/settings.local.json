@@ -148,7 +148,11 @@
       "Skill(review-ui-ux:*)",
       "Bash(git -C \"c:\\\\Users\\\\User\\\\Documents\\\\MycaeTracker\" log --oneline)",
       "Bash(killall node:*)",
-      "Bash(PORT=3001 npm run dev:*)"
+      "Bash(PORT=3001 npm run dev:*)",
+      "Bash(for file in \"src/components/dashboard/ProjectOverviewDashboard.tsx\" \"src/components/dashboard/TasklyDashboard.tsx\" \"src/components/modals/TeamMemberProjectsModal.tsx\" \"src/components/dashboard/PersonalDashboard.tsx\" \"src/components/dashboard/EngineerDashboard.tsx\")",
+      "Bash(do wc -l \"$file\")",
+      "Bash(echo:*)",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

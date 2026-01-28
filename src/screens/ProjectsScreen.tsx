@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Plus, Search, Filter, Edit, Trash2, Eye, FolderOpen, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { useProjectStore } from '../store/projectStore';
 import { useClientStore } from '../store/clientStore';
+import { useCompanyStore } from '../store/companyStore';
 import { useTeamStore } from '../store/teamStore';
 import { AddProjectModal } from '../components/modals/AddProjectModal';
 import { EditProjectModal } from '../components/modals/EditProjectModal';
@@ -17,6 +18,7 @@ import { usePermissions } from '../hooks/usePermissions';
 export const ProjectsScreen: React.FC = () => {
   const { projects, loading, fetchProjects } = useProjectStore();
   const { clients, fetchClients } = useClientStore();
+  const { companies, fetchCompanies } = useCompanyStore();
   const { teamMembers, fetchTeamMembers } = useTeamStore();
 
   const { canAddProject: canAdd } = usePermissions();
@@ -38,6 +40,7 @@ export const ProjectsScreen: React.FC = () => {
   useEffect(() => {
     fetchProjects();
     fetchClients();
+    fetchCompanies();
     fetchTeamMembers();
   }, []);
 
@@ -177,7 +180,7 @@ export const ProjectsScreen: React.FC = () => {
           case 'title':
             return project.title.toLowerCase();
           case 'client':
-            const client = clients.find((c) => c.id === project.clientId);
+            const client = clients.find((c) => c.id === project.companyId);
             return (client?.name || '').toLowerCase();
           case 'engineer':
             return (
@@ -381,7 +384,7 @@ export const ProjectsScreen: React.FC = () => {
                       onClick={() => handleSort('client')}
                       className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                     >
-                      Client {getSortIcon('client')}
+                      Company {getSortIcon('client')}
                     </th>
                     <th
                       onClick={() => handleSort('engineer')}
@@ -408,12 +411,23 @@ export const ProjectsScreen: React.FC = () => {
                 </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredProjects.map((project) => {
-                const client = clients.find((c) => c.id === project.clientId);
+                // Try to find company in both ClientStore and CompanyStore
+                let company = companies.find((c) => c.id === project.companyId);
+                if (!company && project.companyId) {
+                  company = clients.find((c) => c.id === project.companyId);
+                }
 
                 return (
                   <tr key={project.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-primary-600">
-                      {project.projectCode}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <button
+                        onClick={() => handleViewProject(project.id)}
+                        className="text-primary-600 hover:text-primary-700 hover:underline transition-colors cursor-pointer"
+                        title={`View details for project ${project.projectCode}`}
+                        aria-label={`View details for project ${project.projectCode}`}
+                      >
+                        {project.projectCode}
+                      </button>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
                       <div className="max-w-xs truncate" title={project.title}>
@@ -421,7 +435,7 @@ export const ProjectsScreen: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {client?.name || 'Unknown'}
+                      {company?.name || project.companyName || 'Unknown'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       {project.engineerName ||
@@ -444,9 +458,33 @@ export const ProjectsScreen: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                      <div className="font-medium">{project.actualHours} hrs</div>
-                      <div className="text-xs text-gray-500">
-                        of {project.plannedHours} planned
+                      <div className="flex flex-col items-end gap-1.5">
+                        <div className="font-medium">{project.actualHours || 0} hrs</div>
+                        <div className="text-xs text-gray-500">
+                          of {project.plannedHours} planned
+                        </div>
+
+                        {/* Progress bar */}
+                        <div className="w-full bg-gray-200 rounded-full h-2.5 max-w-[100px] shadow-inner overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-300 ease-in-out shadow-sm ${
+                              (project.actualHours || 0) > project.plannedHours
+                                ? 'bg-gradient-to-r from-red-500 to-red-600'
+                                : 'bg-gradient-to-r from-green-500 to-green-600'
+                            }`}
+                            style={{
+                              width: `${Math.min(
+                                Math.max(
+                                  project.plannedHours > 0
+                                    ? ((project.actualHours || 0) / project.plannedHours) * 100
+                                    : 0,
+                                  2
+                                ),
+                                100
+                              )}%`
+                            }}
+                          />
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-right">

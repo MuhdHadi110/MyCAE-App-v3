@@ -65,7 +65,7 @@ export const TeamMemberProjectsModal: React.FC<TeamMemberProjectsModalProps> = (
     project: any;
     status: 'active' | 'completed' | 'preLim';
   }) => {
-    const client = clients.find((c) => c.id === project.clientId);
+    const client = clients.find((c) => c.id === project.companyId);
     const progress = project.plannedHours > 0 ? (project.actualHours / project.plannedHours) * 100 : 0;
 
     const statusColors: Record<string, { bg: string; text: string }> = {

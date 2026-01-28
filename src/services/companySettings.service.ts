@@ -1,4 +1,4 @@
-import { httpClient } from './http-client';
+import { api } from './http-client';
 
 export interface CompanySettings {
   id: string;
@@ -47,7 +47,7 @@ export const companySettingsService = {
    * Get company settings
    */
   async getSettings(): Promise<CompanySettings> {
-    const response = await httpClient.get<CompanySettings>('/company-settings');
+    const response = await api.get<CompanySettings>('/company-settings');
     return response.data;
   },
 
@@ -55,7 +55,7 @@ export const companySettingsService = {
    * Update company settings
    */
   async updateSettings(data: UpdateCompanySettingsData): Promise<CompanySettings> {
-    const response = await httpClient.put<CompanySettings>('/company-settings', data);
+    const response = await api.put<CompanySettings>('/company-settings', data);
     return response.data;
   },
 
@@ -65,7 +65,7 @@ export const companySettingsService = {
   async uploadLogo(file: File): Promise<{ logoUrl: string }> {
     const formData = new FormData();
     formData.append('logo', file);
-    const response = await httpClient.post<{ logoUrl: string }>('/company-settings/logo', formData, {
+    const response = await api.post<{ logoUrl: string }>('/company-settings/logo', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -77,7 +77,7 @@ export const companySettingsService = {
    * Delete company logo
    */
   async deleteLogo(): Promise<void> {
-    await httpClient.delete('/company-settings/logo');
+    await api.delete('/company-settings/logo');
   },
 };
 

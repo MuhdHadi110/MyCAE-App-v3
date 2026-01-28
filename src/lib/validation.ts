@@ -153,7 +153,7 @@ export function validateForm<T extends z.ZodSchema>(
   }
 
   const errors: Record<string, string> = {};
-  for (const error of result.error.errors) {
+  for (const error of result.error.issues) {
     const path = error.path.join('.');
     if (!errors[path]) {
       errors[path] = error.message;
@@ -172,7 +172,7 @@ export function getFieldError(
 ): string | undefined {
   if (!errors) return undefined;
 
-  const fieldError = errors.errors.find(
+  const fieldError = errors.issues.find(
     (err) => err.path.join('.') === fieldName
   );
 
@@ -185,7 +185,7 @@ export function getFieldError(
 export function flattenErrors(errors: z.ZodError): Record<string, string> {
   const flatErrors: Record<string, string> = {};
 
-  for (const error of errors.errors) {
+  for (const error of errors.issues) {
     const path = error.path.join('.');
     if (!flatErrors[path]) {
       flatErrors[path] = error.message;

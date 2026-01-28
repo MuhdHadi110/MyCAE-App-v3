@@ -161,9 +161,11 @@ export const EquipmentManagementScreen: React.FC = () => {
           ? aValue.localeCompare(bValue)
           : bValue.localeCompare(aValue);
       } else {
+        const aNum = typeof aValue === 'number' ? aValue : 0;
+        const bNum = typeof bValue === 'number' ? bValue : 0;
         return locationSortDirection === 'asc'
-          ? aValue - bValue
-          : bValue - aValue;
+          ? aNum - bNum
+          : bNum - aNum;
       }
     });
   }, [locationSummaries, locationSearch, locationSortColumn, locationSortDirection]);
