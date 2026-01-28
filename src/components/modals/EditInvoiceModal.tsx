@@ -26,7 +26,7 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ isOpen, onCl
     projectId: '',
     projectName: '',
     projectCode: '',
-    clientId: '',
+    companyId: '',
     clientName: '',
     amount: '',
     percentageOfTotal: '',
@@ -58,16 +58,16 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ isOpen, onCl
   useEffect(() => {
     if (invoice) {
       setFormData({
-        invoiceNumber: invoice.invoiceNumber || '',
-        projectId: invoice.projectId || '',
+        invoiceNumber: invoice.invoiceNumber,
+        project_id: invoice.companyId || '',
         projectName: invoice.projectName || '',
         projectCode: invoice.projectCode || '',
-        clientId: invoice.clientId || '',
+        companyId: invoice.companyId || '',
         clientName: invoice.clientName || '',
         amount: invoice.amount?.toString() || '',
-        percentageOfTotal: invoice.percentageOfTotal?.toString() || '',
-        issueDate: invoice.invoiceDate ? new Date(invoice.invoiceDate).toISOString().split('T')[0] : '',
-        dueDate: invoice.dueDate ? new Date(invoice.dueDate).toISOString().split('T')[0] : '',
+        percentageOfTotal: invoice.percentage_of_total?.toString() || '',
+        issueDate: invoice.invoice_date ? new Date(invoice.invoice_date).toISOString().split('T')[0] : '',
+        dueDate: invoice.due_date ? new Date(invoice.due_date).toISOString().split('T')[0] : '',
         description: invoice.description || '',
         remark: invoice.remark || '',
         status: (invoice.status as InvoiceStatus) || 'sent',
@@ -96,19 +96,20 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ isOpen, onCl
     }
   }, [formData.projectCode]);
 
-  // Auto-populate client when project is selected
-  useEffect(() => {
-    if (formData.projectId && projects.length > 0 && clients.length > 0) {
-      const selectedProject = projects.find(p => p.id === formData.projectId);
-      if (selectedProject && selectedProject.clientId) {
-        const matchingClient = clients.find(c => c.id === selectedProject.clientId);
-        if (matchingClient && formData.clientId !== selectedProject.clientId) {
-          setFormData(prev => ({
-            ...prev,
-            clientId: selectedProject.clientId,
-            clientName: matchingClient.name || ''
-          }));
-        }
+                // Auto-populate client when project is selected
+                if (formData.projectId && projects.length > 0 && clients.length > 0) {
+                  const selectedProject = projects.find(p => p.id === formData.projectId);
+                  if (selectedProject && selectedProject.companyId) {
+                    const matchingClient = clients.find(c => c.id === selectedProject.companyId);
+                    if (matchingClient && formData.companyId !== selectedProject.companyId) {
+                      setFormData(prev => ({
+                        ...prev,
+                        companyId: selectedProject.companyId,
+                        clientName: matchingClient.name || ''
+                      }));
+                    }
+                  }
+                }
       }
     }
   }, [formData.projectId, projects, clients]);
@@ -192,11 +193,12 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ isOpen, onCl
         invoiceNumber: formData.invoiceNumber,
         project_name: formData.projectName,
         project_code: formData.projectCode,
+        company_id: formData.companyId,
         client_name: formData.clientName,
         amount: parseFloat(formData.amount),
         percentage_of_total: parseFloat(formData.percentageOfTotal),
         issue_date: formData.issueDate,
-        due_date: formData.dueDate || null,
+        due_date: formData.dueDate,
         description: formData.description,
         remark: formData.remark,
         status: formData.status,
@@ -216,10 +218,21 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ isOpen, onCl
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setFormData(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
+      setFormData(prev => ({
+        ...prev,
+        projectId: '',
+        projectCode: '',
+        projectName: '',
+        companyId: '',
+        clientName: '',
+        amount: '',
+        percentageOfTotal: '',
+        issueDate: '',
+        dueDate: '',
+        description: '',
+        remark: '',
+        status: 'sent' as InvoiceStatus,
+      }));
 
     // Track which field was edited for auto-calculation
     if (e.target.name === 'amount') {
@@ -373,15 +386,8 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ isOpen, onCl
                       projectId: '',
                       projectCode: '',
                       projectName: '',
-                      clientId: '',
-                      clientName: ''
-                    });
-                  } else {
-                    setFormData({
-                      ...formData,
-                      projectId: e.target.value,
-                      projectCode: selectedProject?.projectCode || '',
-                      projectName: selectedProject?.title || ''
+                      companyId: '',
+                      clientName: '',
                     });
                   }
                 }}

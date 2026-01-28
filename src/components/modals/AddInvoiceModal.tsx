@@ -20,7 +20,7 @@ export const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ isOpen, onClos
     projectId: '',
     projectName: '',
     projectCode: '',
-    clientId: '',
+    companyId: '',
     clientName: '',
     amount: '',
     percentageOfTotal: '',
@@ -144,7 +144,7 @@ export const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ isOpen, onClos
         project_id: formData.projectId,
         project_name: formData.projectName,
         project_code: formData.projectCode,
-        client_id: formData.clientId,
+        company_id: formData.companyId,
         client_name: formData.clientName,
         amount: parseFloat(formData.amount),
         percentage_of_total: parseFloat(formData.percentageOfTotal),
@@ -163,7 +163,7 @@ export const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ isOpen, onClos
         projectId: '',
         projectName: '',
         projectCode: '',
-        clientId: '',
+        companyId: '',
         clientName: '',
         amount: '',
         percentageOfTotal: '',
@@ -281,21 +281,23 @@ export const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ isOpen, onClos
 
                   if (e.target.value === '') {
                     // If clearing project, also clear client
-                    setFormData({
-                      ...formData,
-                      projectId: '',
-                      projectCode: '',
-                      projectName: '',
-                      clientId: '',
-                      clientName: ''
-                    });
+            setFormData({
+              ...formData,
+              projectId: '',
+              projectCode: '',
+              projectName: '',
+              companyId: '',
+              clientName: '',
+              percentageOfTotal: '',
+            });
                   } else {
                     setFormData({
                       ...formData,
                       projectId: e.target.value,
                       projectCode: selectedProject?.projectCode || '',
-                      projectName: selectedProject?.title || ''
-                      // Client will be auto-populated by useEffect
+                      projectName: selectedProject?.title || '',
+                      companyId: selectedProject?.companyId || '',
+                      clientName: '',
                     });
                   }
                 }}
