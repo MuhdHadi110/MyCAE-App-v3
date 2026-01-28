@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { X, Upload, Save } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { useProjectStore } from '../../store/projectStore';
-import { useClientStore } from '../../store/clientStore';
-import financeService from '../../services/finance.service';
-import projectService from '../../services/project.service';
+import { useCompanyStore } from '../../store/companyStore';
 import { logger } from '../../lib/logger';
+import { getCurrentUser } from '../../lib/auth';
+import { checkPermission } from '../../lib/permissions';
 
 interface EditPOModalProps {
   isOpen: boolean;
@@ -15,14 +16,27 @@ interface EditPOModalProps {
 
 export const EditPOModal: React.FC<EditPOModalProps> = ({ isOpen, po, onClose, onSave }) => {
   const { projects, fetchProjects } = useProjectStore();
-  const { clients, fetchClients } = useClientStore();
+  const { companies, fetchCompanies } = useCompanyStore();
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    poNumber: string;
+    projectId: string;
+    projectCode: string;
+    companyId: string;
+    companyName: string;
+    amount: string;
+    currency: string;
+    receivedDate: string;
+    dueDate: string;
+    description: string;
+    status: string;
+    fileUrl: string;
+  }>({
     poNumber: po?.po_number || '',
     projectId: '',
-    projectCode: po?.project_code || '',
-    clientId: '',
-    clientName: po?.client_name || '',
+    projectCode: '',
+    companyId: '',
+    companyName: po?.company_name || '',
     amount: po?.amount?.toString() || '',
     currency: po?.currency || 'MYR',
     receivedDate: po?.received_date || '',
@@ -31,8 +45,8 @@ export const EditPOModal: React.FC<EditPOModalProps> = ({ isOpen, po, onClose, o
     status: po?.status || 'received',
     fileUrl: po?.file_url || '',
   });
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [useCustomRate, setUseCustomRate] = useState(false);
   const [customRateValue, setCustomRateValue] = useState('');
   const [exchangeRate, setExchangeRate] = useState(po?.exchange_rate || 1.0);
@@ -40,53 +54,33 @@ export const EditPOModal: React.FC<EditPOModalProps> = ({ isOpen, po, onClose, o
 
   useEffect(() => {
     if (isOpen) {
-      fetchClients();
       fetchProjects();
+      fetchCompanies();
     }
-  }, [isOpen, fetchClients, fetchProjects]);
-
-  // Calculate converted amount when currency, amount, or rate changes
-  useEffect(() => {
-    if (formData.currency === 'MYR') {
-      setExchangeRate(1.0);
-      setConvertedAmount(parseFloat(formData.amount) || 0);
-      return;
-    }
-
-    if (useCustomRate && customRateValue) {
-      const rate = parseFloat(customRateValue);
-      setExchangeRate(rate);
-      setConvertedAmount(parseFloat(formData.amount) * rate);
-    } else if (!useCustomRate) {
-      setExchangeRate(po?.exchange_rate || 1.0);
-      setConvertedAmount(po?.amount_myr || (parseFloat(formData.amount) || 0));
-    }
-  }, [formData.currency, formData.amount, useCustomRate, customRateValue, po]);
-
-  if (!isOpen) return null;
+  }, [isOpen, fetchProjects, fetchCompanies]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+
     try {
       let fileUrl = formData.fileUrl;
 
-      // Upload file if selected
       if (selectedFile) {
         const uploadResponse = await projectService.uploadProjectPO(po.id, selectedFile);
         fileUrl = uploadResponse.fileUrl;
       }
 
-      // Update PO data
       const poData = {
         po_number: formData.poNumber,
         project_id: formData.projectId,
         project_code: formData.projectCode,
-        client_id: formData.clientId,
-        client_name: formData.clientName,
+        company_id: formData.companyId,
+        company_name: formData.companyName,
         amount: parseFloat(formData.amount),
         currency: formData.currency,
         customExchangeRate: useCustomRate ? parseFloat(customRateValue) : undefined,
+        amount_myr: useCustomRate ? (parseFloat(formData.amount) * parseFloat(customRateValue)) : convertedAmount,
         received_date: formData.receivedDate,
         due_date: formData.dueDate,
         description: formData.description,
@@ -95,9 +89,26 @@ export const EditPOModal: React.FC<EditPOModalProps> = ({ isOpen, po, onClose, o
       };
 
       await onSave(poData);
+      toast.success(`Purchase Order ${poData.po_number} updated successfully!`);
+
+      setFormData({
+        poNumber: '',
+        projectId: '',
+        projectCode: '',
+        companyId: '',
+        companyName: '',
+        amount: '',
+        currency: 'MYR',
+        receivedDate: '',
+        dueDate: '',
+        description: '',
+        status: '',
+        fileUrl: '',
+      });
       onClose();
     } catch (error: any) {
       logger.error('Error updating PO:', error);
+      toast.error('Failed to update purchase order');
     } finally {
       setIsSubmitting(false);
     }
@@ -107,13 +118,13 @@ export const EditPOModal: React.FC<EditPOModalProps> = ({ isOpen, po, onClose, o
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b border-gray-200">
+        <div className="flex justify-between items-center p-6 border-b border-gray-200 sticky top-0 bg-white">
           <h2 className="text-xl font-semibold text-gray-900">Edit Purchase Order</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
 
@@ -124,205 +135,191 @@ export const EditPOModal: React.FC<EditPOModalProps> = ({ isOpen, po, onClose, o
               <label className="block text-sm font-medium text-gray-700 mb-1">PO Number</label>
               <input
                 type="text"
+                name="poNumber"
                 value={formData.poNumber}
                 onChange={(e) => setFormData(prev => ({ ...prev, poNumber: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
               />
             </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Project Code</label>
-              <input
-                type="text"
-                value={formData.projectCode}
-                onChange={(e) => setFormData(prev => ({ ...prev, projectCode: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
               <select
-                value={formData.clientId}
+                name="projectId"
+                value={formData.projectId}
                 onChange={(e) => {
-                  const clientId = e.target.value;
-                  const client = clients.find(c => c.id === clientId);
-                  setFormData(prev => ({
+                  const selectedProject = projects.find(p => p.id === e.target.value);
+                  const selectedCompany = companies.find(c => c.id === selectedProject?.company_id);
+                  setFormData({
                     ...prev,
-                    clientId,
-                    clientName: client?.name || ''
-                  }));
+                    projectId: e.target.value,
+                    projectCode: selectedProject?.project_code || '',
+                    companyName: selectedCompany?.name || ''
+                  });
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
               >
-                <option value="">Select Client</option>
-                {clients.map(client => (
-                  <option key={client.id} value={client.id}>
-                    {client.name}
-                  </option>
-                ))}
+                <option value="">None (Non-project purchase)</option>
+                {projects
+                  .filter(p => p.status === 'pre-lim')
+                  .map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.project_code} - {project.title}
+                    </option>
+                  ))}
               </select>
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Company (via Project)</label>
+              <input
+                type="text"
+                value={formData.companyName}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                readOnly
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Auto-filled from selected project
+              </p>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
               <div className="flex gap-2">
                 <input
                   type="number"
-                  step="0.01"
+                  name="amount"
                   value={formData.amount}
                   onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
-                <select
+                <CurrencySelector
                   value={formData.currency}
-                  onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="MYR">MYR</option>
-                  <option value="SGD">SGD</option>
-                  <option value="USD">USD</option>
-                  <option value="EUR">EUR</option>
-                  <option value="THB">THB</option>
-                  <option value="INR">INR</option>
-                  <option value="CNY">CNY</option>
-                  <option value="JPY">JPY</option>
-                  <option value="KRW">KRW</option>
-                  <option value="HKD">HKD</option>
-                  <option value="TWD">TWD</option>
-                  <option value="AUD">AUD</option>
-                  <option value="NZD">NZD</option>
-                  <option value="CAD">CAD</option>
-                  <option value="GBP">GBP</option>
-                </select>
+                  onChange={(currency) => setFormData(prev => ({ ...prev, currency: currency })}
+                />
               </div>
-
-              {formData.currency !== 'MYR' && (
-                <div className="mt-2 space-y-2">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={useCustomRate}
-                      onChange={(e) => setUseCustomRate(e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600"
-                    />
-                    <span className="text-sm font-medium text-gray-700">Use custom exchange rate</span>
-                  </label>
-
-                  {useCustomRate && (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        step="0.000001"
-                        min="0"
-                        value={customRateValue}
-                        onChange={(e) => setCustomRateValue(e.target.value)}
-                        placeholder="e.g., 3.45"
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
-                      />
-                      <span className="text-sm text-gray-600">→ RM {convertedAmount.toFixed(2)}</span>
-                    </div>
-                  )}
-
-                  {!useCustomRate && (
-                    <p className="text-xs text-gray-600">
-                      Current rate: {exchangeRate.toFixed(6)} → RM {convertedAmount.toFixed(2)}
-                    </p>
-                  )}
-                </div>
-              )}
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+              <select
+                name="currency"
+                value={formData.currency}
+                onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              >
+                <option value="MYR">MYR</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="GBP">GBP</option>
+                <option value="SGD">SGD</option>
+                <option value="INR">INR</option>
+                <option value="CNY">CNY</option>
+                <option value="JPY">JPY</option>
+                <option value="KRW">KRW</option>
+                <option value="HKD">HKD</option>
+                <option value="TWD">TWD</option>
+                <option value="AUD">AUD</option>
+                <option value="NZD">NZD</option>
+                <option value="CAD">CAD</option>
+              </select>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Received Date</label>
               <input
                 type="date"
+                name="receivedDate"
                 value={formData.receivedDate}
                 onChange={(e) => setFormData(prev => ({ ...prev, receivedDate: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
               />
             </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
               <input
                 type="date"
+                name="dueDate"
                 value={formData.dueDate}
                 onChange={(e) => setFormData(prev => ({ ...prev, dueDate: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2.5 border border-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select
-              value={formData.status}
-              onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="received">Received</option>
-              <option value="in-progress">In Progress</option>
-              <option value="invoiced">Invoiced</option>
-              <option value="paid">Paid</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Replace File (Optional)</label>
-            <div className="flex items-center gap-3">
-              <input
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
-                onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                className="hidden"
-                id="file-upload"
-              />
-              <label
-                htmlFor="file-upload"
-                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <select
+                name="status"
+                value={formData.status}
+                onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
               >
-                <Upload className="w-4 h-4" />
-                <span>{selectedFile ? selectedFile.name : 'Choose File'}</span>
-              </label>
-              {formData.fileUrl && !selectedFile && (
-                <span className="text-sm text-gray-500">Current file uploaded</span>
-              )}
+                <option value="received">Received</option>
+                <option value="in-progress">In Progress</option>
+                <option value="invoiced">Invoiced</option>
+                <option value="paid">Paid</option>
+              </select>
             </div>
-          </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-            >
-              <Save className="w-4 h-4" />
-              {isSubmitting ? 'Saving...' : 'Update PO'}
-            </button>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <textarea
+                name="description"
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                rows={3}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray- name">
+                Replace File (Optional)
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  id="file-upload"
+                  onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="file-upload"
+                  className="px-3 py-2 text-sm font-medium text-gray-700 cursor-pointer"
+                >
+                  {selectedFile ? selectedFile.name : 'Choose File'}
+                </label>
+                {formData.fileUrl && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    Current file uploaded
+                  </p>
+                )}
+              </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 cursor-not-allowed flex items-center gap-2"
+              >
+                {isSubmitting ? 'Saving...' : 'Update PO'}
+              </button>
+            </div>
           </div>
         </form>
       </div>
