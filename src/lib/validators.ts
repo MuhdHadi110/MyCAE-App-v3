@@ -48,7 +48,7 @@ export const projectSchema = z.object({
     .regex(/^[A-Z0-9]{3,10}$/, 'Project code must be 3-10 uppercase letters/numbers')
     .toUpperCase(),
   description: optionalString,
-  clientId: requiredString,
+  companyId: requiredString,
   leadEngineerId: requiredString,
   managerId: optionalString,
   budget: positiveNumber.optional(),

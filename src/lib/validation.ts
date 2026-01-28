@@ -55,7 +55,7 @@ export const currencySchema = z
 export const projectSchema = z.object({
   title: z.string().min(1, 'Project title is required').max(200, 'Title is too long'),
   projectCode: z.string().min(1, 'Project code is required').max(50, 'Code is too long'),
-  clientId: z.string().min(1, 'Please select a client'),
+  companyId: z.string().min(1, 'Please select a company'),
   managerId: z.string().optional(),
   leadEngineerId: z.string().optional(),
   status: z.enum(['planning', 'active', 'on-hold', 'completed', 'cancelled']),

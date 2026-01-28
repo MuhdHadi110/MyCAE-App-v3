@@ -10,7 +10,7 @@ export type ReceivedPOStatus = 'received' | 'in-progress' | 'invoiced' | 'paid' 
 export interface ReceivedPO {
   id: string;
   poNumber: string;
-  clientId: string;
+  companyId: string;
   clientName: string;
   projectId?: string;
   projectCode?: string;

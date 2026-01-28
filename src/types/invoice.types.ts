@@ -20,8 +20,8 @@ export interface Invoice {
   id: string;
   invoiceNumber: string;
 
-  // Client information
-  clientId: string;
+  // Company information
+  companyId: string;
   clientName: string;
   clientAddress?: string;
   clientContact?: string;
