@@ -19,15 +19,22 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
   if (!isOpen || !project) return null;
 
   const getStatusBadge = (status: string) => {
+    const baseClasses = "px-4 py-2 rounded-lg font-semibold text-sm";
     switch (status) {
       case 'pre-lim':
-        return <Badge variant="info">Preliminary</Badge>;
+        return <span className={`${baseClasses} bg-blue-100 text-blue-800`}>Preliminary</span>;
       case 'ongoing':
-        return <Badge variant="success">Ongoing</Badge>;
+        return <span className={`${baseClasses} bg-green-100 text-green-800`}>Ongoing</span>;
       case 'completed':
-        return <Badge variant="default">Completed</Badge>;
+        return <span className={`${baseClasses} bg-gray-100 text-gray-800`}>Completed</span>;
+      case 'on-hold':
+        return <span className={`${baseClasses} bg-yellow-100 text-yellow-800`}>On Hold</span>;
+      case 'open':
+        return <span className={`${baseClasses} bg-purple-100 text-purple-800`}>Open</span>;
+      case 'closed':
+        return <span className={`${baseClasses} bg-red-100 text-red-800`}>Closed</span>;
       default:
-        return <Badge variant="default">{status}</Badge>;
+        return <span className={`${baseClasses} bg-gray-100 text-gray-800`}>{status}</span>;
     }
   };
 
@@ -59,8 +66,8 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
           {/* Status and Progress */}
           <div className="grid grid-cols-2 gap-4">
             <Card variant="bordered" padding="md">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm text-gray-600 font-medium">Status</p>
+              <p className="text-xs text-gray-500 uppercase font-semibold mb-3">Status</p>
+              <div className="flex items-center justify-center py-2">
                 {getStatusBadge(project.status)}
               </div>
             </Card>
@@ -97,16 +104,20 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
 
           {/* Project Details Grid */}
           <div className="grid grid-cols-2 gap-4">
-            {/* Client */}
+            {/* Company */}
             <Card variant="bordered" padding="md">
-              <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Client</p>
-              <p className="text-sm font-medium text-gray-900">{project.clientName}</p>
+              <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Company</p>
+              <p className="text-sm font-medium text-gray-900">
+                {project.companyName || <span className="text-gray-400 italic">Not assigned</span>}
+              </p>
             </Card>
 
             {/* Engineer */}
             <Card variant="bordered" padding="md">
               <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Lead Engineer</p>
-              <p className="text-sm font-medium text-gray-900">{project.engineerName}</p>
+              <p className="text-sm font-medium text-gray-900">
+                {project.engineerName || <span className="text-gray-400 italic">Not assigned</span>}
+              </p>
             </Card>
 
             {/* Start Date */}

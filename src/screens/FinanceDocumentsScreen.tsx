@@ -160,12 +160,22 @@ export const FinanceDocumentsScreen = () => {
     }
   };
 
-  const handleFileUpload = async (documentId: string, files: FileAttachment[]) => {
-    if (files.length === 0) return;
+  const handleFileUpload = async (documentId: string, attachments: FileAttachment[]) => {
+    if (attachments.length === 0) return;
 
-    const file = files[0];
+    const attachment = attachments[0];
     const formData = new FormData();
-    formData.append('file', file.file);
+
+    // Convert base64 data back to blob for upload
+    const byteCharacters = atob(attachment.fileData.split(',')[1]);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], { type: attachment.fileType });
+    const file = new File([blob], attachment.fileName, { type: attachment.fileType });
+    formData.append('file', file);
 
     try {
       toast.loading('Uploading document...');

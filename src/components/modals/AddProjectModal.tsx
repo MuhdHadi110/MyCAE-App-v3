@@ -281,7 +281,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
                 />
               </div>
 
-              {/* Client, Manager, Lead Engineer */}
+              {/* Contact, Manager, Lead Engineer */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label htmlFor="contact" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

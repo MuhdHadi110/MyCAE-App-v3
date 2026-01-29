@@ -108,7 +108,7 @@ export const AddReceivedPOModal: React.FC<AddReceivedPOModalProps> = ({ isOpen, 
     });
 
     if (!formData.poNumber || !formData.amount || !formData.receivedDate || !formData.projectCode || !formData.clientName) {
-      const missingFields = [];
+      const missingFields: string[] = [];
       if (!formData.poNumber) missingFields.push('PO Number');
       if (!formData.projectCode) missingFields.push('Project Code');
       if (!formData.clientName) missingFields.push('Client Name');
@@ -259,9 +259,9 @@ export const AddReceivedPOModal: React.FC<AddReceivedPOModalProps> = ({ isOpen, 
                       clientName: ''
                     });
                   } else {
-                    // Try to find client in multiple places
+                    // Try to find client/company in multiple places
                     // 1. Try ClientStore (legacy)
-                    let matchingClient = project?.companyId
+                    let matchingClient: any = project?.companyId
                       ? clients.find(c => c.id === project.companyId)
                       : null;
 

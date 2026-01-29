@@ -35,7 +35,11 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
     let query = projectRepo.createQueryBuilder('project')
       .leftJoinAndSelect('project.lead_engineer', 'lead_engineer')
-      .leftJoinAndSelect('project.manager', 'manager');
+      .leftJoinAndSelect('project.manager', 'manager')
+      .leftJoin('project.company', 'company')
+      .addSelect(['company.id', 'company.name'])
+      .leftJoin('project.contact', 'contact')
+      .addSelect(['contact.id', 'contact.name', 'contact.email']);
 
     // Non-privileged users can only see projects they're assigned to
     if (!isPrivileged && userId) {
@@ -46,7 +50,16 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     }
 
     const projects = await query.getMany();
-    res.json(projects);
+
+    // Format response to include company name
+    const formattedProjects = projects.map(p => ({
+      ...p,
+      companyName: p.company?.name || null,
+      engineerName: p.lead_engineer?.name || null,
+      managerName: p.manager?.name || null,
+    }));
+
+    res.json(formattedProjects);
   } catch (error: any) {
     console.error('Error fetching projects:', error);
     res.status(500).json({ error: 'Failed to fetch projects' });
@@ -131,14 +144,22 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
     const projectRepo = AppDataSource.getRepository(Project);
     const project = await projectRepo.findOne({
       where: { id: req.params.id },
-      relations: ['lead_engineer', 'manager'],
+      relations: ['lead_engineer', 'manager', 'company', 'contact'],
     });
 
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
 
-    res.json(project);
+    // Format response to include company name
+    const formattedProject = {
+      ...project,
+      companyName: project.company?.name || null,
+      engineerName: project.lead_engineer?.name || null,
+      managerName: project.manager?.name || null,
+    };
+
+    res.json(formattedProject);
   } catch (error: any) {
     console.error('Error fetching project:', error);
     res.status(500).json({ error: 'Failed to fetch project' });

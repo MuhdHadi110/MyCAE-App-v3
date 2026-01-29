@@ -6,6 +6,8 @@ import { useCompanyStore } from '../../store/companyStore';
 import { logger } from '../../lib/logger';
 import { getCurrentUser } from '../../lib/auth';
 import { checkPermission } from '../../lib/permissions';
+import projectService from '../../services/project.service';
+import { CurrencySelector } from '../ui/CurrencySelector';
 
 interface EditPOModalProps {
   isOpen: boolean;
@@ -47,6 +49,7 @@ export const EditPOModal: React.FC<EditPOModalProps> = ({ isOpen, po, onClose, o
   });
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [useCustomRate, setUseCustomRate] = useState(false);
   const [customRateValue, setCustomRateValue] = useState('');
   const [exchangeRate, setExchangeRate] = useState(po?.exchange_rate || 1.0);
@@ -150,11 +153,11 @@ export const EditPOModal: React.FC<EditPOModalProps> = ({ isOpen, po, onClose, o
                 value={formData.projectId}
                 onChange={(e) => {
                   const selectedProject = projects.find(p => p.id === e.target.value);
-                  const selectedCompany = companies.find(c => c.id === selectedProject?.company_id);
+                  const selectedCompany = companies.find(c => c.id === selectedProject?.companyId);
                   setFormData({
-                    ...prev,
+                    ...formData,
                     projectId: e.target.value,
-                    projectCode: selectedProject?.project_code || '',
+                    projectCode: selectedProject?.projectCode || '',
                     companyName: selectedCompany?.name || ''
                   });
                 }}
@@ -166,7 +169,7 @@ export const EditPOModal: React.FC<EditPOModalProps> = ({ isOpen, po, onClose, o
                   .filter(p => p.status === 'pre-lim')
                   .map((project) => (
                     <option key={project.id} value={project.id}>
-                      {project.project_code} - {project.title}
+                      {project.projectCode} - {project.title}
                     </option>
                   ))}
               </select>
@@ -198,7 +201,7 @@ export const EditPOModal: React.FC<EditPOModalProps> = ({ isOpen, po, onClose, o
                 />
                 <CurrencySelector
                   value={formData.currency}
-                  onChange={(currency) => setFormData(prev => ({ ...prev, currency: currency })}
+                  onChange={(currency) => setFormData(prev => ({ ...prev, currency: currency }))}
                 />
               </div>
             </div>
@@ -303,8 +306,9 @@ export const EditPOModal: React.FC<EditPOModalProps> = ({ isOpen, po, onClose, o
                   </p>
                 )}
               </div>
+          </div>
 
-            <div className="flex justify-end gap-3 mt-6">
+          <div className="flex justify-end gap-3 mt-6">
               <button
                 type="button"
                 onClick={onClose}

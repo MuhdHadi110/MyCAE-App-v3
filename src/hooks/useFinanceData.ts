@@ -217,7 +217,7 @@ function calculateProjectSummaries(
       projectId: project.id,
       projectCode: project.projectCode,
       projectTitle: project.title,
-      clientName: project.clientName || 'Unknown Client',
+      clientName: project.companyName || 'Unknown Client',
       status: project.status,
       poReceived,
       invoiced,

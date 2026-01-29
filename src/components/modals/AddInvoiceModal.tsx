@@ -4,7 +4,7 @@ import { toast } from 'react-hot-toast';
 import financeService from '../../services/finance.service';
 import { logger } from '../../lib/logger';
 import { useProjectStore } from '../../store/projectStore';
-import { useClientStore } from '../../store/clientStore';
+import { useCompanyStore } from '../../store/companyStore';
 
 interface AddInvoiceModalProps {
   isOpen: boolean;
@@ -13,7 +13,7 @@ interface AddInvoiceModalProps {
 
 export const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ isOpen, onClose }) => {
   const { projects, fetchProjects } = useProjectStore();
-  const { clients, fetchClients } = useClientStore();
+  const { companies, fetchCompanies } = useCompanyStore();
 
   const [formData, setFormData] = useState({
     invoiceNumber: '',
@@ -36,13 +36,13 @@ export const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ isOpen, onClos
   const [loadingContext, setLoadingContext] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Fetch clients and projects when modal opens
+  // Fetch companies and projects when modal opens
   useEffect(() => {
     if (isOpen) {
-      fetchClients();
+      fetchCompanies();
       fetchProjects();
     }
-  }, [isOpen, fetchClients, fetchProjects]);
+  }, [isOpen, fetchCompanies, fetchProjects]);
 
   // Load next invoice number on mount
   useEffect(() => {
@@ -62,23 +62,23 @@ export const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ isOpen, onClos
 
   // Auto-populate client when project is selected
   useEffect(() => {
-    if (formData.projectId && projects.length > 0 && clients.length > 0) {
+    if (formData.projectId && projects.length > 0 && companies.length > 0) {
       const selectedProject = projects.find(p => p.id === formData.projectId);
-      if (selectedProject && selectedProject.clientId) {
-        // Find the matching client
-        const matchingClient = clients.find(c => c.id === selectedProject.clientId);
+      if (selectedProject && selectedProject.companyId) {
+        // Find the matching company
+        const matchingCompany = companies.find(c => c.id === selectedProject.companyId);
 
-        // Only auto-populate if client isn't already set or is different
-        if (matchingClient && formData.clientId !== selectedProject.clientId) {
+        // Only auto-populate if company isn't already set or is different
+        if (matchingCompany && formData.companyId !== selectedProject.companyId) {
           setFormData(prev => ({
             ...prev,
-            clientId: selectedProject.clientId,
-            clientName: matchingClient.name || ''
+            companyId: selectedProject.companyId,
+            clientName: matchingCompany.name || ''
           }));
         }
       }
     }
-  }, [formData.projectId, projects, clients]);
+  }, [formData.projectId, projects, companies]);
 
   const loadNextInvoiceNumber = async () => {
     try {

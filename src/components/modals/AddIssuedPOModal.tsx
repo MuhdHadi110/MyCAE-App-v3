@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Upload } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useProjectStore } from '../../store/projectStore';
-import { useClientStore } from '../../store/clientStore';
+import { useCompanyStore } from '../../store/companyStore';
 import financeService from '../../services/api.service';
 
 interface AddIssuedPOModalProps {
@@ -13,7 +13,7 @@ interface AddIssuedPOModalProps {
 
 export const AddIssuedPOModal: React.FC<AddIssuedPOModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const { projects, fetchProjects } = useProjectStore();
-  const { companies, fetchCompanies } = useClientStore();
+  const { companies, fetchCompanies } = useCompanyStore();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,13 +30,13 @@ export const AddIssuedPOModal: React.FC<AddIssuedPOModalProps> = ({ isOpen, onCl
     description: '',
   });
 
-  // Fetch clients and projects when modal opens
+  // Fetch companies and projects when modal opens
   useEffect(() => {
     if (isOpen) {
-      fetchClients();
+      fetchCompanies();
       fetchProjects();
     }
-  }, [isOpen, fetchClients, fetchProjects]);
+  }, [isOpen, fetchCompanies, fetchProjects]);
 
   if (!isOpen) return null;
 

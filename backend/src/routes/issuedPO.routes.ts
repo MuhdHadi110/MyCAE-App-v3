@@ -116,8 +116,8 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
   [
     body('poNumber').notEmpty().withMessage('PO number is required'),
     body('items').notEmpty().withMessage('Items description is required'),
-    body('recipient').optional().withMessage('Recipient/vendor name is required'),
-    body('companyId').optional().withMessage('Company ID is required'),
+    body('recipient').optional(),
+    body('companyId').optional(),
     body('amount').isNumeric().withMessage('Amount must be a number'),
     body('issueDate').isISO8601().withMessage('Valid issue date is required'),
   ],
@@ -194,6 +194,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const issuedPORepo = AppDataSource.getRepository(IssuedPO);
+    const companyRepo = AppDataSource.getRepository(Company);
     const po = await issuedPORepo.findOne({ where: { id: req.params.id } });
 
     if (!po) {

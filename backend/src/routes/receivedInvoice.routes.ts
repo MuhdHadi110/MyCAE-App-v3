@@ -87,7 +87,7 @@ router.post(
   [
     body('invoiceNumber').notEmpty().withMessage('Invoice number is required'),
     body('issuedPoId').notEmpty().withMessage('Issued PO ID is required'),
-    body('companyId').optional().withMessage('Company ID is required'),
+    body('companyId').optional(),
     body('amount').isNumeric().withMessage('Amount must be a number'),
     body('invoiceDate').isISO8601().withMessage('Valid invoice date is required'),
     body('receivedDate').isISO8601().withMessage('Valid received date is required'),
@@ -104,6 +104,9 @@ router.post(
         issuedPoId,
         companyId,
         amount,
+        currency,
+        amountMyr,
+        exchangeRate,
         invoiceDate,
         receivedDate,
         dueDate,

@@ -6,7 +6,7 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import toast from 'react-hot-toast';
 import { usePurchaseOrderStore } from '../store/purchaseOrderStore';
 import { useProjectStore } from '../store/projectStore';
-import { useClientStore } from '../store/clientStore';
+import { useCompanyStore } from '../store/companyStore';
 import financeService from '../services/api.service';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -348,7 +348,7 @@ interface CreateEditPOModalProps {
 
 const CreateEditPOModal: React.FC<CreateEditPOModalProps> = ({ isOpen, po, onClose, onSave }) => {
   const { projects, fetchProjects } = useProjectStore();
-  const { clients, fetchClients } = useClientStore();
+  const { companies, fetchCompanies } = useCompanyStore();
 
   const [formData, setFormData] = useState({
     poNumber: po?.poNumber || '',
@@ -368,10 +368,10 @@ const CreateEditPOModal: React.FC<CreateEditPOModalProps> = ({ isOpen, po, onClo
 
   useEffect(() => {
     if (isOpen) {
-      fetchClients();
+      fetchCompanies();
       fetchProjects();
     }
-  }, [isOpen, fetchClients, fetchProjects]);
+  }, [isOpen, fetchCompanies, fetchProjects]);
 
   if (!isOpen) return null;
 
@@ -470,26 +470,26 @@ const CreateEditPOModal: React.FC<CreateEditPOModalProps> = ({ isOpen, po, onClo
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Client Name *</label>
-            <select
-              required
-              value={formData.clientId}
-              onChange={(e) => {
-                const selectedClient = clients.find(c => c.id === e.target.value);
-                setFormData({
-                  ...formData,
-                  clientId: e.target.value,
-                  clientName: selectedClient?.name || ''
-                });
-              }}
+              <label className="block text-sm font-medium text-gray-700 mb-2">Company Name *</label>
+              <select
+                required
+                value={formData.clientId}
+                onChange={(e) => {
+                  const selectedClient = companies.find(c => c.id === e.target.value);
+                  setFormData({
+                    ...formData,
+                    clientId: e.target.value,
+                    clientName: selectedClient?.name || ''
+                  });
+                }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
-              <option value="">Select a client</option>
-              {clients.map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.name}
-                </option>
-              ))}
+                <option value="">Select a company</option>
+                {companies.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                  </option>
+                ))}
             </select>
           </div>
 

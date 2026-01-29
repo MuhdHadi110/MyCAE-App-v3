@@ -411,8 +411,8 @@ export const ProjectsScreen: React.FC = () => {
                 </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredProjects.map((project) => {
-                // Try to find company in both ClientStore and CompanyStore
-                let company = companies.find((c) => c.id === project.companyId);
+                // Try to find company in both CompanyStore and ClientStore
+                let company: any = companies.find((c) => c.id === project.companyId);
                 if (!company && project.companyId) {
                   company = clients.find((c) => c.id === project.companyId);
                 }

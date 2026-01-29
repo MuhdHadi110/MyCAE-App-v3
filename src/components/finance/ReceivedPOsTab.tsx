@@ -203,7 +203,13 @@ export const ReceivedPOsTab: React.FC<ReceivedPOsTabProps> = memo(({
                   Document
                 </span>
               )}
-              {row.attachments?.length > 0 && (
+              {row.attachments && row.attachments.length > 0 && (
+                <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 bg-green-100 text-green-800 rounded-full">
+                  <FileText className="w-3 h-3" />
+                  Document
+                </span>
+              )}
+              {row.attachments && row.attachments.length > 0 && (
                 <span className="inline-flex items-center gap-1 text-xs text-gray-500">
                   <Paperclip className="w-3 h-3" />
                   {row.attachments.length}

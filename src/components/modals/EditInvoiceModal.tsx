@@ -59,7 +59,7 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ isOpen, onCl
     if (invoice) {
       setFormData({
         invoiceNumber: invoice.invoiceNumber,
-        project_id: invoice.companyId || '',
+        projectId: invoice.companyId || '',
         projectName: invoice.projectName || '',
         projectCode: invoice.projectCode || '',
         companyId: invoice.companyId || '',
@@ -96,20 +96,19 @@ export const EditInvoiceModal: React.FC<EditInvoiceModalProps> = ({ isOpen, onCl
     }
   }, [formData.projectCode]);
 
-                // Auto-populate client when project is selected
-                if (formData.projectId && projects.length > 0 && clients.length > 0) {
-                  const selectedProject = projects.find(p => p.id === formData.projectId);
-                  if (selectedProject && selectedProject.companyId) {
-                    const matchingClient = clients.find(c => c.id === selectedProject.companyId);
-                    if (matchingClient && formData.companyId !== selectedProject.companyId) {
-                      setFormData(prev => ({
-                        ...prev,
-                        companyId: selectedProject.companyId,
-                        clientName: matchingClient.name || ''
-                      }));
-                    }
-                  }
-                }
+  // Auto-populate client when project is selected
+  useEffect(() => {
+    if (formData.projectId && projects.length > 0 && clients.length > 0) {
+      const selectedProject = projects.find(p => p.id === formData.projectId);
+      if (selectedProject && selectedProject.companyId) {
+        const matchingClient = clients.find(c => c.id === selectedProject.companyId);
+        if (matchingClient && formData.companyId !== selectedProject.companyId) {
+          setFormData(prevFormData => ({
+            ...formData,
+            companyId: selectedProject.companyId,
+            clientName: matchingClient.name || ''
+          }));
+        }
       }
     }
   }, [formData.projectId, projects, clients]);
