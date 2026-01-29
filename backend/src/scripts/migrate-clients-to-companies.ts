@@ -87,15 +87,15 @@ async function migrateClientsToCompanies() {
 
       let updatedCount = 0;
       for (const project of projects) {
-        if (project.client_id) {
-          const contactId = contactMap.get(project.client_id);
+        if (project.company_id) {
+          const contactId = contactMap.get(project.company_id);
           if (contactId) {
             project.contact_id = contactId;
             await queryRunner.manager.save(project);
             updatedCount++;
             console.log(`   ✅ Updated project "${project.title}" to use contact_id`);
           } else {
-            console.warn(`   ⚠️  No contact found for project "${project.title}" (client_id: ${project.client_id})`);
+            console.warn(`   ⚠️  No contact found for project "${project.title}" (company_id: ${project.company_id})`);
           }
         }
       }

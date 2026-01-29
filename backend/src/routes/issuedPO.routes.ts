@@ -10,6 +10,7 @@ import path from 'path';
 import fs from 'fs';
 
 const router = Router();
+const companyRepo = AppDataSource.getRepository(Company);
 
 // All issued PO routes require authentication
 router.use(authenticate);

@@ -130,15 +130,14 @@ router.post(
         issuedPoId: issuedPoId,
         vendorName: issuedPO.recipient, // Copy from Issued PO
         amount: parseFloat(amount),
-        currency,
+        currency: currency,
         amountMyr: amountMyr ? parseFloat(amountMyr) : null,
         exchangeRate: exchangeRate ? parseFloat(exchangeRate) : null,
         invoiceDate: new Date(invoiceDate),
         receivedDate: new Date(receivedDate),
         dueDate: dueDate ? new Date(dueDate) : null,
         status: ReceivedInvoiceStatus.PENDING,
-        fileUrl,
-        createdBy: req.user?.id,
+        fileUrl: fileUrl,
       });
 
       const savedInvoice = await receivedInvoiceRepo.save(invoice);
