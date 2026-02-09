@@ -175,7 +175,7 @@ export const AddIssuedPOModal: React.FC<AddIssuedPOModalProps> = ({ isOpen, onCl
               >
                 <option value="">None (Non-project purchase)</option>
                 {projects
-                  .filter(p => p.status === 'pre-lim')
+                  .filter(p => p.status === 'pre-lim' || p.status === 'ongoing')
                   .map((project) => (
                     <option key={project.id} value={project.id}>
                       {project.projectCode} - {project.title}

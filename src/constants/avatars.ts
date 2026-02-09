@@ -13,7 +13,7 @@ const generateAvatars = (gender: AvatarGender): AvatarConfig[] =>
     return {
       id: `${gender}-${num}`,
       gender,
-      path: `/src/assets/avatars/${gender}/${gender}-${num}.svg`,
+      path: `/assets/avatars/${gender}/${gender}-${num}.svg`,
       alt: `${gender.charAt(0).toUpperCase() + gender.slice(1)} Avatar ${i + 1}`,
     };
   });

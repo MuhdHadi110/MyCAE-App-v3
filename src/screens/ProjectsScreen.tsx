@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { Plus, Search, Filter, Edit, Trash2, Eye, FolderOpen, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Plus, Search, Filter, Edit, Trash2, Eye, FolderOpen, ChevronUp, ChevronDown, ChevronsUpDown, ChevronRight } from 'lucide-react';
 import { useProjectStore } from '../store/projectStore';
 import { useClientStore } from '../store/clientStore';
 import { useCompanyStore } from '../store/companyStore';
 import { useTeamStore } from '../store/teamStore';
 import { AddProjectModal } from '../components/modals/AddProjectModal';
+import { AddVOModal } from '../components/modals/AddVOModal';
 import { EditProjectModal } from '../components/modals/EditProjectModal';
 import { ProjectDetailModal } from '../components/modals/ProjectDetailModal';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -31,6 +32,9 @@ export const ProjectsScreen: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [showAddVOModal, setShowAddVOModal] = useState(false);
+  const [selectedParentProject, setSelectedParentProject] = useState<Project | null>(null);
+  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     projectId?: string;
@@ -213,6 +217,21 @@ export const ProjectsScreen: React.FC = () => {
       }
     });
   }, [projects, searchTerm, statusFilter, sortColumn, sortDirection, clients, teamMembers]);
+
+  // Memoize project hierarchy for parent-VO relationships
+  const projectHierarchy = useMemo(() => {
+    const parents = filteredProjects.filter(p => !p.isVariationOrder);
+    const vosByParent = filteredProjects
+      .filter(p => p.isVariationOrder)
+      .reduce((acc, vo) => {
+        const parentId = vo.parentProjectId || '';
+        if (!acc[parentId]) acc[parentId] = [];
+        acc[parentId].push(vo);
+        return acc;
+      }, {} as Record<string, Project[]>);
+
+    return { parents, vosByParent };
+  }, [filteredProjects]);
 
   // Memoize status counts to avoid recalculating on every render
   const statusCounts = useMemo(() => ({
@@ -410,116 +429,279 @@ export const ProjectsScreen: React.FC = () => {
                   </tr>
                 </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredProjects.map((project) => {
+                {projectHierarchy.parents.map((project) => {
                 // Try to find company in both CompanyStore and ClientStore
                 let company: any = companies.find((c) => c.id === project.companyId);
                 if (!company && project.companyId) {
                   company = clients.find((c) => c.id === project.companyId);
                 }
 
-                return (
-                  <tr key={project.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button
-                        onClick={() => handleViewProject(project.id)}
-                        className="text-primary-600 hover:text-primary-700 hover:underline transition-colors cursor-pointer"
-                        title={`View details for project ${project.projectCode}`}
-                        aria-label={`View details for project ${project.projectCode}`}
-                      >
-                        {project.projectCode}
-                      </button>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      <div className="max-w-xs truncate" title={project.title}>
-                        {project.title}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {company?.name || project.companyName || 'Unknown'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {project.engineerName ||
-                       (project as any).leadEngineer?.name ||
-                       teamMembers.find(tm => tm.userId === project.leadEngineerId)?.name ||
-                       teamMembers.find(tm => tm.userId === project.engineerId)?.name ||
-                       'Unassigned'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          project.status === 'pre-lim'
-                            ? 'bg-blue-100 text-blue-800'
-                            : project.status === 'ongoing'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {project.status === 'pre-lim' ? 'Preliminary' : project.status === 'ongoing' ? 'Ongoing' : 'Completed'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                      <div className="flex flex-col items-end gap-1.5">
-                        <div className="font-medium">{project.actualHours || 0} hrs</div>
-                        <div className="text-xs text-gray-500">
-                          of {project.plannedHours} planned
-                        </div>
+                const vos = projectHierarchy.vosByParent[project.id] || [];
+                const hasVOs = vos.length > 0;
+                const isCollapsed = collapsedProjects.has(project.id);
 
-                        {/* Progress bar */}
-                        <div className="w-full bg-gray-200 rounded-full h-2.5 max-w-[100px] shadow-inner overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all duration-300 ease-in-out shadow-sm ${
-                              (project.actualHours || 0) > project.plannedHours
-                                ? 'bg-gradient-to-r from-red-500 to-red-600'
-                                : 'bg-gradient-to-r from-green-500 to-green-600'
-                            }`}
-                            style={{
-                              width: `${Math.min(
-                                Math.max(
-                                  project.plannedHours > 0
-                                    ? ((project.actualHours || 0) / project.plannedHours) * 100
-                                    : 0,
-                                  2
-                                ),
-                                100
-                              )}%`
-                            }}
-                          />
+                return (
+                  <React.Fragment key={project.id}>
+                    {/* Parent Project Row */}
+                    <tr className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex items-center gap-2">
+                          {hasVOs && (
+                            <button
+                              onClick={() => {
+                                const newCollapsed = new Set(collapsedProjects);
+                                if (isCollapsed) {
+                                  newCollapsed.delete(project.id);
+                                } else {
+                                  newCollapsed.add(project.id);
+                                }
+                                setCollapsedProjects(newCollapsed);
+                              }}
+                              className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                              title={isCollapsed ? 'Expand VOs' : 'Collapse VOs'}
+                            >
+                              <ChevronRight className={`w-4 h-4 transition-transform ${!isCollapsed ? 'rotate-90' : ''}`} />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleViewProject(project.id)}
+                            className="text-primary-600 hover:text-primary-700 hover:underline transition-colors cursor-pointer"
+                            title={`View details for project ${project.projectCode}`}
+                            aria-label={`View details for project ${project.projectCode}`}
+                          >
+                            {project.projectCode}
+                          </button>
+                          {hasVOs && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              {vos.length} VO{vos.length > 1 ? 's' : ''}
+                            </span>
+                          )}
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleViewProject(project.id)}
-                          className="p-2 text-gray-400 hover:text-primary-600 transition-colors"
-                          title="View Details"
-                          aria-label={`View details for project ${project.projectCode}`}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        <div className="max-w-xs truncate" title={project.title}>
+                          {project.title}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {company?.name || project.companyName || 'Unknown'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {project.engineerName ||
+                         (project as any).leadEngineer?.name ||
+                         teamMembers.find(tm => tm.userId === project.leadEngineerId)?.name ||
+                         teamMembers.find(tm => tm.userId === project.engineerId)?.name ||
+                         'Unassigned'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            project.status === 'pre-lim'
+                              ? 'bg-blue-100 text-blue-800'
+                              : project.status === 'ongoing'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}
                         >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        {canAdd && (
+                          {project.status === 'pre-lim' ? 'Preliminary' : project.status === 'ongoing' ? 'Ongoing' : 'Completed'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                        <div className="flex flex-col items-end gap-1.5">
+                          <div className="font-medium">{project.actualHours || 0} hrs</div>
+                          <div className="text-xs text-gray-500">
+                            of {project.plannedHours} planned
+                          </div>
+
+                          {/* Progress bar */}
+                          <div className="w-full bg-gray-200 rounded-full h-2.5 max-w-[100px] shadow-inner overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-300 ease-in-out shadow-sm ${
+                                (project.actualHours || 0) > project.plannedHours
+                                  ? 'bg-gradient-to-r from-red-500 to-red-600'
+                                  : 'bg-gradient-to-r from-green-500 to-green-600'
+                              }`}
+                              style={{
+                                width: `${Math.min(
+                                  Math.max(
+                                    project.plannedHours > 0
+                                      ? ((project.actualHours || 0) / project.plannedHours) * 100
+                                      : 0,
+                                    2
+                                  ),
+                                  100
+                                )}%`
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {canAdd && (
+                            <button
+                              onClick={() => {
+                                setSelectedParentProject(project);
+                                setShowAddVOModal(true);
+                              }}
+                              className="p-2 text-gray-400 hover:text-green-600 transition-colors"
+                              title="Create Variation Order"
+                              aria-label={`Create VO for ${project.projectCode}`}
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                          )}
                           <button
-                            onClick={() => handleEditProject(project.id)}
+                            onClick={() => handleViewProject(project.id)}
                             className="p-2 text-gray-400 hover:text-primary-600 transition-colors"
-                            title="Edit Project"
-                            aria-label={`Edit project ${project.projectCode}`}
+                            title="View Details"
+                            aria-label={`View details for project ${project.projectCode}`}
                           >
-                            <Edit className="w-4 h-4" />
+                            <Eye className="w-4 h-4" />
                           </button>
-                        )}
-                        {canAdd && (
-                          <button
-                            onClick={() => handleDeleteProject(project.id, project.projectCode)}
-                            className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                            title="Delete Project"
-                            aria-label={`Delete project ${project.projectCode}`}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                          {canAdd && (
+                            <button
+                              onClick={() => handleEditProject(project.id)}
+                              className="p-2 text-gray-400 hover:text-primary-600 transition-colors"
+                              title="Edit Project"
+                              aria-label={`Edit project ${project.projectCode}`}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                          )}
+                          {canAdd && (
+                            <button
+                              onClick={() => handleDeleteProject(project.id, project.projectCode)}
+                              className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                              title="Delete Project"
+                              aria-label={`Delete project ${project.projectCode}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+
+                    {/* Variation Orders (VOs) under parent */}
+                    {!isCollapsed && vos.map((vo) => {
+                      let voCompany: any = companies.find((c) => c.id === vo.companyId);
+                      if (!voCompany && vo.companyId) {
+                        voCompany = clients.find((c) => c.id === vo.companyId);
+                      }
+
+                      return (
+                        <tr key={vo.id} className="bg-blue-50 hover:bg-blue-100 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex items-center gap-2 pl-8">
+                              <span className="text-blue-400">↳</span>
+                              <button
+                                onClick={() => handleViewProject(vo.id)}
+                                className="text-primary-600 hover:text-primary-700 hover:underline transition-colors cursor-pointer"
+                                title={`View details for VO ${vo.projectCode}`}
+                                aria-label={`View details for VO ${vo.projectCode}`}
+                              >
+                                {vo.projectCode}
+                              </button>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-200 text-blue-800">
+                                VO
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-900">
+                            <div className="max-w-xs truncate" title={vo.title}>
+                              {vo.title}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            {voCompany?.name || vo.companyName || 'Unknown'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            {vo.engineerName ||
+                             (vo as any).leadEngineer?.name ||
+                             teamMembers.find(tm => tm.userId === vo.leadEngineerId)?.name ||
+                             teamMembers.find(tm => tm.userId === vo.engineerId)?.name ||
+                             'Unassigned'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                vo.status === 'pre-lim'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : vo.status === 'ongoing'
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}
+                            >
+                              {vo.status === 'pre-lim' ? 'Preliminary' : vo.status === 'ongoing' ? 'Ongoing' : 'Completed'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                            <div className="flex flex-col items-end gap-1.5">
+                              <div className="font-medium">{vo.actualHours || 0} hrs</div>
+                              <div className="text-xs text-gray-500">
+                                of {vo.plannedHours} planned
+                              </div>
+
+                              {/* Progress bar */}
+                              <div className="w-full bg-gray-200 rounded-full h-2.5 max-w-[100px] shadow-inner overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-300 ease-in-out shadow-sm ${
+                                    (vo.actualHours || 0) > vo.plannedHours
+                                      ? 'bg-gradient-to-r from-red-500 to-red-600'
+                                      : 'bg-gradient-to-r from-green-500 to-green-600'
+                                  }`}
+                                  style={{
+                                    width: `${Math.min(
+                                      Math.max(
+                                        vo.plannedHours > 0
+                                          ? ((vo.actualHours || 0) / vo.plannedHours) * 100
+                                          : 0,
+                                        2
+                                      ),
+                                      100
+                                    )}%`
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => handleViewProject(vo.id)}
+                                className="p-2 text-gray-400 hover:text-primary-600 transition-colors"
+                                title="View Details"
+                                aria-label={`View details for VO ${vo.projectCode}`}
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                              {canAdd && (
+                                <button
+                                  onClick={() => handleEditProject(vo.id)}
+                                  className="p-2 text-gray-400 hover:text-primary-600 transition-colors"
+                                  title="Edit VO"
+                                  aria-label={`Edit VO ${vo.projectCode}`}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                              )}
+                              {canAdd && (
+                                <button
+                                  onClick={() => handleDeleteProject(vo.id, vo.projectCode)}
+                                  className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                                  title="Delete VO"
+                                  aria-label={`Delete VO ${vo.projectCode}`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </React.Fragment>
                 );
               })}
               </tbody>
@@ -556,6 +738,17 @@ export const ProjectsScreen: React.FC = () => {
           setSelectedProject(null);
         }}
         project={selectedProject}
+      />
+
+      {/* Add Variation Order Modal */}
+      <AddVOModal
+        isOpen={showAddVOModal}
+        onClose={() => {
+          setShowAddVOModal(false);
+          setSelectedParentProject(null);
+          fetchProjects();
+        }}
+        parentProject={selectedParentProject}
       />
 
       {/* Delete Confirmation Dialog */}

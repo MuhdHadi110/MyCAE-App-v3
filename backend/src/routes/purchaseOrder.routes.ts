@@ -137,6 +137,14 @@ router.post(
         customExchangeRate,
       } = req.body;
 
+      // Check if project already has an active PO
+      const existingPO = await poService.getActivePOByProjectCode(projectCode);
+      if (existingPO) {
+        return res.status(409).json({
+          error: `This project already has ${existingPO.po_number}. Please edit the current PO.`,
+        });
+      }
+
       const po = await poService.createPO({
         poNumber,
         projectCode,
@@ -227,16 +235,29 @@ router.delete('/:id',
 });
 
 /**
- * POST /api/purchase-orders/upload
+ * POST /api/purchase-orders/:id/upload
  * Upload PO document file
  */
-router.post('/upload', upload.single('file'), async (req: AuthRequest, res: Response) => {
+router.post('/:id/upload', upload.single('file'), async (req: AuthRequest, res: Response) => {
   try {
+    const { id } = req.params;
+    const poRepo = AppDataSource.getRepository(PurchaseOrder);
+
+    // Check if PO exists
+    const po = await poRepo.findOne({ where: { id } });
+    if (!po) {
+      return res.status(404).json({ error: 'Purchase order not found' });
+    }
+
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
+    // Generate file URL
     const fileUrl = generateFileUrl(req.file.filename, req);
+
+    // Update PO with file URL
+    await poRepo.update(id, { file_url: fileUrl });
 
     res.status(200).json({
       message: 'File uploaded successfully',

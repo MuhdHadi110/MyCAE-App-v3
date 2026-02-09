@@ -1,5 +1,5 @@
 import React, { memo, useMemo } from 'react';
-import { Paperclip, FileText, Edit2, Eye, Trash2 } from 'lucide-react';
+import { Upload, FileText, Edit2, Eye, Trash2 } from 'lucide-react';
 import { getStatusBadge, formatDate } from '../../lib/financeUtils';
 import { DataTable, Column, MobileCardProps } from '../ui/DataTable';
 import { Button } from '../ui/Button';
@@ -211,7 +211,7 @@ export const ReceivedPOsTab: React.FC<ReceivedPOsTabProps> = memo(({
               )}
               {row.attachments && row.attachments.length > 0 && (
                 <span className="inline-flex items-center gap-1 text-xs text-gray-500">
-                  <Paperclip className="w-3 h-3" />
+                  <Upload className="w-3 h-3" />
                   {row.attachments.length}
                 </span>
               )}
@@ -280,9 +280,9 @@ export const ReceivedPOsTab: React.FC<ReceivedPOsTabProps> = memo(({
             e.stopPropagation();
             onAttachDocument(po.id);
           }}
-          title="Attach Document"
+          title="Upload Document"
         >
-          <Paperclip className="w-4 h-4" />
+          <Upload className="w-4 h-4" />
         </Button>
         {canUpload && (
           <Button

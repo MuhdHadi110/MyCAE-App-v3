@@ -41,6 +41,17 @@ export interface Project {
   teamMembers?: Array<{ memberId: string; hourlyRate: string; }>;
   type?: 'engineering' | 'research';
   researchCode?: string;
+
+  // Variation Order fields
+  parentProjectId?: string;
+  isVariationOrder?: boolean;
+  voNumber?: number;
+  parentProject?: {
+    id: string;
+    projectCode: string;
+    title: string;
+  };
+  variationOrders?: Project[];
 }
 
 export interface Timesheet {

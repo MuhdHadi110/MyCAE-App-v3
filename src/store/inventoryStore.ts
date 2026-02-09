@@ -9,6 +9,7 @@ interface InventoryStore {
   filters: InventoryFilters;
   loading: boolean;
   stats: InventoryStats | null;
+  viewMode: 'grouped' | 'flat';
 
   // Actions
   fetchInventory: () => Promise<void>;
@@ -20,7 +21,13 @@ interface InventoryStore {
   applyFilters: () => void;
   calculateStats: () => void;
   scanBarcode: (barcode: string) => Promise<InventoryItem | null>;
+  setViewMode: (mode: 'grouped' | 'flat') => void;
 }
+
+const getInitialViewMode = (): 'grouped' | 'flat' => {
+  const saved = localStorage.getItem('inventoryViewMode');
+  return saved === 'flat' ? 'flat' : 'grouped';
+};
 
 export const useInventoryStore = create<InventoryStore>((set, get) => ({
   items: [],
@@ -28,6 +35,7 @@ export const useInventoryStore = create<InventoryStore>((set, get) => ({
   filters: {},
   loading: false,
   stats: null,
+  viewMode: getInitialViewMode(),
 
   fetchInventory: async () => {
     set({ loading: true });
@@ -162,5 +170,10 @@ export const useInventoryStore = create<InventoryStore>((set, get) => ({
       toast.error('An error occurred while scanning');
       return null;
     }
+  },
+
+  setViewMode: (mode: 'grouped' | 'flat') => {
+    localStorage.setItem('inventoryViewMode', mode);
+    set({ viewMode: mode });
   },
 }));

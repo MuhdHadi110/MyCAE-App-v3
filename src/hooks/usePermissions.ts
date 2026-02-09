@@ -42,7 +42,7 @@ export function usePermissions() {
         canEditInvoices: false,
         canDeletePO: false,
         canDeleteInvoices: false,
-        canViewManHourCost: false,
+        canViewBaseCost: false,
         canViewAnalytics: false,
         canManageProjectRates: false,
         // Meta

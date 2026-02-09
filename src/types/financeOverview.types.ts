@@ -25,11 +25,21 @@ export interface ProjectFinanceSummary {
   invoicedOriginal: OriginalCurrencyAmount[];
 
   // Cost tracking
-  manHourCost: number;
+  baseCost: number;
   actualHours: number;
 
   // Engineer breakdown for expandable rows
   engineerBreakdown: EngineerCost[];
+
+  // Vendor cost tracking
+  vendorPOsIssued: number;
+  vendorInvoicesReceived: number;
+  vendorPOsOriginal: OriginalCurrencyAmount[];
+  vendorInvoicesOriginal: OriginalCurrencyAmount[];
+
+  // Variation Order tracking
+  isParentProject?: boolean;
+  voCount?: number;
 }
 
 /**
@@ -60,11 +70,17 @@ export interface FinanceTotals {
   totalPOReceived: number;
   totalInvoiced: number;
   totalOutstanding: number;
-  totalManHourCost: number;
+  totalBaseCost: number;
 
   // Original currency breakdown (for multi-currency toggle)
   poReceivedByCurrency: Record<string, number>;
   invoicedByCurrency: Record<string, number>;
+
+  // Vendor totals
+  totalVendorPOsIssued: number;
+  totalVendorInvoicesReceived: number;
+  vendorPOsByCurrency: Record<string, number>;
+  vendorInvoicesByCurrency: Record<string, number>;
 }
 
 /**
@@ -100,6 +116,38 @@ export interface InvoiceData {
   invoiceDate: string;
   status: string;
   percentageOfTotal?: number;
+}
+
+/**
+ * Issued PO data structure (POs to vendors)
+ */
+export interface IssuedPOData {
+  id: string;
+  poNumber: string;
+  projectCode: string;
+  recipient: string;
+  amount: number;
+  currency: string;
+  amountMyr: number;
+  exchangeRate?: number;
+  issueDate: string;
+  status: string;
+}
+
+/**
+ * Received Invoice data structure (invoices from vendors)
+ */
+export interface ReceivedInvoiceData {
+  id: string;
+  invoiceNumber: string;
+  issuedPoId: string;
+  vendorName: string;
+  amount: number;
+  currency: string;
+  amountMyr: number;
+  exchangeRate?: number;
+  invoiceDate: string;
+  status: string;
 }
 
 /**

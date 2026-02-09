@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, AlertCircle, ToggleLeft, ToggleRight, Calendar } from 'lucide-react';
+import { AlertCircle, ToggleLeft, ToggleRight, Calendar } from 'lucide-react';
 import { getPermissionMessage } from '../lib/permissions';
 import { useNavigate } from 'react-router-dom';
 import { usePermissions } from '../hooks/usePermissions';
@@ -7,9 +7,9 @@ import { useFinanceData } from '../hooks/useFinanceData';
 import { FinanceSummaryCards } from '../components/finance/FinanceSummaryCards';
 import { ProjectFinanceTable } from '../components/finance/ProjectFinanceTable';
 
-// Generate year options (current year and 5 years back)
+// Generate year options (All Time + current year and 5 years back)
 const currentYear = new Date().getFullYear();
-const yearOptions = Array.from({ length: 6 }, (_, i) => currentYear - i);
+const yearOptions = [0, ...Array.from({ length: 6 }, (_, i) => currentYear - i)];
 
 // Month options
 const monthOptions = [
@@ -32,15 +32,15 @@ export const FinanceOverviewScreen: React.FC = () => {
   const navigate = useNavigate();
   const { canAccessFinance: canAccess, roleInfo } = usePermissions();
 
-  // Finance data hook
-  const { projectSummaries, totals, loading, error, refetch } = useFinanceData();
+  // Date filter state - default to All Time (0)
+  const [selectedYear, setSelectedYear] = useState<number>(0); // 0 = All Time
+  const [selectedMonth, setSelectedMonth] = useState<number>(0); // 0 = All months
+
+  // Finance data hook with date filters
+  const { projectSummaries, totals, loading, error, refetch } = useFinanceData(selectedYear, selectedMonth);
 
   // Currency toggle state
   const [showOriginalCurrency, setShowOriginalCurrency] = useState(false);
-
-  // Date filter state
-  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
-  const [selectedMonth, setSelectedMonth] = useState<number>(0); // 0 = All months
 
   // Refetch data when screen becomes visible (e.g., when navigating back from Finance Documents)
   useEffect(() => {
@@ -150,7 +150,7 @@ export const FinanceOverviewScreen: React.FC = () => {
                 >
                   {yearOptions.map((year) => (
                     <option key={year} value={year}>
-                      {year}
+                      {year === 0 ? 'All Time' : year}
                     </option>
                   ))}
                 </select>
@@ -172,15 +172,6 @@ export const FinanceOverviewScreen: React.FC = () => {
                   <ToggleLeft className="w-5 h-5" />
                 )}
                 {showOriginalCurrency ? 'Original' : 'MYR'}
-              </button>
-
-              {/* Finance Documents Button */}
-              <button
-                onClick={() => navigate('/finance/documents')}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium shadow-sm"
-              >
-                <FileText className="w-5 h-5" />
-                Finance Documents
               </button>
             </div>
           </div>

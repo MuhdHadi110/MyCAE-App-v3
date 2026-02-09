@@ -81,9 +81,9 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
   // All staff can be lead engineers
   const leadEngineers = teamMembers;
 
-  // Project Managers: Senior Engineers and above (senior-engineer, principal-engineer, manager, admin)
+  // Project Managers: Senior Engineers and above (senior-engineer, principal-engineer, manager, managing-director, admin)
   const projectManagers = teamMembers.filter(
-    (tm) => tm.role === 'senior-engineer' || tm.role === 'principal-engineer' || tm.role === 'manager' || tm.role === 'admin'
+    (tm) => tm.role === 'senior-engineer' || tm.role === 'principal-engineer' || tm.role === 'manager' || tm.role === 'managing-director' || tm.role === 'admin'
   );
 
   const handleSubmit = async (e: React.FormEvent) => {

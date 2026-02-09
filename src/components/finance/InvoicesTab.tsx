@@ -216,10 +216,11 @@ export const InvoicesTab: React.FC<InvoicesTabProps> = ({
   const rowActions = (inv: Invoice) => {
     return (
       <div className="flex items-center gap-2 justify-end flex-wrap">
-        {/* View/Upload Document */}
-        {inv.fileUrl ? (
+        {/* View Document */}
+        {inv.fileUrl && (
           <Button
             size="sm"
+            variant="ghost"
             onClick={(e) => {
               e.stopPropagation();
               onViewPDF(inv.id, inv.invoiceNumber);
@@ -228,29 +229,27 @@ export const InvoicesTab: React.FC<InvoicesTabProps> = ({
           >
             <Eye className="w-4 h-4" />
           </Button>
-        ) : (
-          canUpload && onUploadDocument && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={(e) => {
-                e.stopPropagation();
-                onUploadDocument(inv);
-              }}
-              title="Upload Document"
-            >
-              <Upload className="w-4 h-4" />
-            </Button>
-          )
         )}
 
-        {/* Edit - Draft or Pending (creator only) */}
-        {canUpload && onEditInvoice &&
-         (inv.status === 'draft' ||
-          (inv.status === 'pending-approval' && inv.createdBy === currentUserId)) && (
+        {/* Upload Document */}
+        {canUpload && onUploadDocument && (
           <Button
             size="sm"
             variant="ghost"
+            onClick={(e) => {
+              e.stopPropagation();
+              onUploadDocument(inv);
+            }}
+            title="Upload Document"
+          >
+            <Upload className="w-4 h-4" />
+          </Button>
+        )}
+
+        {/* Edit - Allow editing for all statuses except paid */}
+        {canUpload && onEditInvoice && inv.status !== 'paid' && (
+          <Button
+            size="sm"
             onClick={(e) => {
               e.stopPropagation();
               onEditInvoice(inv);

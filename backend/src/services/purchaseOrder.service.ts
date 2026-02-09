@@ -122,6 +122,19 @@ export class PurchaseOrderService {
   }
 
   /**
+   * Check if project already has an active PO
+   * Returns the active PO if found, null otherwise
+   */
+  async getActivePOByProjectCode(projectCode: string): Promise<PurchaseOrder | null> {
+    return await this.poRepo.findOne({
+      where: { 
+        project_code: projectCode,
+        is_active: true,
+      },
+    });
+  }
+
+  /**
    * Manually adjust MYR amount (for fees, taxes, etc.)
    */
   async adjustMYRAmount(

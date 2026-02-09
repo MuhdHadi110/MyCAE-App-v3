@@ -148,14 +148,20 @@ export const ProjectFinanceTable: React.FC<ProjectFinanceTableProps> = ({
                 Outstanding
               </th>
               <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                Man-Hour Cost
+                Base Cost
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                Vendor POs
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                Vendor Invoices
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {filteredProjects.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                   <div className="flex flex-col items-center">
                     <Search className="w-12 h-12 text-gray-300 mb-3" />
                     <p className="text-sm">No projects found</p>
@@ -263,7 +269,7 @@ export const ProjectFinanceTable: React.FC<ProjectFinanceTableProps> = ({
                       <td className="px-6 py-4 text-right">
                         <div className="flex flex-col items-end">
                           <span className="font-medium text-gray-900">
-                            {formatCurrency(project.manHourCost)}
+                            {formatCurrency(project.baseCost)}
                           </span>
                           {project.actualHours > 0 && (
                             <span className="text-xs text-gray-500">
@@ -272,12 +278,34 @@ export const ProjectFinanceTable: React.FC<ProjectFinanceTableProps> = ({
                           )}
                         </div>
                       </td>
+                      <td className="px-6 py-4 text-right">
+                        <span className="font-medium text-gray-900">
+                          {showOriginalCurrency && project.vendorPOsOriginal.length > 0
+                            ? formatFinanceAmount(
+                                project.vendorPOsIssued,
+                                project.vendorPOsOriginal,
+                                true
+                              )
+                            : formatCurrency(project.vendorPOsIssued)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <span className="font-medium text-gray-900">
+                          {showOriginalCurrency && project.vendorInvoicesOriginal.length > 0
+                            ? formatFinanceAmount(
+                                project.vendorInvoicesReceived,
+                                project.vendorInvoicesOriginal,
+                                true
+                              )
+                            : formatCurrency(project.vendorInvoicesReceived)}
+                        </span>
+                      </td>
                     </tr>
 
                     {/* Expanded Row - Engineer Breakdown */}
                     {isExpanded && (
                       <tr>
-                        <td colSpan={6} className="px-6 py-0 bg-gray-50">
+                        <td colSpan={8} className="px-6 py-0 bg-gray-50">
                           <EngineerBreakdownRow
                             engineers={project.engineerBreakdown}
                           />

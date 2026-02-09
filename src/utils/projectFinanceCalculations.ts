@@ -1,4 +1,4 @@
-import type { ProjectFinance, ManHourBreakdown, CostBreakdown, RevenueDataPoint } from '../types/projectFinance.types';
+import type { ProjectFinance, BaseCostBreakdown, CostBreakdown, RevenueDataPoint } from '../types/projectFinance.types';
 import type { Project, Timesheet } from '../types/project.types';
 import type { TeamMember } from '../types/team.types';
 
@@ -31,8 +31,8 @@ export function calculateProjectFinances(
     const projectTimesheets = safeTimesheets.filter(ts => ts.projectId.toString() === project.id);
     const actualHours = projectTimesheets.reduce((sum, ts) => sum + parseFloat(ts.hours.toString() || '0'), 0);
 
-    // Calculate man-hour cost from timesheets
-    let manHourCost = 0;
+    // Calculate base cost from timesheets
+    let baseCost = 0;
     projectTimesheets.forEach(ts => {
       const engineer = teamMembers.find(tm => tm.id === ts.engineerId.toString());
 
@@ -47,11 +47,11 @@ export function calculateProjectFinances(
           ?? 437.50
         );
 
-      manHourCost += parseFloat(ts.hours.toString() || '0') * hourlyRate;
+      baseCost += parseFloat(ts.hours.toString() || '0') * hourlyRate;
     });
 
-    // Total cost is ONLY man-hour cost (based on actual timesheets)
-    const totalCost = manHourCost;
+    // Total cost is ONLY base cost (based on actual timesheets)
+    const totalCost = baseCost;
 
     // Calculate revenue from purchase orders (active POs only)
     const projectPOList = projectPOs[project.projectCode] || [];
@@ -78,7 +78,7 @@ export function calculateProjectFinances(
     const grossProfit = totalRevenue - totalCost;
     const profitMargin = totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100) : 0;
 
-    const averageRate = actualHours > 0 ? manHourCost / actualHours : 0;
+    const averageRate = actualHours > 0 ? baseCost / actualHours : 0;
 
     return {
       projectId: project.id,
@@ -90,10 +90,10 @@ export function calculateProjectFinances(
       receivedPOs,
       invoiced,
       paid,
-      equipmentCost: 0, // Not tracked - only man-hour costs
-      softwareCost: 0, // Not tracked - only man-hour costs
-      manHourCost,
-      overheadCost: 0, // Not tracked - only man-hour costs
+      equipmentCost: 0, // Not tracked - only base costs
+      softwareCost: 0, // Not tracked - only base costs
+      baseCost,
+      overheadCost: 0, // Not tracked - only base costs
       totalCost,
       grossProfit,
       profitMargin: Math.round(profitMargin * 100) / 100,
@@ -107,15 +107,15 @@ export function calculateProjectFinances(
 }
 
 /**
- * Calculate man-hour breakdown per project
+ * Calculate base cost breakdown per project
  */
-export function calculateManHourBreakdowns(
+export function calculateBaseCostBreakdowns(
   projects: Project[],
   timesheets: Timesheet[],
   teamMembers: TeamMember[],
   projectRates: Record<string, Record<string, number>>
-): Record<string, ManHourBreakdown[]> {
-  const breakdowns: Record<string, ManHourBreakdown[]> = {};
+): Record<string, BaseCostBreakdown[]> {
+  const breakdowns: Record<string, BaseCostBreakdown[]> = {};
   const safeTimesheets = Array.isArray(timesheets) ? timesheets : [];
 
   projects.forEach((project) => {
@@ -127,7 +127,8 @@ export function calculateManHourBreakdowns(
     projectTimesheets.forEach(ts => {
       const engineerIdStr = ts.engineerId.toString();
       if (!engineerHours[engineerIdStr]) {
-        const engineer = teamMembers.find(tm => tm.id === engineerIdStr);
+        // Match against userId (user.id) instead of team member id, since timesheets reference users table
+        const engineer = teamMembers.find(tm => tm.userId?.toString() === engineerIdStr);
         engineerHours[engineerIdStr] = {
           hours: 0,
           engineer,
@@ -157,16 +158,16 @@ export function calculateManHourBreakdowns(
 }
 
 /**
- * Calculate aggregate cost breakdown - Only man-hours
+ * Calculate aggregate cost breakdown - Only base costs
  */
 export function calculateCostBreakdown(projectFinances: ProjectFinance[]): CostBreakdown[] {
-  const totalManHours = projectFinances.reduce((acc, proj) => acc + proj.manHourCost, 0);
+  const totalBaseCosts = projectFinances.reduce((acc, proj) => acc + proj.baseCost, 0);
 
-  if (totalManHours === 0) return [];
+  if (totalBaseCosts === 0) return [];
 
-  // Only man-hour costs tracked
+  // Only base costs tracked
   return [
-    { category: 'Man-Hours', amount: totalManHours, percentage: 100 },
+    { category: 'Base Cost', amount: totalBaseCosts, percentage: 100 },
   ];
 }
 

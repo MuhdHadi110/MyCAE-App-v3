@@ -465,11 +465,9 @@ router.post('/:id/submit-for-approval',
 
       // Fetch all Managing Directors
       const userRepo = AppDataSource.getRepository(User);
-      const mds = await userRepo.find({
-        where: {
-          roles: Raw((alias) => `JSON_CONTAINS(${alias}.roles, '"managing-director"')`)
-        }
-      });
+      const mds = await userRepo.createQueryBuilder('user')
+        .where(`JSON_CONTAINS(user.roles, '"managing-director"')`)
+        .getMany();
 
       // Format date/time
       const submittedDate = invoice.submitted_for_approval_at!.toLocaleDateString('en-MY', {
@@ -654,11 +652,9 @@ router.post('/:id/withdraw',
 
       // Fetch all Managing Directors
       const userRepo = AppDataSource.getRepository(User);
-      const mds = await userRepo.find({
-        where: {
-          roles: Raw((alias) => `JSON_CONTAINS(${alias}.roles, '"managing-director"')`)
-        }
-      });
+      const mds = await userRepo.createQueryBuilder('user')
+        .where(`JSON_CONTAINS(user.roles, '"managing-director"')`)
+        .getMany();
 
       // Format date/time
       const withdrawnDate = new Date().toLocaleDateString('en-MY', {

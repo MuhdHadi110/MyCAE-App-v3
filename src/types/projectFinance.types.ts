@@ -18,7 +18,7 @@ export interface ProjectFinance {
   // Costs
   equipmentCost: number;
   softwareCost: number;
-  manHourCost: number;
+  baseCost: number;
   overheadCost: number;
   totalCost: number;
 
@@ -26,7 +26,7 @@ export interface ProjectFinance {
   grossProfit: number;
   profitMargin: number;
 
-  // Man-Hours (Principal Engineer+ only)
+  // Base Cost Details (Principal Engineer+ only)
   budgetedHours: number;
   actualHours: number;
   averageHourlyRate: number;
@@ -36,7 +36,7 @@ export interface ProjectFinance {
   endDate?: string;
 }
 
-export interface ManHourBreakdown {
+export interface BaseCostBreakdown {
   engineerId: string;
   engineerName: string;
   role: string;

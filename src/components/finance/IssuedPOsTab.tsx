@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Eye, Trash2, Upload } from 'lucide-react';
+import { Eye, Edit2, Trash2, Upload } from 'lucide-react';
 import { getStatusBadge, formatDate } from '../../lib/financeUtils';
 import { DataTable, Column, MobileCardProps } from '../ui/DataTable';
 import { Button } from '../ui/Button';
@@ -8,12 +8,11 @@ interface IssuedPO {
   id: string;
   poNumber: string;
   projectCode?: string;
-  vendor: string;
-  currency: string;
+  recipient: string;  // Vendor name
+  currency?: string;
   amount: number;
   status: string;
-  description?: string;
-  category?: string;
+  items?: string;     // Description/items
   issueDate?: string;
   fileUrl?: string;
   project?: {
@@ -30,6 +29,7 @@ interface IssuedPOsTabProps {
   onViewPDF: (poId: string, poNumber: string) => void;
   onUploadDocument?: (po: any) => void;
   onDeletePO: (po: any) => void;
+  onEditPO?: (po: any) => void;
 }
 
 export const IssuedPOsTab: React.FC<IssuedPOsTabProps> = ({
@@ -41,6 +41,7 @@ export const IssuedPOsTab: React.FC<IssuedPOsTabProps> = ({
   onViewPDF,
   onUploadDocument,
   onDeletePO,
+  onEditPO,
 }) => {
   // Filter POs based on search query
   const filteredPOs = useMemo(() => {
@@ -50,7 +51,7 @@ export const IssuedPOsTab: React.FC<IssuedPOsTabProps> = ({
 
       return (
         po.poNumber?.toLowerCase().includes(query) ||
-        po.vendor?.toLowerCase().includes(query) ||
+        po.recipient?.toLowerCase().includes(query) ||
         po.projectCode?.toLowerCase().includes(query) ||
         po.project?.title?.toLowerCase().includes(query)
       );
@@ -92,23 +93,13 @@ export const IssuedPOsTab: React.FC<IssuedPOsTabProps> = ({
       },
     },
     {
-      key: 'vendor',
+      key: 'recipient',
       header: 'Vendor',
-      accessor: 'vendor',
+      accessor: 'recipient',
       sortable: true,
       cell: (value) => (
         <span className="text-sm text-gray-900">{value as string}</span>
       ),
-    },
-    {
-      key: 'category',
-      header: 'Category',
-      accessor: 'category',
-      sortable: true,
-      cell: (value) => (
-        <span className="text-sm text-gray-700 capitalize">{value as string || '-'}</span>
-      ),
-      hideOnMobile: true,
     },
     {
       key: 'amount',
@@ -118,7 +109,7 @@ export const IssuedPOsTab: React.FC<IssuedPOsTabProps> = ({
       align: 'right',
       cell: (_, row) => (
         <span className="font-bold text-gray-900">
-          {row.currency} {(row.amount || 0).toLocaleString()}
+          {row.currency || 'MYR'} {(row.amount || 0).toLocaleString()}
         </span>
       ),
     },
@@ -151,7 +142,7 @@ export const IssuedPOsTab: React.FC<IssuedPOsTabProps> = ({
                 {statusBadge.label}
               </span>
             </div>
-            <p className="text-2xl font-bold text-gray-900">{row.currency} {(row.amount || 0).toLocaleString()}</p>
+            <p className="text-2xl font-bold text-gray-900">{row.currency || 'MYR'} {(row.amount || 0).toLocaleString()}</p>
           </div>
 
           {/* Project code and title */}
@@ -164,25 +155,16 @@ export const IssuedPOsTab: React.FC<IssuedPOsTabProps> = ({
           )}
 
           {/* Vendor name */}
-          <p className="text-sm text-gray-600 mb-1">{row.vendor}</p>
+          <p className="text-sm text-gray-600 mb-1">{row.recipient}</p>
 
-          {/* Description and Category */}
-          <div className="flex items-center gap-4">
-            {row.description && <p className="text-sm text-gray-500">{row.description}</p>}
-            {row.category && (
-              <span className="text-xs text-gray-500 capitalize">• {row.category}</span>
-            )}
-          </div>
+          {/* Description */}
+          {row.items && <p className="text-sm text-gray-500">{row.items}</p>}
         </div>
 
-        <div className="grid grid-cols-2 gap-4 py-3 border-t border-gray-100">
+        <div className="py-3 border-t border-gray-100">
           <div>
             <p className="text-xs text-gray-500">Issue Date</p>
             <p className="text-sm font-medium text-gray-900">{formatDate(row.issueDate)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500">Category</p>
-            <p className="text-sm font-medium text-gray-900 capitalize">{row.category || '-'}</p>
           </div>
         </div>
 
@@ -198,10 +180,11 @@ export const IssuedPOsTab: React.FC<IssuedPOsTabProps> = ({
   const rowActions = (po: IssuedPO) => {
     return (
       <div className="flex items-center gap-2 justify-end">
-        {/* View/Upload Document */}
-        {po.fileUrl ? (
+        {/* View Document */}
+        {po.fileUrl && (
           <Button
             size="sm"
+            variant="ghost"
             onClick={(e) => {
               e.stopPropagation();
               onViewPDF(po.id, po.poNumber);
@@ -210,21 +193,38 @@ export const IssuedPOsTab: React.FC<IssuedPOsTabProps> = ({
           >
             <Eye className="w-4 h-4" />
           </Button>
-        ) : (
-          canUpload && onUploadDocument && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={(e) => {
-                e.stopPropagation();
-                onUploadDocument(po);
-              }}
-              title="Upload Document"
-            >
-              <Upload className="w-4 h-4" />
-            </Button>
-          )
         )}
+
+        {/* Upload Document */}
+        {canUpload && onUploadDocument && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={(e) => {
+              e.stopPropagation();
+              onUploadDocument(po);
+            }}
+            title="Upload Document"
+          >
+            <Upload className="w-4 h-4" />
+          </Button>
+        )}
+
+        {/* Edit */}
+        {canUpload && onEditPO && (
+          <Button
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEditPO(po);
+            }}
+            title="Edit PO"
+          >
+            <Edit2 className="w-4 h-4" />
+          </Button>
+        )}
+
+        {/* Delete */}
         {canDeletePO && (
           <Button
             size="sm"

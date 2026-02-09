@@ -43,6 +43,7 @@ async function resetAllPasswords() {
       }
 
       user.password_hash = hashedPassword;
+      user.reset_token = 'TEMP_PASSWORD_ASSIGNED'; // Mark as first-time login required
       await userRepo.save(user);
       console.log(`✅ Reset password for: ${user.email} (${user.name})`);
       resetCount++;

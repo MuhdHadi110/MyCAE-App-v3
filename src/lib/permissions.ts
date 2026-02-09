@@ -29,7 +29,7 @@ export interface RolePermissions {
   canApproveInvoices: boolean;
   canEditInvoices: boolean;
   canDeleteInvoices: boolean;
-  canViewManHourCost: boolean;
+  canViewBaseCost: boolean;
   canViewAnalytics: boolean;
   canManageProjectRates: boolean;
 }
@@ -71,7 +71,7 @@ const getPermissionsForRole = (role: UserRole): RolePermissions => {
       canApproveInvoices: true,
       canEditInvoices: true,
       canDeleteInvoices: true,
-      canViewManHourCost: true,
+      canViewBaseCost: true,
       canViewAnalytics: true,
       canManageProjectRates: true,
     };
@@ -106,7 +106,7 @@ const getPermissionsForRole = (role: UserRole): RolePermissions => {
     canApproveInvoices: level >= ROLE_HIERARCHY['managing-director'], // Level 4+ (Only Managing Director and Admin)
     canEditInvoices: level >= ROLE_HIERARCHY['senior-engineer'], // Level 2+ (Senior Engineer and above)
     canDeleteInvoices: level >= ROLE_HIERARCHY['senior-engineer'], // Level 2+ (Senior Engineer and above)
-    canViewManHourCost: level >= ROLE_HIERARCHY['senior-engineer'], // Level 2+
+    canViewBaseCost: level >= ROLE_HIERARCHY['senior-engineer'], // Level 2+
     canViewAnalytics: level >= ROLE_HIERARCHY['senior-engineer'], // Level 2+
     canManageProjectRates: level >= ROLE_HIERARCHY['senior-engineer'], // Level 2+ (Senior Engineer, Principal Engineer, Manager, Managing Director, Admin)
   };

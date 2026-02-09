@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Eye, Edit2, Trash2, CheckCircle, DollarSign, AlertTriangle, Link2 } from 'lucide-react';
+import { Eye, Edit2, Trash2, CheckCircle, DollarSign, Link2, Upload } from 'lucide-react';
 import { getStatusBadge, formatDate } from '../../lib/financeUtils';
 import { DataTable, Column, MobileCardProps } from '../ui/DataTable';
 import { Button } from '../ui/Button';
@@ -27,12 +27,13 @@ interface ReceivedInvoicesTabProps {
   searchQuery: string;
   canVerify: boolean;
   canDelete: boolean;
+  canUpload?: boolean;
   onViewDocument?: (invoice: any) => void;
   onEditInvoice?: (invoice: any) => void;
   onDeleteInvoice?: (invoice: any) => void;
   onVerify?: (invoiceId: string) => void;
   onMarkAsPaid?: (invoiceId: string) => void;
-  onDispute?: (invoiceId: string) => void;
+  onUploadDocument?: (invoice: any) => void;
 }
 
 export const ReceivedInvoicesTab: React.FC<ReceivedInvoicesTabProps> = ({
@@ -40,12 +41,13 @@ export const ReceivedInvoicesTab: React.FC<ReceivedInvoicesTabProps> = ({
   searchQuery,
   canVerify,
   canDelete,
+  canUpload = false,
   onViewDocument,
   onEditInvoice,
   onDeleteInvoice,
   onVerify,
   onMarkAsPaid,
-  onDispute,
+  onUploadDocument,
 }) => {
   // Filter invoices based on search query
   const filteredInvoices = useMemo(() => {
@@ -218,6 +220,7 @@ export const ReceivedInvoicesTab: React.FC<ReceivedInvoicesTabProps> = ({
         {inv.fileUrl && onViewDocument && (
           <Button
             size="sm"
+            variant="ghost"
             onClick={(e) => {
               e.stopPropagation();
               onViewDocument(inv);
@@ -228,11 +231,25 @@ export const ReceivedInvoicesTab: React.FC<ReceivedInvoicesTabProps> = ({
           </Button>
         )}
 
+        {/* Upload Document */}
+        {canUpload && onUploadDocument && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={(e) => {
+              e.stopPropagation();
+              onUploadDocument(inv);
+            }}
+            title="Upload Document"
+          >
+            <Upload className="w-4 h-4" />
+          </Button>
+        )}
+
         {/* Edit - only if not paid */}
         {inv.status !== 'paid' && onEditInvoice && (
           <Button
             size="sm"
-            variant="ghost"
             onClick={(e) => {
               e.stopPropagation();
               onEditInvoice(inv);
@@ -270,21 +287,6 @@ export const ReceivedInvoicesTab: React.FC<ReceivedInvoicesTabProps> = ({
             title="Mark Paid"
           >
             <DollarSign className="w-4 h-4" />
-          </Button>
-        )}
-
-        {/* Dispute - only pending/verified */}
-        {(inv.status === 'pending' || inv.status === 'verified') && onDispute && (
-          <Button
-            size="sm"
-            className="bg-orange-100 hover:bg-orange-200 text-orange-700"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDispute(inv.id);
-            }}
-            title="Dispute"
-          >
-            <AlertTriangle className="w-4 h-4" />
           </Button>
         )}
 

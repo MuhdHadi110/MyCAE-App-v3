@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Search, Plus, Filter, Package, Upload, QrCode, LogIn, ChevronDown, ChevronUp, Box, Edit2, Trash2, X, ChevronsUpDown } from 'lucide-react';
+import { Search, Plus, Filter, Package, Upload, QrCode, LogIn, ChevronDown, ChevronUp, Box, Edit2, Trash2, X, ChevronsUpDown, LayoutGrid, List } from 'lucide-react';
 import { Badge } from '../components/ui/Badge';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { BulkUploadModal } from '../components/modals/BulkUploadModal';
@@ -8,17 +8,20 @@ import { BulkCheckInModal, type BulkCheckInData } from '../components/modals/Bul
 import { SingleItemCheckoutModal, type SingleCheckoutData } from '../components/modals/SingleItemCheckoutModal';
 import { SingleItemCheckInModal, type SingleCheckInData } from '../components/modals/SingleItemCheckInModal';
 import { AddItemModal } from '../components/modals/AddItemModal';
+import { GroupedInventoryRow } from '../components/inventory/GroupedInventoryRow';
+import { SingleInventoryRow } from '../components/inventory/SingleInventoryRow';
 import { useInventoryStore } from '../store/inventoryStore';
 import { getCurrentUser } from '../lib/auth';
 import { checkPermission, getPermissionMessage } from '../lib/permissions';
 import { formatCurrency, formatDate } from '../lib/utils';
 import { useResponsive } from '../hooks/useResponsive';
+import { useCalibrationData } from '../hooks/useCalibrationData';
 import { toast } from 'react-hot-toast';
 import inventoryService from '../services/inventory.service';
-import type { BulkCheckout, InventoryItem } from '../types/inventory.types';
+import type { BulkCheckout, InventoryItem, GroupedInventoryItem } from '../types/inventory.types';
 
 export const InventoryScreen: React.FC = () => {
-  const { filteredItems: storeFilteredItems, filters, setFilters, fetchInventory, loading } = useInventoryStore();
+  const { filteredItems: storeFilteredItems, filters, setFilters, fetchInventory, loading, viewMode, setViewMode } = useInventoryStore();
   const filteredItems = Array.isArray(storeFilteredItems) ? storeFilteredItems : [];
   const { isMobile } = useResponsive();
 
@@ -31,6 +34,7 @@ export const InventoryScreen: React.FC = () => {
   const [stockFilter, setStockFilter] = useState('');
   const [sortColumn, setSortColumn] = useState<string>('title');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [showBulkCheckout, setShowBulkCheckout] = useState(false);
   const [showBulkCheckIn, setShowBulkCheckIn] = useState(false);
@@ -121,6 +125,64 @@ export const InventoryScreen: React.FC = () => {
       }
     });
   }, [filteredItems, categoryFilter, statusFilter, stockFilter, sortColumn, sortDirection]);
+
+  // Group items by title for grouped view
+  const groupedData = useMemo(() => {
+    if (viewMode === 'flat') {
+      return displayedItems.map(item => ({ type: 'single' as const, item }));
+    }
+
+    const groups = new Map<string, InventoryItem[]>();
+    displayedItems.forEach(item => {
+      const key = item.title;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(item);
+    });
+
+    const result: Array<GroupedInventoryItem | { type: 'single'; item: InventoryItem }> = [];
+    groups.forEach((items, title) => {
+      if (items.length >= 1) {
+        // Always group (even single items for consistency)
+        result.push({
+          type: 'group',
+          title,
+          items,
+          totalQuantity: items.reduce((sum, i) => sum + i.quantity, 0),
+          uniqueSKUs: items.length,
+          category: items[0].category,
+          location: items[0].location,
+        });
+      }
+    });
+
+    // Sort groups by title
+    return result.sort((a, b) => {
+      const titleA = a.type === 'group' ? a.title : a.item.title;
+      const titleB = b.type === 'group' ? b.title : b.item.title;
+      return titleA.localeCompare(titleB);
+    });
+  }, [displayedItems, viewMode]);
+
+  // Get all item IDs for calibration data fetching
+  const allItemIds = useMemo(() => {
+    return displayedItems.map(item => item.id);
+  }, [displayedItems]);
+
+  // Fetch calibration data
+  const calibrationData = useCalibrationData(allItemIds);
+
+  // Toggle group expansion
+  const toggleGroup = useCallback((title: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(title)) {
+        next.delete(title);
+      } else {
+        next.add(title);
+      }
+      return next;
+    });
+  }, []);
 
   const clearFilters = () => {
     setCategoryFilter('');
@@ -558,6 +620,27 @@ export const InventoryScreen: React.FC = () => {
                 {showFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </button>
             </div>
+
+            {/* View Mode Toggle */}
+            <div>
+              <button
+                onClick={() => setViewMode(viewMode === 'grouped' ? 'flat' : 'grouped')}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
+                title={viewMode === 'grouped' ? 'Switch to flat view' : 'Switch to grouped view'}
+              >
+                {viewMode === 'grouped' ? (
+                  <>
+                    <List className="w-5 h-5" />
+                    <span className="hidden sm:inline">Show All</span>
+                  </>
+                ) : (
+                  <>
+                    <LayoutGrid className="w-5 h-5" />
+                    <span className="hidden sm:inline">Group Items</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Collapsible Filter Panel */}
@@ -695,73 +778,55 @@ export const InventoryScreen: React.FC = () => {
       {/* Inventory Items - Desktop Table */}
       {!loading && !isMobile && (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-200">
+          <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">
               All Items ({displayedItems.length})
             </h2>
+            <span className="text-sm text-gray-500">
+              {viewMode === 'grouped' ? `Grouped by title (${groupedData.length} groups)` : 'Individual items'}
+            </span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th onClick={() => handleSort('title')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Item {getSortIcon('title')}</th>
-                  <th onClick={() => handleSort('sku')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">SKU {getSortIcon('sku')}</th>
-                  <th onClick={() => handleSort('category')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Category {getSortIcon('category')}</th>
-                  <th onClick={() => handleSort('quantity')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Quantity {getSortIcon('quantity')}</th>
-                  <th onClick={() => handleSort('price')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Price {getSortIcon('price')}</th>
-                  <th onClick={() => handleSort('location')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Location {getSortIcon('location')}</th>
-                  <th onClick={() => handleSort('status')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Status {getSortIcon('status')}</th>
-                  {canAdd && <th className="px-3 py-2 text-right text-xs font-semibold text-gray-700">Actions</th>}
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Item</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700">SKUs</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700">Quantity</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Category</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Location</th>
+                  {canAdd && <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700">Actions</th>}
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-100">
-                {displayedItems.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-3 py-2">
-                      <div>
-                        <p className="font-medium text-gray-900">{item.title}</p>
-                        <p className="text-xs text-gray-500">{item.supplier}</p>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2 text-gray-900">{item.sku}</td>
-                    <td className="px-3 py-2 text-gray-600">{item.category}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-gray-900">{item.quantity}</span>
-                        {getStockStatus(item.quantity, item.minimumStock)}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2 text-gray-900">{formatCurrency(item.price)}</td>
-                    <td className="px-3 py-2 text-gray-600">{item.location}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        {getStatusBadge(item.status)}
-                        {getLastActionBadge(item.lastAction)}
-                      </div>
-                    </td>
-                    {canAdd && (
-                      <td className="px-3 py-2 text-right">
-                        <div className="flex gap-1 justify-end">
-                          <button
-                            onClick={() => handleEditItem(item)}
-                            className="p-1.5 hover:bg-blue-100 text-blue-600 rounded transition-colors"
-                            title="Edit item"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteItem(item.id)}
-                            className="p-1.5 hover:bg-red-100 text-red-600 rounded transition-colors"
-                            title="Delete item"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))}
+              <tbody>
+                {groupedData.map((group) =>
+                  group.type === 'group' ? (
+                    <GroupedInventoryRow
+                      key={group.title}
+                      title={group.title}
+                      supplier={group.items[0]?.supplier}
+                      items={group.items}
+                      totalQuantity={group.totalQuantity}
+                      uniqueSKUs={group.uniqueSKUs}
+                      category={group.category}
+                      location={group.location}
+                      isExpanded={expandedGroups.has(group.title)}
+                      onToggle={() => toggleGroup(group.title)}
+                      onEditItem={handleEditItem}
+                      canEdit={!!canAdd}
+                      calibrationData={calibrationData}
+                    />
+                  ) : (
+                    <SingleInventoryRow
+                      key={group.item.id}
+                      item={group.item}
+                      onEditItem={handleEditItem}
+                      onDeleteItem={handleDeleteItem}
+                      canEdit={!!canAdd}
+                    />
+                  )
+                )}
               </tbody>
             </table>
           </div>

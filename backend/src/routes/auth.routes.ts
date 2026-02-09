@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { AppDataSource } from '../config/database';
 import { User, UserRole } from '../entities/User';
+import { TeamMember } from '../entities/TeamMember';
 import { generateToken } from '../middleware/auth';
 import bcrypt from 'bcryptjs';
 import { body, validationResult } from 'express-validator';
@@ -204,6 +205,25 @@ router.post(
 
       if (!user || !isValidPassword) {
         return res.status(401).json({ error: 'Invalid credentials' });
+      }
+
+      // Check team member status - block terminated/inactive users
+      const teamMemberRepo = AppDataSource.getRepository(TeamMember);
+      const teamMember = await teamMemberRepo.findOne({ where: { user_id: user.id } });
+
+      if (teamMember) {
+        // Block login for terminated or inactive employees
+        if (teamMember.status === 'terminated') {
+          return res.status(403).json({
+            error: 'Your account has been terminated. Please contact HR if you believe this is an error.'
+          });
+        }
+        if (teamMember.status === 'inactive') {
+          return res.status(403).json({
+            error: 'Your account is currently inactive. Please contact your administrator.'
+          });
+        }
+        // 'active' and 'on-leave' are allowed to log in
       }
 
       // Check if this is first-time login (user has never changed password)

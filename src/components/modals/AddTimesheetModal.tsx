@@ -91,7 +91,7 @@ export const AddTimesheetModal: React.FC<AddTimesheetModalProps> = ({ isOpen, on
       try {
         // Add to store - this will automatically sync with:
         // 1. Project actual hours
-        // 2. Finance man-hours calculations
+        // 2. Finance base cost calculations
         // 3. Timesheet list
         await addTimesheet(timesheetData);
 
@@ -370,7 +370,7 @@ export const AddTimesheetModal: React.FC<AddTimesheetModalProps> = ({ isOpen, on
                 </p>
                 <ul className="text-xs text-green-700 mt-2 ml-4 space-y-1 list-disc">
                   <li>Project actual hours</li>
-                  <li>Finance man-hours calculations</li>
+                  <li>Finance base cost calculations</li>
                   <li>Timesheet reports</li>
                 </ul>
               </div>

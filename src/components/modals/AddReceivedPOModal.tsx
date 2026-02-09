@@ -327,42 +327,45 @@ export const AddReceivedPOModal: React.FC<AddReceivedPOModalProps> = ({ isOpen, 
                   value={formData.currency}
                   onChange={(currency) => setFormData({ ...formData, currency })}
                 />
+              </div>
+              
+              {/* Exchange Rate Section - Only show for non-MYR */}
+              {formData.currency !== 'MYR' && formData.amount && (
+                <div className="mt-3 space-y-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  {/* Exchange Rate Input */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Exchange Rate (1 {formData.currency} to MYR)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        step="0.000001"
+                        min="0"
+                        value={useCustomRate ? customRateValue : exchangeRate.toFixed(6)}
+                        onChange={(e) => {
+                          setUseCustomRate(true);
+                          setCustomRateValue(e.target.value);
+                        }}
+                        placeholder="Enter exchange rate"
+                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      />
+                      {!useCustomRate && (
+                        <span className="text-xs text-gray-500 whitespace-nowrap">Auto-fetched</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Converted Amount Display */}
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                    <span className="text-sm text-gray-600">Converted Amount:</span>
+                    <span className="text-lg font-semibold text-green-700">
+                      RM {convertedAmount.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
                 </div>
-               {formData.currency !== 'MYR' && formData.amount && (
-                 <div className="mt-2 space-y-2">
-                   <label className="flex items-center gap-2">
-                     <input
-                       type="checkbox"
-                       checked={useCustomRate}
-                       onChange={(e) => setUseCustomRate(e.target.checked)}
-                       className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                     />
-                     <span className="text-sm font-medium text-gray-700">Use custom exchange rate</span>
-                   </label>
-
-                   {useCustomRate && (
-                     <div className="flex items-center gap-2">
-                       <input
-                         type="number"
-                         step="0.000001"
-                         min="0"
-                         value={customRateValue}
-                         onChange={(e) => setCustomRateValue(e.target.value)}
-                         placeholder="e.g., 3.45"
-                         className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                       />
-                       <span className="text-sm text-gray-600">→ RM {convertedAmount.toFixed(2)}</span>
-                     </div>
-                   )}
-
-                   {!useCustomRate && (
-                     <p className="text-xs text-gray-600">
-                       Using system rate: {exchangeRate.toFixed(6)} → RM {convertedAmount.toFixed(2)}
-                     </p>
-                   )}
-                 </div>
-               )}
-             </div>
+              )}
+            </div>
 
             {/* Received Date */}
             <div>

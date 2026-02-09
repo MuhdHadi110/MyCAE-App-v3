@@ -31,11 +31,64 @@ router.get('/projects', async (req: AuthRequest, res: Response) => {
       .skip(pagination.offset)
       .getManyAndCount();
 
-    // Transform to include lead researcher name
+    // Get total hours for each project from research_timesheets
+    const projectIds = projects.map(p => p.id);
+    console.log('Research projects found:', projectIds);
+    
+    let hoursMap = new Map<string, number>();
+    if (projectIds.length > 0) {
+      try {
+        // Check if table exists first
+        const tableExists = await AppDataSource.query(
+          `SELECT COUNT(*) as count FROM information_schema.tables 
+           WHERE table_schema = DATABASE() AND table_name = 'research_timesheets'`
+        );
+        console.log('research_timesheets table exists:', tableExists);
+        
+        if (tableExists[0]?.count > 0) {
+          // Build the IN clause manually for MySQL
+          const placeholders = projectIds.map(() => '?').join(',');
+          
+          // Get all timesheets for these projects
+          const hoursQuery = await AppDataSource.query(
+            `SELECT research_project_id as projectId, SUM(hours) as totalHours 
+             FROM research_timesheets 
+             WHERE research_project_id IN (${placeholders}) 
+             GROUP BY research_project_id`,
+            projectIds
+          );
+          console.log('Hours query result:', hoursQuery);
+          
+          // Build hours map
+          hoursQuery.forEach((row: any) => {
+            hoursMap.set(row.projectId, parseFloat(row.totalHours) || 0);
+          });
+          
+          // Also check raw data
+          const rawData = await AppDataSource.query(
+            `SELECT * FROM research_timesheets WHERE research_project_id IN (${placeholders})`,
+            projectIds
+          );
+          console.log('Raw timesheet data count:', rawData.length);
+          console.log('Raw timesheet data:', rawData);
+        } else {
+          console.log('research_timesheets table does not exist');
+        }
+      } catch (error) {
+        console.error('Error fetching hours:', error);
+      }
+    }
+    
+    console.log('Hours map:', Array.from(hoursMap.entries()));
+    
+    // Transform to include lead researcher name and total hours
     const transformedProjects = projects.map(p => ({
       ...p,
       leadResearcherName: p.leadResearcher?.name || null,
+      totalHoursLogged: hoursMap.get(p.id) || 0,
     }));
+    
+    console.log('Transformed projects with hours:', transformedProjects.map(p => ({ id: p.id, totalHoursLogged: p.totalHoursLogged })));
 
     res.json({
       data: transformedProjects,

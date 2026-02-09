@@ -6,6 +6,7 @@ import { Company } from '../entities/Company';
 import { UserRole } from '../entities/User';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { body, validationResult } from 'express-validator';
+import { upload, generateFileUrl } from '../utils/fileUpload';
 
 const router = Router();
 
@@ -328,10 +329,52 @@ router.post('/:id/mark-as-paid',
 );
 
 /**
- * POST /api/received-invoices/:id/dispute
- * Mark received invoice as disputed
+ * POST /api/received-invoices/:id/upload
+ * Upload document file for received invoice
+ * Authorization: Senior Engineer and above
  */
-router.post('/:id/dispute', async (req: AuthRequest, res: Response) => {
+router.post(
+  '/:id/upload',
+  authorize(UserRole.SENIOR_ENGINEER, UserRole.PRINCIPAL_ENGINEER, UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN),
+  upload.single('file'),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const receivedInvoiceRepo = AppDataSource.getRepository(ReceivedInvoice);
+
+      // Check if invoice exists
+      const invoice = await receivedInvoiceRepo.findOne({ where: { id } });
+      if (!invoice) {
+        return res.status(404).json({ error: 'Received invoice not found' });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+
+      // Generate file URL
+      const fileUrl = generateFileUrl(req.file.filename, req);
+
+      // Update invoice with file URL
+      await receivedInvoiceRepo.update(id, { fileUrl });
+
+      res.status(200).json({
+        message: 'File uploaded successfully',
+        fileUrl,
+        filename: req.file.filename,
+      });
+    } catch (error: any) {
+      console.error('Error uploading received invoice file:', error);
+      res.status(500).json({ error: error.message || 'Failed to upload file' });
+    }
+  }
+);
+
+/**
+ * GET /api/received-invoices/:id/file
+ * View uploaded received invoice document
+ */
+router.get('/:id/file', async (req: AuthRequest, res: Response) => {
   try {
     const receivedInvoiceRepo = AppDataSource.getRepository(ReceivedInvoice);
     const invoice = await receivedInvoiceRepo.findOne({ where: { id: req.params.id } });
@@ -340,20 +383,32 @@ router.post('/:id/dispute', async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: 'Received invoice not found' });
     }
 
-    if (invoice.status === ReceivedInvoiceStatus.PAID) {
-      return res.status(400).json({ error: 'Cannot dispute a paid invoice' });
+    if (!invoice.fileUrl) {
+      return res.status(404).json({ error: 'No file uploaded for this invoice' });
     }
 
-    invoice.status = ReceivedInvoiceStatus.DISPUTED;
-    const updatedInvoice = await receivedInvoiceRepo.save(invoice);
+    // Extract filename from fileUrl
+    const filename = invoice.fileUrl.split('/').pop();
+    if (!filename) {
+      return res.status(404).json({ error: 'Invalid file URL' });
+    }
 
-    res.json({
-      message: 'Received invoice marked as disputed',
-      data: updatedInvoice,
-    });
+    // Serve the file
+    const path = await import('path');
+    const fs = await import('fs');
+    const uploadsDir = path.default.join(__dirname, '../../uploads/purchase-orders');
+    const filePath = path.default.join(uploadsDir, filename);
+
+    // Check if file exists
+    if (!fs.default.existsSync(filePath)) {
+      return res.status(404).json({ error: 'File not found on server' });
+    }
+
+    // Send file
+    res.sendFile(path.default.resolve(filePath));
   } catch (error: any) {
-    console.error('Error disputing received invoice:', error);
-    res.status(500).json({ error: 'Failed to dispute received invoice' });
+    console.error('Error serving received invoice file:', error);
+    res.status(500).json({ error: 'Failed to serve file' });
   }
 });
 

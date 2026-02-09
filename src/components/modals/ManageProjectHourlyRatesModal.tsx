@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { X, DollarSign, Save } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import type { ManHourBreakdown } from '../../types/projectFinance.types';
+import type { BaseCostBreakdown } from '../../types/projectFinance.types';
 
 interface ManageProjectHourlyRatesModalProps {
   isOpen: boolean;
   onClose: () => void;
   projectCode: string;
   projectTitle: string;
-  manHourBreakdown: ManHourBreakdown[];
+  manHourBreakdown: BaseCostBreakdown[];
   onSave: (rates: Record<string, number>) => Promise<void>;
 }
 

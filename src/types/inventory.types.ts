@@ -80,3 +80,26 @@ export interface CheckoutItem {
   status: 'checked-out' | 'returned' | 'overdue';
   masterBarcode?: string;
 }
+
+// Calibration tracking for grouped inventory view
+export interface CalibrationInfo {
+  itemId: string;
+  lastCalibrated?: string;
+  nextDue?: string;
+  status: 'recent' | 'due-soon' | 'overdue' | 'none';
+}
+
+// Grouped inventory display types
+export interface GroupedInventoryItem {
+  type: 'group';
+  title: string;
+  items: InventoryItem[];
+  totalQuantity: number;
+  uniqueSKUs: number;
+  category: string;
+  location: string;
+}
+
+export type InventoryDisplayItem = 
+  | GroupedInventoryItem 
+  | { type: 'single'; item: InventoryItem };

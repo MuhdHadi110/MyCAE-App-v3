@@ -1,8 +1,8 @@
 import React from 'react';
-import { FileText, Receipt, Clock, Briefcase } from 'lucide-react';
+import { FileText, Receipt, Clock, Briefcase, ShoppingCart, FileCheck } from 'lucide-react';
 import type { FinanceTotals } from '../../types/financeOverview.types';
 import { formatTotalWithCurrency } from '../../hooks/useFinanceData';
-import { DAILY_MAN_HOUR_COST, FIXED_HOURLY_RATE } from '../../constants/finance';
+import { DAILY_BASE_COST, FIXED_HOURLY_RATE } from '../../constants/finance';
 
 interface FinanceSummaryCardsProps {
   totals: FinanceTotals;
@@ -49,19 +49,39 @@ export const FinanceSummaryCards: React.FC<FinanceSummaryCardsProps> = ({
       subtitle: 'Remaining to invoice',
     },
     {
-      title: 'Man-Hour Cost',
-      value: formatCurrency(totals.totalManHourCost),
+      title: 'Vendor POs Issued',
+      value: showOriginalCurrency
+        ? formatTotalWithCurrency(totals.totalVendorPOsIssued, totals.vendorPOsByCurrency, true)
+        : formatCurrency(totals.totalVendorPOsIssued),
+      icon: ShoppingCart,
+      iconBg: 'bg-indigo-100',
+      iconColor: 'text-indigo-600',
+      subtitle: 'Purchase orders to vendors',
+    },
+    {
+      title: 'Vendor Invoices',
+      value: showOriginalCurrency
+        ? formatTotalWithCurrency(totals.totalVendorInvoicesReceived, totals.vendorInvoicesByCurrency, true)
+        : formatCurrency(totals.totalVendorInvoicesReceived),
+      icon: FileCheck,
+      iconBg: 'bg-teal-100',
+      iconColor: 'text-teal-600',
+      subtitle: 'Invoices received from vendors',
+    },
+    {
+      title: 'Base Cost',
+      value: formatCurrency(totals.totalBaseCost),
       icon: Briefcase,
       iconBg: 'bg-purple-100',
       iconColor: 'text-purple-600',
-      subtitle: `RM ${DAILY_MAN_HOUR_COST.toLocaleString()}/day (RM ${FIXED_HOURLY_RATE.toFixed(2)}/hr)`,
+      subtitle: `Base rate: RM ${DAILY_BASE_COST.toLocaleString()}/day (RM ${FIXED_HOURLY_RATE.toFixed(2)}/hr)`,
     },
   ];
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[...Array(4)].map((_, i) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        {[...Array(6)].map((_, i) => (
           <div key={i} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 animate-pulse">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-gray-200 rounded-xl" />
@@ -76,7 +96,7 @@ export const FinanceSummaryCards: React.FC<FinanceSummaryCardsProps> = ({
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
       {cards.map((card) => {
         const Icon = card.icon;
         const isMultiLine = card.value.includes('\n');
@@ -95,13 +115,13 @@ export const FinanceSummaryCards: React.FC<FinanceSummaryCardsProps> = ({
             {isMultiLine ? (
               <div className="space-y-1">
                 {card.value.split('\n').map((line, i) => (
-                  <div key={i} className="text-lg font-bold text-gray-900">
+                  <div key={i} className="text-sm font-bold text-gray-900">
                     {line}
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-2xl lg:text-3xl font-bold text-gray-900 whitespace-nowrap overflow-hidden text-ellipsis">
+              <div className="text-xl lg:text-2xl font-bold text-gray-900 whitespace-nowrap">
                 {card.value}
               </div>
             )}

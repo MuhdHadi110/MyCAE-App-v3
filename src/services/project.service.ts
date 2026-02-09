@@ -133,6 +133,23 @@ class ProjectService {
     const response = await api.get('/migration/template');
     return response.data;
   }
+
+  // ==================== Variation Orders ====================
+
+  async getVariationOrders(projectId: string): Promise<any[]> {
+    const response = await api.get(`/projects/${projectId}/variation-orders`);
+    return response.data || [];
+  }
+
+  async getProjectWithVOs(projectId: string): Promise<any> {
+    const response = await api.get(`/projects/${projectId}/with-vos`);
+    return response.data;
+  }
+
+  async createVariationOrder(parentProjectId: string, voData: any): Promise<any> {
+    const response = await api.post(`/projects/${parentProjectId}/create-vo`, voData);
+    return response.data;
+  }
 }
 
 // Export singleton instance

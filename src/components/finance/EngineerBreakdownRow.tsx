@@ -19,7 +19,7 @@ const roleLabels: Record<string, string> = {
 export const EngineerBreakdownRow: React.FC<EngineerBreakdownRowProps> = ({
   engineers,
 }) => {
-  const { canViewManHourCost } = usePermissions();
+  const { canViewBaseCost } = usePermissions();
 
   const formatCurrency = (amount: number) => {
     return `RM ${amount.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -56,7 +56,7 @@ export const EngineerBreakdownRow: React.FC<EngineerBreakdownRowProps> = ({
               <th className="pb-2 text-left font-medium text-gray-600">Engineer</th>
               <th className="pb-2 text-left font-medium text-gray-600">Role</th>
               <th className="pb-2 text-right font-medium text-gray-600">Hours</th>
-              {canViewManHourCost && (
+              {canViewBaseCost && (
                 <>
                   <th className="pb-2 text-right font-medium text-gray-600">Rate/hr</th>
                   <th className="pb-2 text-right font-medium text-gray-600">Cost</th>
@@ -78,7 +78,7 @@ export const EngineerBreakdownRow: React.FC<EngineerBreakdownRowProps> = ({
                 <td className="py-2.5 text-right">
                   <span className="text-gray-900">{engineer.hours.toFixed(1)} hrs</span>
                 </td>
-                {canViewManHourCost && (
+                {canViewBaseCost && (
                   <>
                     <td className="py-2.5 text-right">
                       <span className="text-gray-600">
@@ -102,7 +102,7 @@ export const EngineerBreakdownRow: React.FC<EngineerBreakdownRowProps> = ({
               <td className="py-2.5 text-right font-semibold text-gray-900">
                 {totalHours.toFixed(1)} hrs
               </td>
-              {canViewManHourCost && (
+              {canViewBaseCost && (
                 <>
                   <td className="py-2.5 text-right text-gray-600">
                     Avg: {formatCurrency(avgRate)}

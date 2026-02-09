@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
   BeforeInsert,
   ManyToOne,
+  OneToMany,
   JoinColumn,
 } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
@@ -43,6 +44,24 @@ export class Project {
   @ManyToOne(() => Company)
   @JoinColumn({ name: 'company_id' })
   company?: Company;
+
+  // Variation Order (VO) support
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  parent_project_id?: string;
+
+  @Column({ type: 'boolean', default: false })
+  is_variation_order: boolean;
+
+  @Column({ type: 'int', nullable: true })
+  vo_number?: number;
+
+  // Self-referential relations
+  @ManyToOne(() => Project, (project) => project.variationOrders, { nullable: true })
+  @JoinColumn({ name: 'parent_project_id' })
+  parentProject?: Project;
+
+  @OneToMany(() => Project, (project) => project.parentProject)
+  variationOrders?: Project[];
 
   @Column({
     type: 'enum',

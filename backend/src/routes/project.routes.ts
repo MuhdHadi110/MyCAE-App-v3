@@ -39,7 +39,9 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       .leftJoin('project.company', 'company')
       .addSelect(['company.id', 'company.name'])
       .leftJoin('project.contact', 'contact')
-      .addSelect(['contact.id', 'contact.name', 'contact.email']);
+      .addSelect(['contact.id', 'contact.name', 'contact.email'])
+      .leftJoin('project.parentProject', 'parentProject')
+      .addSelect(['parentProject.id', 'parentProject.project_code', 'parentProject.title']);
 
     // Non-privileged users can only see projects they're assigned to
     if (!isPrivileged && userId) {
@@ -234,15 +236,49 @@ router.post(
         }
       }
 
-      // Validate project code format (J + 5 digits, e.g., J25001)
-      const projectCodeRegex = /^J\d{5}$/;
+      // Validate project code format (J + 5 digits or J + 5 digits + _number for VOs)
+      // Regular projects: J25001
+      // Variation Orders: J25001_1, J25001_2, etc.
+      const projectCodeRegex = /^J\d{5}(_\d+)?$/;
       if (!req.body.projectCode || !projectCodeRegex.test(req.body.projectCode)) {
         return res.status(400).json({
-          error: 'Project Code must be in format J2XXXX (e.g., J25001)',
+          error: 'Project Code must be in format J2XXXX or J2XXXX_N (e.g., J25001 or J25001_1)',
         });
       }
 
       const projectCode = req.body.projectCode;
+
+      // Handle VO fields if this is a variation order
+      let parentProjectId = null;
+      let isVariationOrder = false;
+      let voNumber = null;
+
+      // If it's a VO code (contains underscore), validate parent exists
+      const isVO = projectCode.includes('_');
+      if (isVO) {
+        const [parentCode, voNumberStr] = projectCode.split('_');
+        const parentProject = await projectRepo.findOne({
+          where: { project_code: parentCode },
+        });
+
+        if (!parentProject) {
+          return res.status(400).json({
+            error: `Parent project ${parentCode} not found. Create the parent project first.`,
+          });
+        }
+
+        // Validate parent is not itself a VO
+        if (parentProject.is_variation_order) {
+          return res.status(400).json({
+            error: 'Cannot create a Variation Order under another Variation Order.',
+          });
+        }
+
+        // Set VO fields
+        parentProjectId = parentProject.id;
+        isVariationOrder = true;
+        voNumber = parseInt(voNumberStr, 10);
+      }
 
       // Check for duplicate project code
       const existingProjectCode = await projectRepo.findOne({
@@ -277,8 +313,12 @@ router.post(
         inquiry_date: new Date(), // Set inquiry date when created
         remarks: req.body.description || null,
         categories: req.body.workTypes || null,
+        // VO fields
+        parent_project_id: parentProjectId,
+        is_variation_order: isVariationOrder,
+        vo_number: voNumber,
         // completion_date will be set automatically when status changes to 'completed'
-      });
+      } as Partial<Project>);
       await projectRepo.save(project);
 
       // Fetch related data for notifications
@@ -520,10 +560,36 @@ router.delete(
         return res.status(404).json({ error: 'Project not found' });
       }
 
+      // Check for variation orders if this is a parent project
+      if (!project.is_variation_order) {
+        const vos = await projectRepo.find({
+          where: { parent_project_id: project.id },
+        });
+
+        if (vos.length > 0) {
+          return res.status(400).json({
+            error: 'Cannot delete project with variation orders',
+            variationOrders: vos.map(vo => ({
+              id: vo.id,
+              projectCode: vo.project_code,
+              title: vo.title,
+            })),
+            message: 'Please delete all variation orders first, or use force delete.',
+          });
+        }
+      }
+
       // Delete PO file if exists
       if (project.po_file_url) {
         deleteFile(project.po_file_url);
       }
+
+      // Delete related timesheets first to avoid foreign key constraint
+      await AppDataSource.createQueryBuilder()
+        .delete()
+        .from('timesheets')
+        .where('project_id = :projectId', { projectId: req.params.id })
+        .execute();
 
       await projectRepo.remove(project);
 
@@ -666,6 +732,204 @@ router.patch(
     } catch (error: any) {
       console.error('Error updating project status:', error);
       res.status(500).json({ error: 'Failed to update project status' });
+    }
+  }
+);
+
+/**
+ * GET /api/projects/:id/variation-orders
+ * Get all variation orders for a parent project
+ */
+router.get('/:id/variation-orders', async (req: AuthRequest, res: Response) => {
+  try {
+    const projectRepo = AppDataSource.getRepository(Project);
+
+    // Find the parent project
+    const parentProject = await projectRepo.findOne({
+      where: { id: req.params.id },
+    });
+
+    if (!parentProject) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    // Check if this is itself a VO
+    if (parentProject.is_variation_order) {
+      return res.status(400).json({
+        error: 'This is a Variation Order. Use the parent project ID to get all VOs.',
+      });
+    }
+
+    // Get all VOs for this parent
+    const vos = await projectRepo.find({
+      where: { parent_project_id: parentProject.id },
+      relations: ['lead_engineer', 'manager', 'company', 'contact'],
+      order: { vo_number: 'ASC' },
+    });
+
+    res.json(vos);
+  } catch (error: any) {
+    console.error('Error fetching variation orders:', error);
+    res.status(500).json({ error: 'Failed to fetch variation orders' });
+  }
+});
+
+/**
+ * GET /api/projects/:id/with-vos
+ * Get project with all its variation orders and aggregated financials
+ */
+router.get('/:id/with-vos', async (req: AuthRequest, res: Response) => {
+  try {
+    const projectRepo = AppDataSource.getRepository(Project);
+
+    // Find the project
+    const project = await projectRepo.findOne({
+      where: { id: req.params.id },
+      relations: ['lead_engineer', 'manager', 'company', 'contact', 'variationOrders'],
+    });
+
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    // If this is a VO, redirect to parent
+    if (project.is_variation_order && project.parent_project_id) {
+      const parentProject = await projectRepo.findOne({
+        where: { id: project.parent_project_id },
+        relations: ['lead_engineer', 'manager', 'company', 'contact', 'variationOrders'],
+      });
+      return res.json(parentProject);
+    }
+
+    res.json(project);
+  } catch (error: any) {
+    console.error('Error fetching project with VOs:', error);
+    res.status(500).json({ error: 'Failed to fetch project with VOs' });
+  }
+});
+
+/**
+ * POST /api/projects/:id/create-vo
+ * Create a new variation order for a parent project
+ * Auto-generates the next VO number
+ */
+router.post(
+  '/:id/create-vo',
+  authorize(
+    UserRole.SENIOR_ENGINEER,
+    UserRole.PRINCIPAL_ENGINEER,
+    UserRole.MANAGER,
+    UserRole.MANAGING_DIRECTOR,
+    UserRole.ADMIN
+  ),
+  [
+    body('title').notEmpty().withMessage('Title is required'),
+  ],
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const projectRepo = AppDataSource.getRepository(Project);
+
+      // Find parent project
+      const parentProject = await projectRepo.findOne({
+        where: { id: req.params.id },
+      });
+
+      if (!parentProject) {
+        return res.status(404).json({ error: 'Parent project not found' });
+      }
+
+      // Validate parent is not itself a VO
+      if (parentProject.is_variation_order) {
+        return res.status(400).json({
+          error: 'Cannot create a VO under another VO',
+        });
+      }
+
+      // Find existing VOs and determine next VO number
+      const existingVOs = await projectRepo.find({
+        where: { parent_project_id: parentProject.id },
+        order: { vo_number: 'DESC' },
+      });
+
+      const nextVONumber = existingVOs.length > 0
+        ? (existingVOs[0].vo_number || 0) + 1
+        : 1;
+
+      const voCode = `${parentProject.project_code}_${nextVONumber}`;
+
+      // Check for duplicate VO code (shouldn't happen but safety check)
+      const existingVO = await projectRepo.findOne({
+        where: { project_code: voCode },
+      });
+
+      if (existingVO) {
+        return res.status(400).json({
+          error: `VO code ${voCode} already exists`,
+        });
+      }
+
+      // Resolve team member IDs
+      const teamMemberRepo = AppDataSource.getRepository(TeamMember);
+      let managerUserId = req.body.managerId || parentProject.manager_id;
+      let leadEngineerUserId = req.body.leadEngineerId || parentProject.lead_engineer_id;
+
+      if (req.body.managerId) {
+        const manager = await teamMemberRepo.findOne({
+          where: { id: req.body.managerId },
+          relations: ['user']
+        });
+        if (manager && manager.user_id) {
+          managerUserId = manager.user_id;
+        }
+      }
+
+      if (req.body.leadEngineerId) {
+        const leadEngineer = await teamMemberRepo.findOne({
+          where: { id: req.body.leadEngineerId },
+          relations: ['user']
+        });
+        if (leadEngineer && leadEngineer.user_id) {
+          leadEngineerUserId = leadEngineer.user_id;
+        }
+      }
+
+      // Create VO (inherit fields from parent by default)
+      const vo = projectRepo.create({
+        project_code: voCode,
+        title: req.body.title,
+        company_id: req.body.companyId || parentProject.company_id,
+        contact_id: req.body.contactId || parentProject.contact_id,
+        status: req.body.status || ProjectStatus.PRE_LIM,
+        planned_hours: req.body.plannedHours || 0,
+        actual_hours: 0,
+        lead_engineer_id: leadEngineerUserId,
+        manager_id: managerUserId,
+        start_date: req.body.startDate ? new Date(req.body.startDate) : new Date(),
+        inquiry_date: new Date(),
+        remarks: req.body.description || null,
+        categories: req.body.workTypes || parentProject.categories,
+        // VO-specific fields
+        parent_project_id: parentProject.id,
+        is_variation_order: true,
+        vo_number: nextVONumber,
+      });
+
+      await projectRepo.save(vo);
+
+      res.status(201).json({
+        message: 'Variation Order created successfully',
+        vo,
+        voCode,
+        voNumber: nextVONumber,
+      });
+    } catch (error: any) {
+      console.error('Error creating variation order:', error);
+      res.status(500).json({ error: 'Failed to create variation order' });
     }
   }
 );

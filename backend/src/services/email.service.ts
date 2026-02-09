@@ -582,7 +582,87 @@ class EmailService {
     submittedDate: string,
     submittedTime: string
   ): Promise<void> {
-    console.log('Email service disabled: sendInvoiceApprovalRequest called');
+    const subject = `Invoice Approval Required: ${invoiceNumber} - ${currency} ${invoiceAmount.toLocaleString()}`;
+    const approvalUrl = `${process.env.FRONTEND_URL}/finance/invoices/${invoiceId}`;
+
+    // Send to all MDs
+    for (const md of mds) {
+      try {
+        const personalizedHtml = this.getInvoiceApprovalRequestTemplate(
+          invoiceNumber,
+          invoiceAmount,
+          currency,
+          projectCode,
+          projectName,
+          creatorName,
+          creatorEmail,
+          submittedDate,
+          submittedTime,
+          approvalUrl,
+          md.name
+        );
+        await this.sendEmail(md.email, subject, personalizedHtml);
+        console.log(`✓ Email sent successfully to MD: ${md.name} (${md.email})`);
+      } catch (error: any) {
+        console.error(`✗ Failed to send email to MD ${md.name}:`, error.message);
+      }
+    }
+  }
+
+  /**
+   * Invoice approval request email template - Clean professional format
+   */
+  private getInvoiceApprovalRequestTemplate(
+    invoiceNumber: string,
+    invoiceAmount: number,
+    currency: string,
+    projectCode: string,
+    projectName: string,
+    creatorName: string,
+    creatorEmail: string,
+    submittedDate: string,
+    submittedTime: string,
+    approvalUrl: string,
+    mdName: string
+  ): string {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333333; margin: 0; padding: 20px;">
+  <div style="max-width: 600px; margin: 0 auto;">
+    <p>Dear ${mdName},</p>
+
+    <p>An invoice has been submitted and requires your approval.</p>
+
+    <p style="margin: 20px 0;">
+      Invoice Number : ${invoiceNumber}<br>
+      Amount : ${currency} ${invoiceAmount.toLocaleString()}<br>
+      Project Code : ${projectCode}<br>
+      Project Name : ${projectName}<br>
+      Submitted By : ${creatorName}<br>
+      Submitted On : ${submittedDate} at ${submittedTime}
+    </p>
+
+    <p>Please review and approve this invoice at your earliest convenience.</p>
+
+    <p style="margin: 20px 0;">
+      <a href="${approvalUrl}" style="display: inline-block; padding: 12px 24px; background-color: #0066cc; color: #ffffff; text-decoration: none; border-radius: 4px;">Review Invoice</a>
+    </p>
+
+    <p>Should you have any questions, please contact ${creatorName} at ${creatorEmail}.</p>
+
+    <p style="margin-top: 30px;">
+      Best regards,<br>
+      MyCAE Admin.
+    </p>
+  </div>
+</body>
+</html>
+    `;
   }
 
   async sendInvoiceApprovalConfirmation(
@@ -598,7 +678,77 @@ class EmailService {
     approvedDate: string,
     approvedTime: string
   ): Promise<void> {
-    console.log('Email service disabled: sendInvoiceApprovalConfirmation called');
+    const subject = `Invoice Approved: ${invoiceNumber} - ${currency} ${invoiceAmount.toLocaleString()}`;
+    const invoiceUrl = `${process.env.FRONTEND_URL}/finance/invoices/${invoiceId}`;
+
+    const html = this.getInvoiceApprovalConfirmationTemplate(
+      creatorName,
+      invoiceNumber,
+      invoiceAmount,
+      currency,
+      projectCode,
+      projectName,
+      approverName,
+      approvedDate,
+      approvedTime,
+      invoiceUrl
+    );
+
+    await this.sendEmail(creatorEmail, subject, html);
+    console.log(`✓ Email sent successfully to creator: ${creatorName} (${creatorEmail}) - Invoice Approval Confirmation`);
+  }
+
+  /**
+   * Invoice approval confirmation email template - Clean professional format
+   */
+  private getInvoiceApprovalConfirmationTemplate(
+    creatorName: string,
+    invoiceNumber: string,
+    invoiceAmount: number,
+    currency: string,
+    projectCode: string,
+    projectName: string,
+    approverName: string,
+    approvedDate: string,
+    approvedTime: string,
+    invoiceUrl: string
+  ): string {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333333; margin: 0; padding: 20px;">
+  <div style="max-width: 600px; margin: 0 auto;">
+    <p>Dear ${creatorName},</p>
+
+    <p>Your invoice has been <strong>approved</strong>.</p>
+
+    <p style="margin: 20px 0;">
+      Invoice Number : ${invoiceNumber}<br>
+      Amount : ${currency} ${invoiceAmount.toLocaleString()}<br>
+      Project Code : ${projectCode}<br>
+      Project Name : ${projectName}<br>
+      Approved By : ${approverName}<br>
+      Approved On : ${approvedDate} at ${approvedTime}
+    </p>
+
+    <p>You can now proceed with the next steps for this invoice.</p>
+
+    <p style="margin: 20px 0;">
+      <a href="${invoiceUrl}" style="display: inline-block; padding: 12px 24px; background-color: #10b981; color: #ffffff; text-decoration: none; border-radius: 4px;">View Invoice</a>
+    </p>
+
+    <p style="margin-top: 30px;">
+      Best regards,<br>
+      MyCAE Admin.
+    </p>
+  </div>
+</body>
+</html>
+    `;
   }
 
   async sendInvoiceWithdrawnNotification(
@@ -613,7 +763,76 @@ class EmailService {
     withdrawnDate: string,
     withdrawnTime: string
   ): Promise<void> {
-    console.log('Email service disabled: sendInvoiceWithdrawnNotification called');
+    const subject = `Invoice Withdrawn: ${invoiceNumber} - ${currency} ${invoiceAmount.toLocaleString()}`;
+
+    // Send to all MDs
+    for (const md of mds) {
+      try {
+        const personalizedHtml = this.getInvoiceWithdrawnTemplate(
+          invoiceNumber,
+          invoiceAmount,
+          currency,
+          projectCode,
+          projectName,
+          creatorName,
+          withdrawnDate,
+          withdrawnTime,
+          md.name
+        );
+        await this.sendEmail(md.email, subject, personalizedHtml);
+        console.log(`✓ Email sent successfully to MD: ${md.name} (${md.email})`);
+      } catch (error: any) {
+        console.error(`✗ Failed to send email to MD ${md.name}:`, error.message);
+      }
+    }
+  }
+
+  /**
+   * Invoice withdrawn notification email template - Clean professional format
+   */
+  private getInvoiceWithdrawnTemplate(
+    invoiceNumber: string,
+    invoiceAmount: number,
+    currency: string,
+    projectCode: string,
+    projectName: string,
+    creatorName: string,
+    withdrawnDate: string,
+    withdrawnTime: string,
+    mdName: string
+  ): string {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333333; margin: 0; padding: 20px;">
+  <div style="max-width: 600px; margin: 0 auto;">
+    <p>Dear ${mdName},</p>
+
+    <p>An invoice approval request has been <strong>withdrawn</strong> by the creator.</p>
+
+    <p style="margin: 20px 0;">
+      Invoice Number : ${invoiceNumber}<br>
+      Amount : ${currency} ${invoiceAmount.toLocaleString()}<br>
+      Project Code : ${projectCode}<br>
+      Project Name : ${projectName}<br>
+      Withdrawn By : ${creatorName}<br>
+      Withdrawn On : ${withdrawnDate} at ${withdrawnTime}
+    </p>
+
+    <p>No action is required. This is for your information only.</p>
+
+    <p style="margin-top: 30px;">
+      Best regards,<br>
+      MyCAE Admin.
+    </p>
+  </div>
+</body>
+</html>
+    `;
   }
 }
 

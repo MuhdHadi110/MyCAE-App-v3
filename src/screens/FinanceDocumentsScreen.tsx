@@ -8,6 +8,7 @@ import { EditInvoiceModal } from '../components/modals/EditInvoiceModal';
 import { AddIssuedPOModal } from '../components/modals/AddIssuedPOModal';
 import { AddReceivedInvoiceModal } from '../components/modals/AddReceivedInvoiceModal';
 import { EditPOModal } from '../components/modals/EditPOModal';
+import { EditIssuedPOModal } from '../components/modals/EditIssuedPOModal';
 import { ViewPODetailsModal } from '../components/modals/ViewPODetailsModal';
 import { ReceivedPOsTab } from '../components/finance/ReceivedPOsTab';
 import { InvoicesTab } from '../components/finance/InvoicesTab';
@@ -55,6 +56,8 @@ export const FinanceDocumentsScreen = () => {
   const [editingReceivedInvoice, setEditingReceivedInvoice] = useState<any | null>(null);
   const [showEditPOModal, setShowEditPOModal] = useState(false);
   const [selectedPO, setSelectedPO] = useState<any | null>(null);
+  const [showEditIssuedPOModal, setShowEditIssuedPOModal] = useState(false);
+  const [selectedIssuedPO, setSelectedIssuedPO] = useState<any | null>(null);
   const [showViewDetailsModal, setShowViewDetailsModal] = useState(false);
 
   // Real data from API
@@ -187,9 +190,24 @@ export const FinanceDocumentsScreen = () => {
 
       // Determine endpoint based on selected document type
       const documentType = (selectedDocument as any)?.type || 'invoice';
-      const endpoint = documentType === 'invoice'
-        ? `/api/invoices/${documentId}/upload`
-        : `/api/issued-pos/${documentId}/upload`;
+      let endpoint: string;
+      if (documentType === 'invoice') {
+        endpoint = `/api/invoices/${documentId}/upload`;
+      } else if (documentType === 'issued-po') {
+        endpoint = `/api/issued-pos/${documentId}/upload`;
+      } else if (documentType === 'received-po') {
+        // Received POs use the purchase-orders upload endpoint with ID
+        endpoint = `/api/purchase-orders/${documentId}/upload`;
+      } else if (documentType === 'purchase-order') {
+        // General PO upload with ID
+        endpoint = `/api/purchase-orders/${documentId}/upload`;
+      } else if (documentType === 'received-invoice') {
+        endpoint = `/api/received-invoices/${documentId}/upload`;
+      } else {
+        // Improved error handling instead of silent fallback
+        console.error('Unknown document type:', documentType);
+        throw new Error(`Cannot upload: Unknown document type "${documentType}"`);
+      }
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -358,23 +376,132 @@ export const FinanceDocumentsScreen = () => {
     }
   };
 
-  const handleViewDocument = (po: any) => {
-    if (po.file_url) {
-      window.open(po.file_url, '_blank');
-      toast.success('Opening document in new tab');
-    } else {
-      toast.error('No document available');
+  const handleViewDocument = async (po: any) => {
+    try {
+      console.log('=== handleViewDocument called ===');
+      console.log('Full PO object:', po);
+      console.log('po.file_url:', po.file_url);
+      console.log('po.fileUrl:', po.fileUrl);
+      console.log('All PO keys:', Object.keys(po));
+
+      // Check for both field names (camelCase and snake_case)
+      const fileUrl = po.fileUrl || po.file_url;
+
+      if (!fileUrl) {
+        console.log('No fileUrl found, returning early');
+        toast.error('No document available');
+        return;
+      }
+
+      console.log('Using fileUrl:', fileUrl);
+
+      toast.loading('Opening document...');
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        toast.error('Authentication required');
+        return;
+      }
+
+      // Extract filename from file_url
+      const filename = fileUrl.split('/').pop();
+      if (!filename) {
+        toast.error('Invalid file URL');
+        return;
+      }
+
+      // Use backend download endpoint
+      const downloadUrl = `/api/purchase-orders/download/${filename}`;
+      fetch(downloadUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      .then(response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.blob();
+      })
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.target = '_blank';
+        a.click();
+        window.URL.revokeObjectURL(url);
+        toast.dismiss();
+        toast.success('Opening document');
+      })
+      .catch(error => {
+        toast.dismiss();
+        logger.error('Error opening document:', error);
+        toast.error('Failed to open document: ' + error.message);
+      });
+    } catch (error: any) {
+      toast.dismiss();
+      logger.error('Error opening PO document:', error);
+      toast.error('Failed to open document');
     }
   };
 
   const handleAttachDocument = (poId: string) => {
-    setSelectedDocument(poId);
+    setSelectedDocument({ id: poId, type: 'received-po' });
     setShowUploadModal(true);
+  };
+
+  const handleUploadReceivedInvoiceDocument = (invoice: any) => {
+    setSelectedDocument({ id: invoice.id, type: 'received-invoice' });
+    setShowUploadModal(true);
+  };
+
+  const handleViewReceivedInvoiceDocument = async (invoice: any) => {
+    try {
+      toast.loading('Opening received invoice document...');
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        toast.error('Authentication required');
+        return;
+      }
+
+      // Fetch document with authentication header, then open in new tab
+      const fileUrl = `/api/received-invoices/${invoice.id}/file`;
+      fetch(fileUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      .then(response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.blob();
+      })
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.target = '_blank';
+        a.click();
+        window.URL.revokeObjectURL(url);
+        toast.dismiss();
+        toast.success('Opening document');
+      })
+      .catch(error => {
+        toast.dismiss();
+        logger.error('Error opening document:', error);
+        toast.error('Failed to open document: ' + error.message);
+      });
+    } catch (error: any) {
+      toast.dismiss();
+      logger.error('Error opening received invoice document:', error);
+      toast.error('Failed to open document');
+    }
   };
 
   const handleEditPO = (po: any) => {
     setSelectedPO(po);
     setShowEditPOModal(true);
+  };
+
+  const handleEditIssuedPO = (po: any) => {
+    setSelectedIssuedPO(po);
+    setShowEditIssuedPOModal(true);
   };
 
   const handleViewDetails = (po: any) => {
@@ -479,18 +606,6 @@ export const FinanceDocumentsScreen = () => {
     } catch (error: any) {
       logger.error('Error marking received invoice as paid:', error);
       toast.error(error.message || 'Failed to mark received invoice as paid');
-    }
-  };
-
-  const handleDisputeReceivedInvoice = async (invoiceId: string) => {
-    try {
-      toast.loading('Disputing received invoice...');
-      await financeService.disputeReceivedInvoice(invoiceId);
-      toast.success('Received invoice disputed successfully');
-      loadData();
-    } catch (error: any) {
-      logger.error('Error disputing received invoice:', error);
-      toast.error(error.message || 'Failed to dispute received invoice');
     }
   };
 
@@ -615,6 +730,7 @@ export const FinanceDocumentsScreen = () => {
                 onViewPDF={handleViewIssuedPOPDF}
                 onUploadDocument={handleUploadIssuedPODocument}
                 onDeletePO={handleDeletePO}
+                onEditPO={handleEditIssuedPO}
               />
             )}
             {activeTab === 'received-invoices' && (
@@ -623,12 +739,13 @@ export const FinanceDocumentsScreen = () => {
                 searchQuery={searchQuery}
                 canVerify={canApprove}
                 canDelete={canDeleteInvoice || false}
-                onViewDocument={() => {}}
+                canUpload={true}
+                onViewDocument={handleViewReceivedInvoiceDocument}
                 onEditInvoice={handleEditReceivedInvoice}
                 onDeleteInvoice={(invoice: any) => handleDeleteReceivedInvoice(invoice.id)}
                 onVerify={handleVerifyReceivedInvoice}
                 onMarkAsPaid={handleMarkReceivedInvoiceAsPaid}
-                onDispute={handleDisputeReceivedInvoice}
+                onUploadDocument={handleUploadReceivedInvoiceDocument}
               />
             )}
           </>
@@ -752,6 +869,23 @@ export const FinanceDocumentsScreen = () => {
                 toast.error(error.response?.data?.message || 'Failed to update PO');
                 setShowEditPOModal(false);
               }
+            }}
+          />
+        )}
+
+        {/* Edit Issued PO Modal */}
+        {showEditIssuedPOModal && selectedIssuedPO && (
+          <EditIssuedPOModal
+            isOpen={showEditIssuedPOModal}
+            issuedPO={selectedIssuedPO}
+            onClose={() => {
+              setShowEditIssuedPOModal(false);
+              setSelectedIssuedPO(null);
+            }}
+            onSave={() => {
+              loadData();
+              setShowEditIssuedPOModal(false);
+              setSelectedIssuedPO(null);
             }}
           />
         )}

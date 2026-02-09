@@ -16,7 +16,10 @@
     "check:users": "ts-node src/scripts/check-database-users.ts",
     "backup": "ts-node src/scripts/backup-database.ts",
     "backup:verify": "ts-node src/scripts/verify-backup.ts",
-    "backup:restore": "ts-node src/scripts/restore-database.ts"
+    "backup:restore": "ts-node src/scripts/restore-database.ts",
+    "fix:reset-loop": "ts-node src/scripts/fix-reset-token-loop.ts",
+    "fix:reset-smart": "ts-node src/scripts/fix-reset-token-smart.ts",
+    "reset:passwords": "ts-node src/scripts/reset-all-passwords.ts"
   },
   "dependencies": {
     "@types/multer": "^1.4.7",

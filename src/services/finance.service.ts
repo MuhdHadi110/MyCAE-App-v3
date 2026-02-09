@@ -157,11 +157,6 @@ class FinanceService {
     return transformKeysToCAmelCase(response.data);
   }
 
-  async disputeReceivedInvoice(id: string): Promise<any> {
-    const response = await api.post(`/received-invoices/${id}/dispute`);
-    return transformKeysToCAmelCase(response.data);
-  }
-
   // ==================== Purchase Orders (Received from Clients) ====================
 
   async getAllPurchaseOrders(filters?: any): Promise<any> {
