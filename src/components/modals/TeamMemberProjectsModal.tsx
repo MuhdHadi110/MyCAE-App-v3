@@ -91,11 +91,19 @@ export const TeamMemberProjectsModal: React.FC<TeamMemberProjectsModalProps> = (
           <div className="flex items-center justify-center gap-2">
             <div className="w-12 bg-gray-200 rounded-full h-1.5 overflow-hidden">
               <div
-                className="bg-primary-600 h-1.5 rounded-full transition-all"
+                className={`h-1.5 rounded-full transition-all ${
+                  (project.actualHours || 0) > project.plannedHours
+                    ? 'bg-red-500'
+                    : 'bg-primary-600'
+                }`}
                 style={{ width: `${Math.min(progress, 100)}%` }}
               />
             </div>
-            <span className="font-semibold text-gray-900 w-6 text-right text-xs">{progress.toFixed(0)}%</span>
+            <span className={`font-semibold w-6 text-right text-xs ${
+              (project.actualHours || 0) > project.plannedHours ? 'text-red-600' : 'text-gray-900'
+            }`}>
+              {progress.toFixed(0)}%
+            </span>
           </div>
         </td>
         <td className="px-4 py-3 text-right whitespace-nowrap">

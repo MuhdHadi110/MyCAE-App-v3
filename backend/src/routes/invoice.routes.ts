@@ -480,22 +480,25 @@ router.post('/:id/submit-for-approval',
         minute: '2-digit'
       });
 
-      // Send approval request email to all MDs
-      await emailService.sendInvoiceApprovalRequest(
-        invoice.id,
-        mds,
-        invoice.invoice_number,
-        invoice.amount,
-        invoice.currency,
-        invoice.project_code,
-        invoice.project_name,
-        req.user!.name,
-        req.user!.email,
-        submittedDate,
-        submittedTime
-      ).catch(err => {
-        console.error('Failed to send invoice approval notification:', err.message);
-      });
+      // Send approval request email to all MDs (don't fail request if email fails)
+      try {
+        await emailService.sendInvoiceApprovalRequest(
+          invoice.id,
+          mds,
+          invoice.invoice_number,
+          invoice.amount,
+          invoice.currency,
+          invoice.project_code,
+          invoice.project_name,
+          req.user!.name,
+          req.user!.email,
+          submittedDate,
+          submittedTime
+        );
+      } catch (emailError: any) {
+        console.error('Failed to send invoice approval notification:', emailError.message);
+        // Don't fail the request if email fails
+      }
 
       res.json({
         message: 'Invoice submitted for approval',
@@ -856,20 +859,42 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response) => {
     if (invoice.file_url) {
       console.log('Serving uploaded document:', invoice.file_url);
 
-      // Extract filename from URL
-      const filename = path.basename(invoice.file_url);
+      // Extract filename from URL (handle both relative and absolute URLs)
+      let filename = path.basename(invoice.file_url);
+
+      // Handle URLs like "/uploads/filename.pdf" or "http://domain/uploads/filename.pdf"
+      if (invoice.file_url.includes('/uploads/')) {
+        const parts = invoice.file_url.split('/uploads/');
+        filename = parts[parts.length - 1];
+      }
+
       const uploadsDir = path.join(__dirname, '../../uploads');
       const filePath = path.join(uploadsDir, filename);
 
+      console.log('Resolved file path:', {
+        fileUrl: invoice.file_url,
+        filename,
+        uploadsDir,
+        fullPath: filePath,
+        exists: fs.existsSync(filePath)
+      });
+
       // Check if file exists
       if (!fs.existsSync(filePath)) {
-        console.error('Uploaded file not found on disk:', filePath);
-        return res.status(404).json({ error: 'Document file not found' });
+        console.error('Uploaded file not found on disk:', {
+          filePath,
+          uploadsDir,
+          filesInDir: fs.existsSync(uploadsDir) ? fs.readdirSync(uploadsDir) : 'uploads dir not found'
+        });
+        return res.status(404).json({
+          error: 'Document file not found on server',
+          details: `Looking for: ${filename}`
+        });
       }
 
       // Set headers and send file
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="invoice-${invoice.invoice_number}.pdf"`);
+      res.setHeader('Content-Disposition', `inline; filename="invoice-${invoice.invoice_number}.pdf"`);
 
       const fileStream = fs.createReadStream(filePath);
       fileStream.pipe(res);

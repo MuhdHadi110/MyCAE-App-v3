@@ -469,11 +469,19 @@ export const EngineerDashboard: React.FC = () => {
                           <div className="flex items-center justify-center gap-2">
                             <div className="w-16 bg-gray-200 rounded-full h-2">
                               <div
-                                className="bg-gradient-to-r from-primary-500 to-primary-600 h-2 rounded-full transition-all"
+                                className={`h-2 rounded-full transition-all ${
+                                  (project.actualHours || 0) > project.plannedHours
+                                    ? 'bg-gradient-to-r from-red-500 to-red-600'
+                                    : 'bg-gradient-to-r from-primary-500 to-primary-600'
+                                }`}
                                 style={{ width: `${Math.min(progress, 100)}%` }}
                               />
                             </div>
-                            <span className="font-semibold text-gray-900 w-10 text-right">{progress.toFixed(0)}%</span>
+                            <span className={`font-semibold w-10 text-right ${
+                              (project.actualHours || 0) > project.plannedHours ? 'text-red-600' : 'text-gray-900'
+                            }`}>
+                              {progress.toFixed(0)}%
+                            </span>
                           </div>
                         </td>
                         <td className="px-6 py-4 text-right">

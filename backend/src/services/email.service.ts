@@ -610,6 +610,106 @@ class EmailService {
   }
 
   /**
+   * Send PO received notification to Managing Directors
+   */
+  async sendPOReceivedNotification(
+    poId: string,
+    mds: any[],
+    poNumber: string,
+    poAmount: number,
+    currency: string,
+    projectCode: string,
+    clientName: string,
+    creatorName: string,
+    creatorEmail: string,
+    receivedDate: string,
+    receivedTime: string
+  ): Promise<void> {
+    const subject = `New PO Received: ${poNumber} - ${currency} ${poAmount.toLocaleString()}`;
+    const poUrl = `${process.env.FRONTEND_URL}/finance/purchase-orders`;
+
+    // Send to all MDs
+    for (const md of mds) {
+      try {
+        const personalizedHtml = this.getPOReceivedNotificationTemplate(
+          poNumber,
+          poAmount,
+          currency,
+          projectCode,
+          clientName,
+          creatorName,
+          creatorEmail,
+          receivedDate,
+          receivedTime,
+          poUrl,
+          md.name
+        );
+        await this.sendEmail(md.email, subject, personalizedHtml);
+        console.log(`✓ PO notification sent to MD: ${md.name} (${md.email})`);
+      } catch (error: any) {
+        console.error(`✗ Failed to send PO notification to MD ${md.name}:`, error.message);
+      }
+    }
+  }
+
+  /**
+   * PO received notification email template
+   */
+  private getPOReceivedNotificationTemplate(
+    poNumber: string,
+    poAmount: number,
+    currency: string,
+    projectCode: string,
+    clientName: string,
+    creatorName: string,
+    creatorEmail: string,
+    receivedDate: string,
+    receivedTime: string,
+    poUrl: string,
+    mdName: string
+  ): string {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333333; margin: 0; padding: 20px;">
+  <div style="max-width: 600px; margin: 0 auto;">
+    <p>Dear ${mdName},</p>
+
+    <p>A new Purchase Order has been received and added to the system.</p>
+
+    <p style="margin: 20px 0;">
+      <strong>PO Details:</strong><br>
+      PO Number : ${poNumber}<br>
+      Amount : ${currency} ${poAmount.toLocaleString()}<br>
+      Project Code : ${projectCode}<br>
+      Client Name : ${clientName}<br>
+      Added By : ${creatorName}<br>
+      Received On : ${receivedDate} at ${receivedTime}
+    </p>
+
+    <p>This PO has been added to the finance tracking system.</p>
+
+    <p style="margin: 20px 0;">
+      <a href="${poUrl}" style="display: inline-block; padding: 12px 24px; background-color: #10b981; color: #ffffff; text-decoration: none; border-radius: 4px;">View Purchase Orders</a>
+    </p>
+
+    <p>Should you have any questions, please contact ${creatorName} at ${creatorEmail}.</p>
+
+    <p style="margin-top: 30px;">
+      Best regards,<br>
+      MyCAE Tracker System
+    </p>
+  </div>
+</body>
+</html>
+    `;
+  }
+
+  /**
    * Invoice approval request email template - Clean professional format
    */
   private getInvoiceApprovalRequestTemplate(

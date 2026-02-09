@@ -8,6 +8,7 @@ import { body, validationResult } from 'express-validator';
 import { upload, generateFileUrl, deleteFile } from '../utils/fileUpload';
 import { CurrencyService } from '../services/currency.service';
 import { PurchaseOrderService } from '../services/purchaseOrder.service';
+import emailService from '../services/email.service';
 import path from 'path';
 import fs from 'fs';
 
@@ -162,6 +163,44 @@ router.post(
 
       // Fetch the complete PO with project relation
       const fullPO = await poService.getById(po.id);
+
+      // Send notification to Managing Directors (don't fail request if email fails)
+      try {
+        const userRepo = AppDataSource.getRepository(User);
+        const mds = await userRepo.createQueryBuilder('user')
+          .where(`JSON_CONTAINS(user.roles, '"managing-director"')`)
+          .getMany();
+
+        if (mds.length > 0) {
+          // Format date/time
+          const receivedDateFormatted = new Date(receivedDate).toLocaleDateString('en-MY', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          });
+          const receivedTimeFormatted = new Date().toLocaleTimeString('en-MY', {
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+
+          await emailService.sendPOReceivedNotification(
+            po.id,
+            mds,
+            poNumber,
+            parseFloat(amount),
+            currency,
+            projectCode,
+            clientName,
+            req.user!.name,
+            req.user!.email,
+            receivedDateFormatted,
+            receivedTimeFormatted
+          );
+        }
+      } catch (emailError: any) {
+        console.error('Failed to send PO notification:', emailError.message);
+        // Don't fail the request if email fails
+      }
 
       res.status(201).json({
         message: 'Purchase order created successfully',
