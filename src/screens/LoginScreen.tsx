@@ -306,7 +306,7 @@ export const LoginScreen: React.FC = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3.5 px-6 rounded-xl transition-all duration-200 disabled:bg-gray-300 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+              className="w-full bg-primary-600 hover:bg-primary-700 text-white font-medium py-3.5 px-6 rounded-xl transition-all duration-200 disabled:bg-gray-300 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
             >
               {isLoading ? 'Logging in...' : 'Login'}
             </button>
@@ -314,7 +314,7 @@ export const LoginScreen: React.FC = () => {
             <div className="text-center mt-4">
               <button
                 type="button"
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                className="text-sm text-primary-600 hover:text-primary-700 font-medium"
                 onClick={() => setIsForgotPasswordOpen(true)}
               >
                 Forgot Password?

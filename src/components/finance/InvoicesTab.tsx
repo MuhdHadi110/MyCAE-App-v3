@@ -325,7 +325,7 @@ export const InvoicesTab: React.FC<InvoicesTabProps> = ({
         {inv.status === 'approved' && canUpload && onMarkAsSent && (
           <Button
             size="sm"
-            className="bg-blue-600 hover:bg-blue-700 text-white"
+            className="bg-primary-600 hover:bg-primary-700 text-white"
             onClick={(e) => {
               e.stopPropagation();
               onMarkAsSent(inv.id);

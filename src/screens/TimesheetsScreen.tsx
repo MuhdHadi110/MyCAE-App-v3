@@ -615,6 +615,7 @@ export const TimesheetsScreen: React.FC = () => {
                 <th onClick={() => handleProjectSort('projectCode')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Project Code {getProjectSortIcon('projectCode')}</th>
                 <th onClick={() => handleProjectSort('projectName')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Project Name {getProjectSortIcon('projectName')}</th>
                 <th onClick={() => handleProjectSort('category')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Work Category {getProjectSortIcon('category')}</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">Description</th>
                 <th onClick={() => handleProjectSort('hours')} className="px-3 py-2 text-right text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Hours {getProjectSortIcon('hours')}</th>
                 <th className="px-3 py-2 text-right text-xs font-semibold text-gray-700">Actions</th>
               </tr>
@@ -637,6 +638,7 @@ export const TimesheetsScreen: React.FC = () => {
                       <td className="px-3 py-2 text-sm font-medium text-primary-600">{(entry as any).projectCode || 'N/A'}</td>
                       <td className="px-3 py-2 text-sm text-gray-700">{project?.title || 'N/A'}</td>
                       <td className="px-3 py-2 text-sm text-gray-600">{getWorkCategoryLabel(entry.workCategory)}</td>
+                      <td className="px-3 py-2 text-sm text-gray-600 max-w-xs truncate" title={entry.description}>{entry.description || '-'}</td>
                       <td className="px-3 py-2 text-sm text-right font-medium text-primary-600">{entry.hours} hrs</td>
                       <td className="px-3 py-2 text-sm text-right">
                         <div className="flex gap-1 justify-end">
@@ -663,7 +665,7 @@ export const TimesheetsScreen: React.FC = () => {
             {/* Total Row */}
             <tfoot className="bg-gray-50 border-t border-gray-200">
               <tr>
-                <td colSpan={5} className="px-3 py-2 text-right text-sm font-medium text-gray-700">
+                <td colSpan={6} className="px-3 py-2 text-right text-sm font-medium text-gray-700">
                   Total:
                 </td>
                 <td className="px-3 py-2 text-right text-sm font-bold text-primary-700">
@@ -684,6 +686,7 @@ export const TimesheetsScreen: React.FC = () => {
                   <th onClick={() => handleResearchSort('researcher')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Researcher {getResearchSortIcon('researcher')}</th>
                   <th onClick={() => handleResearchSort('project')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Research Project {getResearchSortIcon('project')}</th>
                   <th onClick={() => handleResearchSort('category')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Category {getResearchSortIcon('category')}</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">Description</th>
                   <th onClick={() => handleResearchSort('hours')} className="px-3 py-2 text-right text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Hours {getResearchSortIcon('hours')}</th>
                   <th onClick={() => handleResearchSort('status')} className="px-3 py-2 text-center text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Status {getResearchSortIcon('status')}</th>
                   <th className="px-3 py-2 text-right text-xs font-semibold text-gray-700">Actions</th>
@@ -692,7 +695,7 @@ export const TimesheetsScreen: React.FC = () => {
               <tbody className="bg-white divide-y divide-gray-100">
                 {filteredResearchTimesheets.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-3 py-12 text-center">
+                    <td colSpan={8} className="px-3 py-12 text-center">
                       <FlaskConical className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                       <h3 className="text-lg font-medium text-gray-900 mb-2">No research timesheet entries</h3>
                       <p className="text-gray-600">
@@ -716,6 +719,7 @@ export const TimesheetsScreen: React.FC = () => {
                           <td className="px-3 py-2 text-sm font-medium text-gray-900">{entry.teamMemberName || entry.researcherName || 'Unknown'}</td>
                           <td className="px-3 py-2 text-sm font-medium text-purple-600">{entry.projectTitle || entry.researchProjectTitle || 'N/A'}</td>
                           <td className="px-3 py-2 text-sm text-gray-600">{entry.researchCategory || '-'}</td>
+                          <td className="px-3 py-2 text-sm text-gray-600 max-w-xs truncate" title={entry.description}>{entry.description || '-'}</td>
                           <td className="px-3 py-2 text-sm text-right font-medium text-purple-600">{hours} hrs</td>
                           <td className="px-3 py-2 text-sm text-center">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
@@ -754,7 +758,7 @@ export const TimesheetsScreen: React.FC = () => {
               {filteredResearchTimesheets.length > 0 && (
                 <tfoot className="bg-gray-50 border-t border-gray-200">
                   <tr>
-                    <td colSpan={4} className="px-3 py-2 text-right text-sm font-medium text-gray-700">
+                    <td colSpan={5} className="px-3 py-2 text-right text-sm font-medium text-gray-700">
                       Total:
                     </td>
                     <td className="px-3 py-2 text-right text-sm font-bold text-purple-700">

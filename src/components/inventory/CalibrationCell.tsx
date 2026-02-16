@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatDate } from '../../lib/utils';
+import type { InventoryItem } from '../../types/inventory.types';
 
 interface CalibrationInfo {
   itemId: string;
@@ -9,17 +10,24 @@ interface CalibrationInfo {
 }
 
 interface CalibrationCellProps {
+  item: InventoryItem;
   calibrationInfo?: CalibrationInfo;
 }
 
-export const CalibrationCell: React.FC<CalibrationCellProps> = ({ calibrationInfo }) => {
-  if (!calibrationInfo || calibrationInfo.status === 'none') {
+export const CalibrationCell: React.FC<CalibrationCellProps> = ({ item, calibrationInfo }) => {
+  // Prioritize database value over maintenance records
+  const displayDate = item.lastCalibratedDate || calibrationInfo?.lastCalibrated;
+
+  if (!displayDate) {
     return (
       <span className="text-gray-400 text-sm italic">
         Not calibrated
       </span>
     );
   }
+
+  // Determine status from calibrationInfo if available, otherwise show 'none'
+  const status = calibrationInfo?.status || 'none';
 
   const statusColors = {
     'recent': 'text-green-600 bg-green-50',
@@ -35,18 +43,16 @@ export const CalibrationCell: React.FC<CalibrationCellProps> = ({ calibrationInf
     'none': 'Not Calibrated',
   };
 
-  const displayDate = calibrationInfo.lastCalibrated
-    ? formatDate(calibrationInfo.lastCalibrated)
-    : 'Not calibrated';
-
   return (
     <div className="flex flex-col gap-1">
       <span className="text-sm text-gray-900">
-        {displayDate}
+        {formatDate(displayDate)}
       </span>
-      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium w-fit ${statusColors[calibrationInfo.status]}`}>
-        {statusLabels[calibrationInfo.status]}
-      </span>
+      {status !== 'none' && (
+        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium w-fit ${statusColors[status]}`}>
+          {statusLabels[status]}
+        </span>
+      )}
     </div>
   );
 };

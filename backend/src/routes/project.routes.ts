@@ -1,10 +1,11 @@
 import { Router, Response } from 'express';
 import { AppDataSource } from '../config/database';
-import { Project, ProjectStatus } from '../entities/Project';
+import { Project, ProjectStatus, BillingType } from '../entities/Project';
 import { TeamMember } from '../entities/TeamMember';
 import { User } from '../entities/User';
 import { Company } from '../entities/Company';
 import { Contact } from '../entities/Contact';
+import { PurchaseOrder } from '../entities/PurchaseOrder';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { UserRole } from '../entities/User';
 import { body, validationResult } from 'express-validator';
@@ -20,20 +21,13 @@ router.use(authenticate);
 /**
  * GET /api/projects
  * Get all projects
- * Authorization: Managers/Admins see all, others see only their assigned projects
+ * Authorization: All authenticated users can see all projects (for overview dashboard)
  */
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const projectRepo = AppDataSource.getRepository(Project);
 
-    // Authorization: Check user roles
-    const userId = req.user?.id;
-    const userRoles = req.user?.roles || [];
-    const isPrivileged = userRoles.some((r: string) =>
-      ['admin', 'managing_director', 'manager'].includes(r)
-    );
-
-    let query = projectRepo.createQueryBuilder('project')
+    const query = projectRepo.createQueryBuilder('project')
       .leftJoinAndSelect('project.lead_engineer', 'lead_engineer')
       .leftJoinAndSelect('project.manager', 'manager')
       .leftJoin('project.company', 'company')
@@ -42,14 +36,6 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       .addSelect(['contact.id', 'contact.name', 'contact.email'])
       .leftJoin('project.parentProject', 'parentProject')
       .addSelect(['parentProject.id', 'parentProject.project_code', 'parentProject.title']);
-
-    // Non-privileged users can only see projects they're assigned to
-    if (!isPrivileged && userId) {
-      query = query.where(
-        '(project.manager_id = :userId OR project.lead_engineer_id = :userId)',
-        { userId }
-      );
-    }
 
     const projects = await query.getMany();
 
@@ -305,13 +291,15 @@ router.post(
         company_id: req.body.companyId,
         contact_id: req.body.contactId || null,
         status: ProjectStatus.PRE_LIM, // Always start with pre-lim status
+        billing_type: req.body.billingType === 'lump_sum' ? BillingType.LUMP_SUM : BillingType.HOURLY,
         planned_hours: req.body.plannedHours || 0,
+        daily_rate: req.body.hourlyRate || null, // Map hourlyRate from frontend to daily_rate
         actual_hours: 0,
         lead_engineer_id: leadEngineerUserId || null,
         manager_id: managerUserId,
         start_date: new Date(), // Auto set to current date
         inquiry_date: new Date(), // Set inquiry date when created
-        remarks: req.body.description || null,
+        description: req.body.description || null,
         categories: req.body.workTypes || null,
         // VO fields
         parent_project_id: parentProjectId,
@@ -458,11 +446,18 @@ router.put(
     try {
       const projectRepo = AppDataSource.getRepository(Project);
       const teamMemberRepo = AppDataSource.getRepository(TeamMember);
+      const purchaseOrderRepo = AppDataSource.getRepository(PurchaseOrder);
       const project = await projectRepo.findOne({ where: { id: req.params.id } });
 
       if (!project) {
         return res.status(404).json({ error: 'Project not found' });
       }
+
+      // Check if project has any POs (for billing type change validation)
+      const existingPOs = await purchaseOrderRepo.find({
+        where: { project_code: project.project_code }
+      });
+      const hasPOs = existingPOs.length > 0;
 
       // Resolve team_member IDs to user_ids for manager and lead engineer (if provided)
       let managerUserId = req.body.managerId;
@@ -495,15 +490,26 @@ router.put(
 
       if (req.body.title !== undefined) updates.title = req.body.title;
       if (req.body.plannedHours !== undefined) updates.planned_hours = req.body.plannedHours;
-      if (req.body.remarks !== undefined) updates.remarks = req.body.remarks;
       if (req.body.categories !== undefined) updates.categories = req.body.categories;
       if (req.body.description !== undefined) updates.description = req.body.description;
       if (req.body.status !== undefined) updates.status = req.body.status;
       if (leadEngineerUserId !== undefined) updates.lead_engineer_id = leadEngineerUserId;
       if (managerUserId !== undefined) updates.manager_id = managerUserId;
+      if (req.body.companyId !== undefined) updates.company_id = req.body.companyId;
+      if (req.body.contactId !== undefined) updates.contact_id = req.body.contactId;
       if (req.body.inquiryDate !== undefined) updates.inquiry_date = req.body.inquiryDate;
       if (req.body.poReceivedDate !== undefined) updates.po_received_date = req.body.poReceivedDate;
       if (req.body.completionDate !== undefined) updates.completion_date = req.body.completionDate;
+
+      // Handle billing type change (only allowed if no POs exist)
+      if (req.body.billingType !== undefined) {
+        if (hasPOs) {
+          return res.status(400).json({
+            error: 'Cannot change billing type after PO has been created'
+          });
+        }
+        updates.billing_type = req.body.billingType === 'lump_sum' ? BillingType.LUMP_SUM : BillingType.HOURLY;
+      }
 
       // Handle status-related date auto-updates
       if (updates.status) {
@@ -911,7 +917,7 @@ router.post(
         manager_id: managerUserId,
         start_date: req.body.startDate ? new Date(req.body.startDate) : new Date(),
         inquiry_date: new Date(),
-        remarks: req.body.description || null,
+        description: req.body.description || null,
         categories: req.body.workTypes || parentProject.categories,
         // VO-specific fields
         parent_project_id: parentProject.id,

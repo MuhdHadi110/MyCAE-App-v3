@@ -17,6 +17,7 @@ export enum CheckoutStatus {
   RETURNED = 'returned',
   OVERDUE = 'overdue',
   PARTIAL_RETURN = 'partial-return',
+  RECEIVED = 'received',
 }
 
 @Entity('checkouts')

@@ -191,8 +191,9 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 /**
  * PUT /api/issued-pos/:id
  * Update issued PO
+ * Authorization: Senior Engineer and above
  */
-router.put('/:id', async (req: AuthRequest, res: Response) => {
+router.put('/:id', authorize(UserRole.SENIOR_ENGINEER, UserRole.PRINCIPAL_ENGINEER, UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const issuedPORepo = AppDataSource.getRepository(IssuedPO);
     const companyRepo = AppDataSource.getRepository(Company);

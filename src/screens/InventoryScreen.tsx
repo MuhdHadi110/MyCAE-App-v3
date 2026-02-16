@@ -1,12 +1,8 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Search, Plus, Filter, Package, Upload, QrCode, LogIn, ChevronDown, ChevronUp, Box, Edit2, Trash2, X, ChevronsUpDown, LayoutGrid, List } from 'lucide-react';
+import { Search, Plus, Filter, Package, Upload, ChevronUp, ChevronDown, Edit2, Trash2, X, ChevronsUpDown, LayoutGrid, List } from 'lucide-react';
 import { Badge } from '../components/ui/Badge';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { BulkUploadModal } from '../components/modals/BulkUploadModal';
-import { BulkCheckoutModal } from '../components/modals/BulkCheckoutModal';
-import { BulkCheckInModal, type BulkCheckInData } from '../components/modals/BulkCheckInModal';
-import { SingleItemCheckoutModal, type SingleCheckoutData } from '../components/modals/SingleItemCheckoutModal';
-import { SingleItemCheckInModal, type SingleCheckInData } from '../components/modals/SingleItemCheckInModal';
 import { AddItemModal } from '../components/modals/AddItemModal';
 import { GroupedInventoryRow } from '../components/inventory/GroupedInventoryRow';
 import { SingleInventoryRow } from '../components/inventory/SingleInventoryRow';
@@ -18,7 +14,7 @@ import { useResponsive } from '../hooks/useResponsive';
 import { useCalibrationData } from '../hooks/useCalibrationData';
 import { toast } from 'react-hot-toast';
 import inventoryService from '../services/inventory.service';
-import type { BulkCheckout, InventoryItem, GroupedInventoryItem } from '../types/inventory.types';
+import type { InventoryItem, GroupedInventoryItem } from '../types/inventory.types';
 
 export const InventoryScreen: React.FC = () => {
   const { filteredItems: storeFilteredItems, filters, setFilters, fetchInventory, loading, viewMode, setViewMode } = useInventoryStore();
@@ -36,19 +32,20 @@ export const InventoryScreen: React.FC = () => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [showBulkUpload, setShowBulkUpload] = useState(false);
-  const [showBulkCheckout, setShowBulkCheckout] = useState(false);
-  const [showBulkCheckIn, setShowBulkCheckIn] = useState(false);
-  const [showSingleCheckout, setShowSingleCheckout] = useState(false);
-  const [showSingleCheckIn, setShowSingleCheckIn] = useState(false);
   const [showAddItem, setShowAddItem] = useState(false);
-  const [showCheckoutMenu, setShowCheckoutMenu] = useState(false);
-  const [showCheckInMenu, setShowCheckInMenu] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     itemId?: string;
     itemTitle?: string;
+  }>({ isOpen: false });
+  
+  // Bulk import confirmation state
+  const [bulkImportConfirm, setBulkImportConfirm] = useState<{
+    isOpen: boolean;
+    file?: File;
+    itemCount?: number;
   }>({ isOpen: false });
 
   // Categories for filter dropdown
@@ -225,11 +222,17 @@ export const InventoryScreen: React.FC = () => {
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, 'success' | 'warning' | 'danger'> = {
-      Active: 'success',
+      Available: 'success',
+      available: 'success',  // Handle lowercase from DB
+      Active: 'success',     // Legacy support
       Inactive: 'warning',
       Discontinued: 'danger',
     };
-    return <Badge variant={variants[status] || 'default'}>{status}</Badge>;
+
+    // Normalize display text
+    const displayText = (status === 'available' || status === 'Active') ? 'Available' : status;
+
+    return <Badge variant={variants[status] || 'default'}>{displayText}</Badge>;
   };
 
   const getStockStatus = (quantity: number, minStock: number) => {
@@ -257,9 +260,9 @@ export const InventoryScreen: React.FC = () => {
 
   const handleBulkImport = async (file: File) => {
     try {
-      // Parse and extract valid items from CSV
+      // Parse CSV first to validate and count items
       const reader = new FileReader();
-
+      
       reader.onload = async (e) => {
         try {
           const csvText = e.target?.result as string;
@@ -270,6 +273,75 @@ export const InventoryScreen: React.FC = () => {
             return;
           }
 
+          const headers = lines[0].split(',').map((h) => h.trim());
+          const dataRows = lines.slice(1);
+          let validItemCount = 0;
+          let errorCount = 0;
+
+          // Parse each row to count valid items
+          for (let i = 0; i < dataRows.length; i++) {
+            const row = dataRows[i].split(',').map((v) => v.trim());
+            const rowObj: any = {};
+            headers.forEach((header, index) => {
+              rowObj[header] = row[index];
+            });
+
+            // Validate required fields
+            if (!rowObj.title || !rowObj.sku) {
+              errorCount++;
+              continue;
+            }
+
+            // Validate numeric fields
+            const quantity = parseInt(rowObj.quantity);
+            const minimumStock = parseInt(rowObj.minimumStock);
+            const cost = parseFloat(rowObj.cost || '0');
+            const price = parseFloat(rowObj.price || '0');
+
+            if (isNaN(quantity) || isNaN(minimumStock) || isNaN(cost) || isNaN(price)) {
+              errorCount++;
+              continue;
+            }
+
+            validItemCount++;
+          }
+
+          if (validItemCount === 0) {
+            toast.error('No valid items found in CSV file');
+            return;
+          }
+
+          // Show confirmation dialog
+          setBulkImportConfirm({
+            isOpen: true,
+            file,
+            itemCount: validItemCount,
+          });
+        } catch (error: any) {
+          toast.error('Error validating CSV file');
+        }
+      };
+
+      reader.onerror = () => {
+        toast.error('Failed to read CSV file');
+      };
+
+      reader.readAsText(file);
+    } catch (error: any) {
+      toast.error('Error processing bulk import');
+    }
+  };
+
+  const executeBulkImport = async () => {
+    if (!bulkImportConfirm.file) return;
+    
+    try {
+      const reader = new FileReader();
+      
+      reader.onload = async (e) => {
+        try {
+          const csvText = e.target?.result as string;
+          const lines = csvText.split('\n').filter((line) => line.trim());
           const headers = lines[0].split(',').map((h) => h.trim());
           const dataRows = lines.slice(1);
           const itemsToImport: Array<Omit<InventoryItem, 'id'>> = [];
@@ -322,19 +394,15 @@ export const InventoryScreen: React.FC = () => {
             itemsToImport.push(item);
           }
 
-          if (itemsToImport.length === 0) {
-            toast.error('No valid items found in CSV file');
-            return;
-          }
-
           // Send to API
-          const response = await inventoryService.bulkCreateInventoryItems(itemsToImport);
+          await inventoryService.bulkCreateInventoryItems(itemsToImport);
           toast.success(
             `Successfully imported ${itemsToImport.length} items${
               errorCount > 0 ? ` (${errorCount} rows skipped due to errors)` : ''
             }`
           );
 
+          setBulkImportConfirm({ isOpen: false });
           setShowBulkUpload(false);
           await fetchInventory();
         } catch (error: any) {
@@ -347,36 +415,9 @@ export const InventoryScreen: React.FC = () => {
         toast.error('Failed to read CSV file');
       };
 
-      reader.readAsText(file);
+      reader.readAsText(bulkImportConfirm.file);
     } catch (error: any) {
       toast.error('Error processing bulk import');
-    }
-  };
-
-  const handleBulkCheckout = async (checkout: BulkCheckout) => {
-    try {
-      const result = await inventoryService.createBulkCheckout(checkout);
-      toast.success(result.message || 'Bulk checkout completed successfully!');
-      await fetchInventory(); // Refresh inventory to show updated quantities
-      setShowBulkCheckout(false);
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Failed to complete checkout');
-    }
-  };
-
-  const handleBulkCheckIn = async (checkInData: BulkCheckInData) => {
-    try {
-      const result = await inventoryService.checkInBulk({
-        masterBarcode: checkInData.masterBarcode,
-        returnType: checkInData.returnType,
-        items: checkInData.items,
-        notes: checkInData.notes,
-      });
-      toast.success(result.message || 'Check-in completed successfully!');
-      await fetchInventory(); // Refresh inventory to show updated quantities
-      setShowBulkCheckIn(false);
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Failed to complete check-in');
     }
   };
 
@@ -396,27 +437,7 @@ export const InventoryScreen: React.FC = () => {
     }
   };
 
-  const handleSingleCheckout = async (checkout: SingleCheckoutData) => {
-    try {
-      const result = await inventoryService.createSingleCheckout(checkout);
-      toast.success(result.message || 'Item checked out successfully!');
-      await fetchInventory(); // Refresh inventory to show updated quantities
-      setShowSingleCheckout(false);
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Failed to checkout item');
-    }
-  };
 
-  const handleSingleCheckIn = async (checkIn: SingleCheckInData) => {
-    try {
-      const result = await inventoryService.checkInSingle(checkIn);
-      toast.success(result.message || 'Item checked in successfully!');
-      await fetchInventory(); // Refresh inventory to show updated quantities
-      setShowSingleCheckIn(false);
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Failed to check in item');
-    }
-  };
 
   const handleEditItem = (item: InventoryItem) => {
     setSelectedItem(item);
@@ -486,90 +507,6 @@ export const InventoryScreen: React.FC = () => {
                 {!isMobile && 'Bulk Import'}
               </button>
 
-              {/* Checkout Dropdown */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowCheckoutMenu(!showCheckoutMenu)}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium shadow-sm"
-                >
-                  <QrCode className="w-5 h-5" />
-                  {!isMobile && 'Checkout'}
-                  <ChevronDown className="w-4 h-4" />
-                </button>
-                {showCheckoutMenu && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                    <button
-                      onClick={() => {
-                        setShowSingleCheckout(true);
-                        setShowCheckoutMenu(false);
-                      }}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 transition-colors rounded-t-lg"
-                    >
-                      <Box className="w-5 h-5 text-primary-600" />
-                      <div>
-                        <p className="font-medium text-gray-900">Single Item</p>
-                        <p className="text-xs text-gray-500">Check out one item</p>
-                      </div>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowBulkCheckout(true);
-                        setShowCheckoutMenu(false);
-                      }}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 transition-colors rounded-b-lg border-t border-gray-100"
-                    >
-                      <QrCode className="w-5 h-5 text-primary-600" />
-                      <div>
-                        <p className="font-medium text-gray-900">Bulk Checkout</p>
-                        <p className="text-xs text-gray-500">Check out multiple items</p>
-                      </div>
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Check-In Dropdown */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowCheckInMenu(!showCheckInMenu)}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium shadow-sm"
-                >
-                  <LogIn className="w-5 h-5" />
-                  {!isMobile && 'Check-In'}
-                  <ChevronDown className="w-4 h-4" />
-                </button>
-                {showCheckInMenu && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                    <button
-                      onClick={() => {
-                        setShowSingleCheckIn(true);
-                        setShowCheckInMenu(false);
-                      }}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 transition-colors rounded-t-lg"
-                    >
-                      <Box className="w-5 h-5 text-green-600" />
-                      <div>
-                        <p className="font-medium text-gray-900">Single Item</p>
-                        <p className="text-xs text-gray-500">Return one item</p>
-                      </div>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowBulkCheckIn(true);
-                        setShowCheckInMenu(false);
-                      }}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 transition-colors rounded-b-lg border-t border-gray-100"
-                    >
-                      <LogIn className="w-5 h-5 text-green-600" />
-                      <div>
-                        <p className="font-medium text-gray-900">Bulk Check-In</p>
-                        <p className="text-xs text-gray-500">Return with master barcode</p>
-                      </div>
-                    </button>
-                  </div>
-                )}
-              </div>
-
               {canAdd && (
                 <button
                   onClick={() => setShowAddItem(true)}
@@ -585,9 +522,9 @@ export const InventoryScreen: React.FC = () => {
 
         {/* Search and Filters */}
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="flex flex-col md:flex-row gap-3">
             {/* Search */}
-            <div className="md:col-span-3">
+            <div className="flex-1">
               <div className="relative">
                 <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <input
@@ -601,32 +538,29 @@ export const InventoryScreen: React.FC = () => {
             </div>
 
             {/* Filter Button */}
-            <div>
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 border rounded-xl transition-colors ${
-                  activeFilterCount > 0
-                    ? 'border-primary-500 bg-primary-50 text-primary-700'
-                    : 'border-gray-200 text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                <Filter className="w-5 h-5" />
-                Filters
-                {activeFilterCount > 0 && (
-                  <span className="ml-1 px-1.5 py-0.5 text-xs font-medium bg-primary-600 text-white rounded-full">
-                    {activeFilterCount}
-                  </span>
-                )}
-                {showFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              </button>
-            </div>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`inline-flex items-center justify-center gap-2 px-4 py-2.5 border rounded-xl transition-colors whitespace-nowrap ${
+                activeFilterCount > 0
+                  ? 'border-primary-500 bg-primary-50 text-primary-700'
+                  : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <Filter className="w-5 h-5" />
+              <span className="hidden sm:inline">Filters</span>
+              {activeFilterCount > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 text-xs font-medium bg-primary-600 text-white rounded-full">
+                  {activeFilterCount}
+                </span>
+              )}
+              {showFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
 
             {/* View Mode Toggle */}
-            <div>
-              <button
-                onClick={() => setViewMode(viewMode === 'grouped' ? 'flat' : 'grouped')}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
-                title={viewMode === 'grouped' ? 'Switch to flat view' : 'Switch to grouped view'}
+            <button
+              onClick={() => setViewMode(viewMode === 'grouped' ? 'flat' : 'grouped')}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors whitespace-nowrap"
+              title={viewMode === 'grouped' ? 'Switch to flat view' : 'Switch to grouped view'}
               >
                 {viewMode === 'grouped' ? (
                   <>
@@ -641,9 +575,8 @@ export const InventoryScreen: React.FC = () => {
                 )}
               </button>
             </div>
-          </div>
 
-          {/* Collapsible Filter Panel */}
+            {/* Collapsible Filter Panel */}
           {showFilters && (
             <div className="mt-4 pt-4 border-t border-gray-200">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -839,7 +772,20 @@ export const InventoryScreen: React.FC = () => {
           <div className="flex flex-col items-center justify-center py-12 text-gray-500">
             <Package className="w-16 h-16 mb-4 opacity-50" />
             <p className="text-lg font-medium mb-2">No items found</p>
-            <p className="text-sm">Try adjusting your search or filters</p>
+            <p className="text-sm mb-4">Try adjusting your search or filters</p>
+            {(searchTerm || categoryFilter || statusFilter || stockFilter) && (
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setCategoryFilter('');
+                  setStatusFilter('');
+                  setStockFilter('');
+                }}
+                className="px-4 py-2 text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
+              >
+                Clear All Filters
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -849,26 +795,6 @@ export const InventoryScreen: React.FC = () => {
           isOpen={showBulkUpload}
           onClose={() => setShowBulkUpload(false)}
           onImport={handleBulkImport}
-        />
-        <BulkCheckoutModal
-          isOpen={showBulkCheckout}
-          onClose={() => setShowBulkCheckout(false)}
-          onCheckout={handleBulkCheckout}
-        />
-        <BulkCheckInModal
-          isOpen={showBulkCheckIn}
-          onClose={() => setShowBulkCheckIn(false)}
-          onCheckIn={handleBulkCheckIn}
-        />
-        <SingleItemCheckoutModal
-          isOpen={showSingleCheckout}
-          onClose={() => setShowSingleCheckout(false)}
-          onCheckout={handleSingleCheckout}
-        />
-        <SingleItemCheckInModal
-          isOpen={showSingleCheckIn}
-          onClose={() => setShowSingleCheckIn(false)}
-          onCheckIn={handleSingleCheckIn}
         />
         <AddItemModal
           isOpen={showAddItem}
@@ -887,6 +813,18 @@ export const InventoryScreen: React.FC = () => {
           message={`Are you sure you want to delete "${confirmDialog.itemTitle}"? This action cannot be undone.`}
           variant="danger"
           confirmText="Delete Item"
+          cancelText="Cancel"
+        />
+
+        {/* Bulk Import Confirmation Dialog */}
+        <ConfirmDialog
+          isOpen={bulkImportConfirm.isOpen}
+          onClose={() => setBulkImportConfirm({ isOpen: false })}
+          onConfirm={executeBulkImport}
+          title="Confirm Bulk Import"
+          message={`You are about to import ${bulkImportConfirm.itemCount} inventory items. This action cannot be undone. Do you want to proceed?`}
+          variant="warning"
+          confirmText="Import Items"
           cancelText="Cancel"
         />
       </div>

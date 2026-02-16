@@ -36,6 +36,10 @@ export const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ isOpen, onClos
   const [loadingContext, setLoadingContext] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // Check if selected project is lump sum
+  const selectedProject = projects.find(p => p.id === formData.projectId);
+  const isLumpSum = selectedProject?.billingType === 'lump_sum';
+
   // Fetch companies and projects when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -200,7 +204,7 @@ export const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ isOpen, onClos
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-primary-50 to-primary-100 dark:from-gray-800 dark:to-gray-700">
           <h2 className="text-2xl font-bold text-gray-900">Create Invoice</h2>
           <button
             onClick={onClose}
@@ -214,27 +218,36 @@ export const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ isOpen, onClos
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {/* Smart Context Display */}
           {projectContext && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
+            <div className={`border rounded-lg p-4 space-y-2 ${isLumpSum ? 'bg-purple-50 border-purple-200' : 'bg-blue-50 border-blue-200'}`}>
               <div className="flex items-start gap-2">
-                <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                <Info className={`w-5 h-5 mt-0.5 flex-shrink-0 ${isLumpSum ? 'text-purple-600' : 'text-blue-600'}`} />
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-blue-900 mb-2">Project Invoice History</p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className={`text-sm font-medium ${isLumpSum ? 'text-purple-900' : 'text-blue-900'}`}>
+                      {isLumpSum ? 'Lump Sum Project' : 'Project Invoice History'}
+                    </p>
+                    {isLumpSum && (
+                      <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
+                        Fixed Amount
+                      </span>
+                    )}
+                  </div>
                   <div className="grid grid-cols-2 gap-3 text-xs">
                     <div>
-                      <span className="text-blue-700">Previous Invoices:</span>
-                      <span className="font-semibold text-blue-900 ml-1">{projectContext.previousInvoices?.length || 0}</span>
+                      <span className={isLumpSum ? 'text-purple-700' : 'text-blue-700'}>Previous Invoices:</span>
+                      <span className={`font-semibold ml-1 ${isLumpSum ? 'text-purple-900' : 'text-blue-900'}`}>{projectContext.previousInvoices?.length || 0}</span>
                     </div>
                     <div>
-                      <span className="text-blue-700">Total Invoiced:</span>
-                      <span className="font-semibold text-blue-900 ml-1">{projectContext.totalInvoiced ?? 0}%</span>
+                      <span className={isLumpSum ? 'text-purple-700' : 'text-blue-700'}>Total Invoiced:</span>
+                      <span className={`font-semibold ml-1 ${isLumpSum ? 'text-purple-900' : 'text-blue-900'}`}>{projectContext.totalInvoiced ?? 0}%</span>
                     </div>
                     <div>
-                      <span className="text-blue-700">Remaining:</span>
-                      <span className="font-semibold text-blue-900 ml-1">{projectContext.remainingPercentage ?? 100}%</span>
+                      <span className={isLumpSum ? 'text-purple-700' : 'text-blue-700'}>Remaining:</span>
+                      <span className={`font-semibold ml-1 ${isLumpSum ? 'text-purple-900' : 'text-blue-900'}`}>{projectContext.remainingPercentage ?? 100}%</span>
                     </div>
                     <div>
-                      <span className="text-blue-700">This Invoice #:</span>
-                      <span className="font-semibold text-blue-900 ml-1">{projectContext.nextSequence || 1}</span>
+                      <span className={isLumpSum ? 'text-purple-700' : 'text-blue-700'}>This Invoice #:</span>
+                      <span className={`font-semibold ml-1 ${isLumpSum ? 'text-purple-900' : 'text-blue-900'}`}>{projectContext.nextSequence || 1}</span>
                     </div>
                   </div>
                   {projectContext.totalInvoiced >= 100 && (
@@ -379,30 +392,32 @@ export const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ isOpen, onClos
               )}
             </div>
 
-            {/* Percentage of Total */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Percentage of Total (%) <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                name="percentageOfTotal"
-                value={formData.percentageOfTotal}
-                onChange={handleChange}
-                required
-                min="0"
-                max="100"
-                step="0.01"
-                placeholder="e.g., 30, 50, 100"
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-              {projectContext && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Suggested: {projectContext.remainingPercentage}% remaining
-                  {lastEditedField === 'amount' && <span className="text-blue-600 ml-1">Auto-calculated from amount</span>}
-                </p>
-              )}
-            </div>
+            {/* Percentage of Total - Hidden for lump sum projects */}
+            {!isLumpSum && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Percentage of Total (%) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  name="percentageOfTotal"
+                  value={formData.percentageOfTotal}
+                  onChange={handleChange}
+                  required={!isLumpSum}
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  placeholder="e.g., 30, 50, 100"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+                {projectContext && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Suggested: {projectContext.remainingPercentage}% remaining
+                    {lastEditedField === 'amount' && <span className="text-blue-600 ml-1">Auto-calculated from amount</span>}
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Issue Date */}
             <div>

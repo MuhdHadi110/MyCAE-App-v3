@@ -266,15 +266,15 @@ export const MaintenanceScreen: React.FC = () => {
                   setShowScheduleModal(true);
                 }}
                 variant="outline"
-                icon={<Calendar className="w-5 h-5" />}
-                size={isMobile ? 'md' : 'lg'}
+                icon={<Calendar className="w-4 h-4" />}
+                size="md"
               >
                 Schedule
               </Button>
               <Button
                 onClick={() => setShowNewTicketModal(true)}
-                icon={<Plus className="w-5 h-5" />}
-                size={isMobile ? 'md' : 'lg'}
+                icon={<Plus className="w-4 h-4" />}
+                size="md"
               >
                 New Ticket
               </Button>
@@ -434,7 +434,7 @@ export const MaintenanceScreen: React.FC = () => {
                     )}
                     <button
                       onClick={() => handleEditClick(ticket)}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                      className="p-2 text-primary-600 hover:bg-primary-50 rounded transition-colors"
                       title="Edit ticket"
                     >
                       <Edit2 className="w-4 h-4" />
@@ -564,7 +564,7 @@ export const MaintenanceScreen: React.FC = () => {
                       )}
                       <button
                         onClick={() => handleEditSchedule(schedule)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        className="p-2 text-primary-600 hover:bg-primary-50 rounded transition-colors"
                         title="Edit schedule"
                       >
                         <Edit2 className="w-4 h-4" />
@@ -730,24 +730,29 @@ const EditMaintenanceTicketModal: React.FC<EditMaintenanceTicketModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">Edit Maintenance Ticket</h2>
-            <p className="text-sm text-gray-600 mt-1">Update ticket details</p>
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-primary-50 to-primary-100 dark:from-gray-800 dark:to-gray-700">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
+              <Wrench className="w-5 h-5 text-primary-600" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Edit Maintenance Ticket</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">Update ticket details</p>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="p-2 hover:bg-primary-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5 text-gray-600 dark:text-gray-400" />
           </button>
         </div>
 
         {/* Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto max-h-[calc(90vh-140px)]">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Title *</label>
             <input
@@ -755,7 +760,7 @@ const EditMaintenanceTicketModal: React.FC<EditMaintenanceTicketModalProps> = ({
               required
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               placeholder="Ticket title"
             />
           </div>
@@ -766,7 +771,7 @@ const EditMaintenanceTicketModal: React.FC<EditMaintenanceTicketModalProps> = ({
               required
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               rows={4}
               placeholder="Describe the maintenance issue..."
             />
@@ -779,7 +784,7 @@ const EditMaintenanceTicketModal: React.FC<EditMaintenanceTicketModalProps> = ({
                 required
                 value={formData.priority}
                 onChange={(e) => setFormData({ ...formData, priority: e.target.value as any })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               >
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
@@ -794,7 +799,7 @@ const EditMaintenanceTicketModal: React.FC<EditMaintenanceTicketModalProps> = ({
                 required
                 value={formData.status}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               >
                 <option value="open">Open</option>
                 <option value="in-progress">In Progress</option>
@@ -810,7 +815,7 @@ const EditMaintenanceTicketModal: React.FC<EditMaintenanceTicketModalProps> = ({
               type="text"
               value={formData.itemName}
               onChange={(e) => setFormData({ ...formData, itemName: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               placeholder="e.g., Laptop A, Server B"
             />
           </div>
@@ -821,7 +826,7 @@ const EditMaintenanceTicketModal: React.FC<EditMaintenanceTicketModalProps> = ({
               type="text"
               value={formData.assignedTo}
               onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               placeholder="Staff name or ID"
             />
           </div>
@@ -839,7 +844,7 @@ const EditMaintenanceTicketModal: React.FC<EditMaintenanceTicketModalProps> = ({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="px-4 py-2 bg-primary-600 text-white font-semibold rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
             >
               {isSubmitting ? 'Saving...' : 'Save Changes'}
             </button>

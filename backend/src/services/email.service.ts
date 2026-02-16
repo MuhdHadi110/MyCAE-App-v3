@@ -16,6 +16,22 @@ class EmailService {
         pass: process.env.SMTP_PASSWORD,
       },
     });
+
+    // Verify SMTP connection on startup
+    this.verifyConnection();
+  }
+
+  /**
+   * Verify SMTP connection
+   */
+  private async verifyConnection(): Promise<void> {
+    try {
+      await this.transporter.verify();
+      console.log('✅ SMTP Server connection verified');
+    } catch (error: any) {
+      console.error('❌ SMTP Connection Error:', error.message);
+      console.warn('⚠️  Email notifications will not work until SMTP is configured');
+    }
   }
 
   /**
@@ -320,7 +336,7 @@ class EmailService {
     scheduledDate: string,
     timeframe: string
   ): string {
-    const supportEmail = process.env.SUPPORT_EMAIL || 'hadi@mycae.com.my';
+    const supportEmail = process.env.SUPPORT_EMAIL || 'noreply@mycaetech.com';
 
     return `
 <!DOCTYPE html>
@@ -365,7 +381,7 @@ class EmailService {
     scheduledDate: string,
     daysOverdue: number
   ): string {
-    const supportEmail = process.env.SUPPORT_EMAIL || 'hadi@mycae.com.my';
+    const supportEmail = process.env.SUPPORT_EMAIL || 'noreply@mycaetech.com';
 
     return `
 <!DOCTYPE html>
@@ -410,7 +426,7 @@ class EmailService {
     content: string,
     actionUrl: string
   ): string {
-    const supportEmail = process.env.SUPPORT_EMAIL || 'hadi@mycae.com.my';
+    const supportEmail = process.env.SUPPORT_EMAIL || 'noreply@mycaetech.com';
 
     // Convert HTML content to plain text format
     // Replace <p><strong>Label:</strong> Value</p> with Label : Value<br>
@@ -494,7 +510,7 @@ class EmailService {
    * Password reset email template - Clean professional format
    */
   private getPasswordResetTemplate(userName: string, resetUrl: string): string {
-    const supportEmail = process.env.SUPPORT_EMAIL || 'hadi@mycae.com.my';
+    const supportEmail = process.env.SUPPORT_EMAIL || 'noreply@mycaetech.com';
 
     return `
 <!DOCTYPE html>
@@ -535,7 +551,7 @@ class EmailService {
    * Password reset confirmation email template - Clean professional format
    */
   private getPasswordResetConfirmationTemplate(userName: string): string {
-    const supportEmail = process.env.SUPPORT_EMAIL || 'hadi@mycae.com.my';
+    const supportEmail = process.env.SUPPORT_EMAIL || 'noreply@mycaetech.com';
     const loginUrl = `${process.env.FRONTEND_URL}/login`;
 
     return `
@@ -933,6 +949,70 @@ class EmailService {
 </body>
 </html>
     `;
+  }
+
+  /**
+   * Send welcome email to new user with temporary password and onboarding guide
+   */
+  async sendWelcomeEmail(
+    userEmail: string,
+    userName: string,
+    tempPassword: string,
+    expiryDate: Date,
+    pdfBuffer: Buffer
+  ): Promise<void> {
+    const subject = 'MyCAE Technologies App - Your Login Details';
+    const loginUrl = `${process.env.FRONTEND_URL}/login`;
+    const formattedExpiryDate = expiryDate.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    // Plain text email body
+    const textBody = `Hi ${userName},
+
+Welcome to MyCAE Technologies App! Your account has been created.
+
+LOGIN DETAILS:
+Website: ${loginUrl}
+Email: ${userEmail}
+Temporary Password: ${tempPassword}
+
+IMPORTANT INFORMATION:
+- You must change your password on first login
+- This password expires on ${formattedExpiryDate}
+- See the attached Onboarding Guide for instructions
+
+GETTING STARTED:
+1. Go to ${loginUrl}
+2. Enter your email and temporary password
+3. Change your password when prompted
+4. Review the attached PDF guide
+
+Welcome to the team!
+
+MyCAE Admin Team`;
+
+    try {
+      await this.transporter.sendMail({
+        from: process.env.EMAIL_FROM,
+        to: userEmail,
+        subject: subject,
+        text: textBody,
+        attachments: [
+          {
+            filename: 'MyCAE-Onboarding-Guide.pdf',
+            content: pdfBuffer,
+            contentType: 'application/pdf'
+          }
+        ]
+      });
+      console.log(`✅ Welcome email sent to ${userEmail}`);
+    } catch (error: any) {
+      console.error(`❌ Failed to send welcome email to ${userEmail}:`, error.message);
+      throw error;
+    }
   }
 }
 

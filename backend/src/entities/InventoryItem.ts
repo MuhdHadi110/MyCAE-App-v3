@@ -77,6 +77,9 @@ export class InventoryItem {
   @Column({ type: 'date', nullable: true })
   next_maintenance_date?: Date;
 
+  @Column({ type: 'date', nullable: true })
+  last_calibrated_date?: Date;
+
   @Column({ type: 'int', default: 0 })
   in_maintenance_quantity: number;
 

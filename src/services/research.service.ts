@@ -68,7 +68,7 @@ class ResearchService {
     endDate?: string;
   }): Promise<any[]> {
     const response = await api.get('/research/timesheets', { params: filters });
-    return response.data;
+    return transformKeysToCAmelCase(response.data);
   }
 }
 

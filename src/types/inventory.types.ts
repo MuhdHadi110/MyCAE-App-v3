@@ -12,10 +12,11 @@ export interface InventoryItem {
   cost: number;
   price: number;
   supplier: string;
-  status: 'Active' | 'Inactive' | 'Discontinued';
+  status: 'Available' | 'available' | 'Active' | 'Inactive' | 'Discontinued';
   imageURL?: string;
   barcode?: string;
   notes?: string;
+  lastCalibratedDate?: string;
   lastUpdated: string;
   createdBy: string;
   lastAction?: InventoryLastAction;

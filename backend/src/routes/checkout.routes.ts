@@ -85,14 +85,16 @@ router.post(
 
       await checkoutRepo.save(checkout);
 
-      // Trigger n8n workflow
-      await n8nService.onCheckoutCreated({
+      // Trigger n8n workflow (non-blocking)
+      n8nService.onCheckoutCreated({
         checkoutId: checkout.id,
         itemName: item.title,
         quantity,
         checkedOutBy: req.user.name || 'Unknown User',
         location,
         purpose,
+      }).catch((err) => {
+        console.error('n8n webhook error (non-blocking):', err.message);
       });
 
       res.status(201).json({
@@ -151,24 +153,38 @@ router.post(
       await queryRunner.startTransaction();
 
       try {
-        // Create checkout for each item
+        // Create checkout for each item - ALL operations inside transaction
         for (let i = 0; i < items.length; i++) {
           const itemData = items[i];
           const validation = validations[i];
           const inventoryItem = validation.item!;
 
-          // Decrease inventory
-          const inventoryUpdate = await decreaseInventoryQuantity(
-            itemData.barcode,
+          // Decrease inventory INSIDE the transaction using queryRunner.manager
+          const updateResult = await queryRunner.manager.decrement(
+            InventoryItem,
+            { id: inventoryItem.id },
+            'quantity',
             itemData.quantity
           );
 
-          if (!inventoryUpdate.success) {
-            // Transaction will be rolled back automatically in catch block
-            throw new Error(`Failed to checkout ${inventoryItem.title}: ${inventoryUpdate.error}`);
+          if (!updateResult || updateResult.affected === 0) {
+            throw new Error(`Failed to update inventory for ${inventoryItem.title}`);
           }
 
-          // Create checkout record
+          // Verify the item still has valid quantity after update
+          const updatedItem = await queryRunner.manager.findOne(InventoryItem, {
+            where: { id: inventoryItem.id }
+          });
+
+          if (!updatedItem) {
+            throw new Error(`Inventory item ${inventoryItem.title} no longer exists`);
+          }
+
+          if (updatedItem.quantity < 0) {
+            throw new Error(`Insufficient quantity for ${inventoryItem.title}. Available: ${updatedItem.quantity + itemData.quantity}, Requested: ${itemData.quantity}`);
+          }
+
+          // Create checkout record inside transaction
           const checkout = checkoutRepo.create({
             masterBarcode,
             item_id: inventoryItem.id,
@@ -199,12 +215,14 @@ router.post(
         await queryRunner.release();
       }
 
-      // Trigger n8n workflow
-      await n8nService.onCheckoutCreated({
+      // Trigger n8n workflow (non-blocking)
+      n8nService.onCheckoutCreated({
         masterBarcode,
         itemCount: items.length,
         checkedOutBy: req.user.name || 'Unknown User',
         purpose,
+      }).catch((err) => {
+        console.error('n8n webhook error (non-blocking):', err.message);
       });
 
       res.status(201).json({

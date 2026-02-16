@@ -3,7 +3,34 @@ import { TeamMember, EmploymentType } from '../entities/TeamMember';
 import { User, UserRole } from '../entities/User';
 import { Project } from '../entities/Project';
 import { Timesheet } from '../entities/Timesheet';
+import emailService from './email.service';
+import { OnboardingPdfService } from './onboardingPdf.service';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+
+/**
+ * Generate a secure random temporary password
+ */
+const generateTempPassword = (): string => {
+  const length = 12;
+  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+  let password = '';
+  
+  // Ensure at least one of each character type
+  password += charset.match(/[a-z]/)![0]; // lowercase
+  password += charset.match(/[A-Z]/)![0]; // uppercase
+  password += charset.match(/[0-9]/)![0]; // number
+  password += charset.match(/[!@#$%^&*]/)![0]; // special
+  
+  // Fill the rest randomly
+  for (let i = 4; i < length; i++) {
+    const randomIndex = crypto.randomInt(0, charset.length);
+    password += charset[randomIndex];
+  }
+  
+  // Shuffle the password
+  return password.split('').sort(() => Math.random() - 0.5).join('');
+};
 
 export interface TeamMemberFilters {
   status?: string;
@@ -195,6 +222,7 @@ export class TeamService {
     const { name, email, phone, role = 'engineer', department, employment_type = EmploymentType.FULL_TIME, userId, ...rest } = data;
 
     let user;
+    let tempPassword: string | null = null;
 
     // If userId is provided, use existing user
     if (userId) {
@@ -209,17 +237,29 @@ export class TeamService {
         throw new Error('User with this email already exists');
       }
 
-      const tempPassword = 'TempPassword123!';
+      tempPassword = generateTempPassword();
       const hashedPassword = await bcrypt.hash(tempPassword, 10);
+      
+      // Set password expiry to 7 days from now
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + 7);
 
-      user = this.userRepo.create({
+      const newUser = this.userRepo.create({
         name,
         email,
         password_hash: hashedPassword,
         role: role as UserRole,
+        temp_password_expires: expiryDate,
+        is_temp_password: true,
       });
 
-      await this.userRepo.save(user);
+      await this.userRepo.save(newUser);
+      
+      // Reload user to ensure all getters/setters are properly applied
+      user = await this.userRepo.findOne({ where: { id: newUser.id } });
+      if (!user) {
+        throw new Error('Failed to create user');
+      }
     }
 
     // Check if team member already exists for this user
@@ -244,11 +284,44 @@ export class TeamService {
       relations: ['user'],
     });
 
-    // Return response with temporary password for new users
+    // Send welcome email for new users
+    let emailSent = false;
+    let emailError = null;
+    
+    if (!userId && tempPassword && user) {
+      try {
+        // Generate onboarding PDF
+        const pdfBuffer = await OnboardingPdfService.generateOnboardingGuide(name);
+        
+        // Send welcome email with PDF
+        await emailService.sendWelcomeEmail(
+          email,
+          name,
+          tempPassword,
+          user.temp_password_expires!,
+          pdfBuffer
+        );
+        
+        emailSent = true;
+        console.log(`✅ Welcome email sent to ${email}`);
+      } catch (err: any) {
+        emailError = err.message;
+        console.error(`❌ Failed to send welcome email to ${email}:`, err.message);
+      }
+    }
+
+    // Return response
     const response: any = fullMember;
-    if (!userId) {
-      response.tempPassword = 'TempPassword123!';
-      response.message = `New user created. Share this temporary password with the team member and ask them to change it on first login.`;
+    if (!userId && tempPassword) {
+      response.tempPassword = tempPassword;
+      if (emailSent) {
+        response.message = `New user created successfully. Welcome email with login credentials sent to ${email}.`;
+        response.emailStatus = 'sent';
+      } else {
+        response.message = `New user created successfully but welcome email failed to send. Please manually share the password with the user.`;
+        response.emailStatus = 'failed';
+        response.emailError = emailError;
+      }
     }
 
     return response;

@@ -85,7 +85,7 @@ export const EditTimesheetModal: React.FC<EditTimesheetModalProps> = ({
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-primary-50 to-primary-100 dark:from-gray-800 dark:to-gray-700">
           <h2 className="text-xl font-bold text-gray-900">Edit Timesheet Entry</h2>
           <button
             onClick={onClose}

@@ -11,7 +11,7 @@ import { useEffect, useRef } from 'react';
  * Then use refs on first input and trigger button
  */
 export const useModalFocus = (isOpen: boolean) => {
-  const firstInputRef = useRef<HTMLElement | null>(null);
+  const firstInputRef = useRef<HTMLInputElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {

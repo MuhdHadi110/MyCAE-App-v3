@@ -8,6 +8,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useProjectStore } from '../../store/projectStore';
 import { useClientStore } from '../../store/clientStore';
+import { useResearchStore } from '../../store/researchStore';
 import { ProjectDetailModal } from '../modals/ProjectDetailModal';
 import {
   BarChart,
@@ -27,6 +28,7 @@ export const PersonalDashboard: React.FC = () => {
   const { user } = useAuth();
   const { projects, timesheets, fetchProjects, fetchTimesheets } = useProjectStore();
   const { clients, fetchClients } = useClientStore();
+  const { researchProjects, researchTimesheets, fetchResearchProjects, fetchResearchTimesheets } = useResearchStore();
   const [selectedYear, setSelectedYear] = useState<number | 'all'>(new Date().getFullYear());
   const [selectedProject, setSelectedProject] = useState<any>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -35,6 +37,8 @@ export const PersonalDashboard: React.FC = () => {
     fetchProjects();
     fetchTimesheets();
     fetchClients();
+    fetchResearchProjects();
+    fetchResearchTimesheets();
   }, []);
 
   // Get my timesheets
@@ -57,6 +61,21 @@ export const PersonalDashboard: React.FC = () => {
       return year === selectedYear;
     });
   }, [myTimesheets, selectedYear]);
+
+  // Get my research timesheets
+  const myResearchTimesheets = useMemo(() => {
+    if (!user) return [];
+    return (Array.isArray(researchTimesheets) ? researchTimesheets : []).filter((ts) => ts.teamMemberId === user.id);
+  }, [researchTimesheets, user?.id]);
+
+  // Filter research timesheets by selected year
+  const filteredResearchTimesheets = useMemo(() => {
+    if (selectedYear === 'all') return myResearchTimesheets;
+    return myResearchTimesheets.filter((ts) => {
+      const year = new Date(ts.date).getFullYear();
+      return year === selectedYear;
+    });
+  }, [myResearchTimesheets, selectedYear]);
 
   // Year summary statistics
   const summary = useMemo(() => {
@@ -147,6 +166,58 @@ export const PersonalDashboard: React.FC = () => {
       .slice(0, 5);
   }, [filteredTimesheets, projects]);
 
+  // Monthly research hours breakdown by project
+  const researchMonthlyData = useMemo(() => {
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    // Initialize: { 'Jan': {}, 'Feb': {}, ... }
+    const dataMap: Record<string, Record<string, number>> = {};
+    monthNames.forEach((month) => {
+      dataMap[month] = {};
+    });
+
+    // Aggregate hours by month and research project
+    filteredResearchTimesheets.forEach((ts) => {
+      const date = new Date(ts.date);
+      const month = monthNames[date.getMonth()];
+      const researchProject = researchProjects.find((p) => p.id === ts.projectId.toString());
+      const projectCode = researchProject?.researchCode || researchProject?.title || 'Unknown';
+
+      if (!dataMap[month][projectCode]) {
+        dataMap[month][projectCode] = 0;
+      }
+      dataMap[month][projectCode] += parseFloat(ts.hoursLogged.toString() || '0');
+    });
+
+    // Transform to array format: [{ name: 'Jan', 'RES-001': 20, 'RES-002': 15 }]
+    return monthNames.map((month) => ({
+      name: month,
+      ...dataMap[month],
+    }));
+  }, [filteredResearchTimesheets, researchProjects]);
+
+  // Get unique research project codes from timesheets for the chart
+  const researchProjectsInChart = useMemo(() => {
+    const projectSet = new Set<string>();
+    filteredResearchTimesheets.forEach((ts) => {
+      const researchProject = researchProjects.find((p) => p.id === ts.projectId.toString());
+      if (researchProject) {
+        projectSet.add(researchProject.researchCode || researchProject.title || 'Unknown');
+      }
+    });
+    return Array.from(projectSet);
+  }, [filteredResearchTimesheets, researchProjects]);
+
+  // Define colors for research projects
+  const researchProjectColors: Record<string, string> = useMemo(() => {
+    const colors = ['#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#84cc16', '#f97316'];
+    const colorMap: Record<string, string> = {};
+    researchProjectsInChart.forEach((projectCode, index) => {
+      colorMap[projectCode] = colors[index % colors.length];
+    });
+    return colorMap;
+  }, [researchProjectsInChart]);
+
   // Work category distribution
   const categoryDistribution = useMemo(() => {
     const categoryTotals = {
@@ -196,6 +267,73 @@ export const PersonalDashboard: React.FC = () => {
     ].filter((item) => item.value > 0);
   }, [filteredTimesheets]);
 
+  // Work Fields distribution from user's projects
+  const fieldDistribution = useMemo(() => {
+    const fieldMap: Record<string, number> = {
+      'CFD': 0,
+      'FEA': 0,
+      'Vibration & Acoustic': 0,
+    };
+
+    // Map work types to fields (support multiple formats)
+    const workTypeToField: Record<string, string> = {
+      'computational-fluid-dynamic': 'CFD',
+      'Computational Fluid Dynamics': 'CFD',
+      'CFD': 'CFD',
+      'finite-element-analysis': 'FEA',
+      'Finite Element Analysis': 'FEA',
+      'FEA': 'FEA',
+      'vibration-acoustic': 'Vibration & Acoustic',
+      'Vibration': 'Vibration & Acoustic',
+      'Vibration & Acoustic': 'Vibration & Acoustic',
+      'Acoustic': 'Vibration & Acoustic',
+    };
+
+    // Get only user's projects
+    myProjects.forEach((project) => {
+      // Check both 'categories' and 'workTypes' for backward compatibility
+      let categories = (project as any).categories || project.workTypes;
+
+      // Parse if it's a JSON string
+      if (typeof categories === 'string') {
+        try {
+          categories = JSON.parse(categories);
+        } catch (e) {
+          console.warn('Failed to parse categories:', categories);
+        }
+      }
+
+      if (categories && Array.isArray(categories)) {
+        categories.forEach((category) => {
+          const field = workTypeToField[category];
+          if (field) {
+            // Weight by hours worked on this project
+            const projectHours = filteredTimesheets
+              .filter((ts) => ts.projectId === project.id)
+              .reduce((sum, ts) => sum + ts.hours, 0);
+            fieldMap[field] += projectHours;
+          }
+        });
+      }
+    });
+
+    const colors = {
+      'CFD': '#6366f1',
+      'FEA': '#ec4899',
+      'Vibration & Acoustic': '#f59e0b',
+    };
+
+    const totalHours = Object.values(fieldMap).reduce((sum, h) => sum + h, 0);
+
+    return Object.entries(fieldMap)
+      .map(([name, value]) => ({
+        name,
+        value,
+        percentage: totalHours > 0 ? (value / totalHours) * 100 : 0,
+        color: colors[name as keyof typeof colors],
+      }))
+      .filter((item) => item.value > 0);
+  }, [myProjects, filteredTimesheets]);
 
   // My projects with hours info
   const myProjectsWithHours = useMemo(() => {
@@ -298,11 +436,11 @@ export const PersonalDashboard: React.FC = () => {
 
           {/* Charts Row */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Monthly Hours */}
+            {/* Monthly Project Hours */}
             <div className="bg-white rounded-lg p-5 border border-gray-200">
               <div className="mb-6">
-                <h2 className="text-lg font-semibold text-gray-900">Monthly Hours</h2>
-                <p className="text-sm text-gray-500 mt-1">Hours tracked each month by project</p>
+                <h2 className="text-lg font-semibold text-gray-900">Monthly Project Hours</h2>
+                <p className="text-sm text-gray-500 mt-1">Hours tracked each month on engineering projects</p>
               </div>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={monthlyData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
@@ -384,6 +522,113 @@ export const PersonalDashboard: React.FC = () => {
             </div>
           </div>
 
+          {/* Second Charts Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Monthly Research Hours */}
+            <div className="bg-white rounded-lg p-5 border border-gray-200">
+              <div className="mb-6">
+                <h2 className="text-lg font-semibold text-gray-900">Monthly Research Hours</h2>
+                <p className="text-sm text-gray-500 mt-1">Hours tracked each month on research projects</p>
+              </div>
+              {researchProjectsInChart.length === 0 ? (
+                <div className="h-[300px] flex items-center justify-center">
+                  <div className="text-center">
+                    <p className="text-gray-500">No research hours tracked</p>
+                    <p className="text-sm text-gray-400 mt-1">Hours will appear here when you log time on research projects</p>
+                  </div>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={researchMonthlyData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+                    <XAxis
+                      dataKey="name"
+                      tick={{ fontSize: 11, fill: '#9CA3AF' }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 11, fill: '#9CA3AF' }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#fff',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                      }}
+                      formatter={(value: number, name: string) => [`${value} hrs`, name]}
+                    />
+                    <Legend
+                      wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
+                      iconType="rect"
+                    />
+                    {researchProjectsInChart.map((projectCode) => (
+                      <Bar
+                        key={projectCode}
+                        dataKey={projectCode}
+                        stackId="hours"
+                        fill={researchProjectColors[projectCode]}
+                        radius={[0, 0, 0, 0]}
+                      />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+
+            {/* Work Fields Distribution */}
+            <div className="bg-white rounded-lg p-5 border border-gray-200">
+              <div className="mb-6">
+                <h2 className="text-lg font-semibold text-gray-900">Work Fields</h2>
+                <p className="text-sm text-gray-500 mt-1">Time spent by engineering field</p>
+              </div>
+              {fieldDistribution.length === 0 ? (
+                <div className="h-[300px] flex items-center justify-center">
+                  <div className="text-center">
+                    <p className="text-gray-500">No field data available</p>
+                    <p className="text-sm text-gray-400 mt-1">Fields will appear when you work on projects with work types assigned</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <ResponsiveContainer width="100%" height={240}>
+                    <PieChart>
+                      <Pie
+                        data={fieldDistribution}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={90}
+                        paddingAngle={4}
+                        dataKey="value"
+                        animationDuration={800}
+                      >
+                        {fieldDistribution.map((entry, index) => (
+                          <Cell key={`cell-field-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value: number) => `${value} hrs`} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="space-y-2 mt-4">
+                    {fieldDistribution.map((item, index) => (
+                      <div key={index} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                          <span className="text-gray-700">{item.name}</span>
+                        </div>
+                        <span className="font-semibold text-gray-900">{item.percentage.toFixed(0)}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
           {/* My Projects Table */}
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200">
@@ -406,8 +651,7 @@ export const PersonalDashboard: React.FC = () => {
                       <th className="px-6 py-3 text-left font-semibold text-gray-700">Code</th>
                       <th className="px-6 py-3 text-left font-semibold text-gray-700">Project</th>
                       <th className="px-6 py-3 text-left font-semibold text-gray-700">Client</th>
-                      <th className="px-6 py-3 text-center font-semibold text-gray-700">Progress</th>
-                      <th className="px-6 py-3 text-right font-semibold text-gray-700">My Hours</th>
+                      <th className="px-6 py-3 text-right font-semibold text-gray-700">Hours</th>
                       <th className="px-6 py-3 text-center font-semibold text-gray-700">Status</th>
                     </tr>
                   </thead>
@@ -431,27 +675,33 @@ export const PersonalDashboard: React.FC = () => {
                             <p className="font-medium text-gray-900 truncate">{project.title}</p>
                           </td>
                           <td className="px-6 py-4 text-gray-700">{client?.name || 'Unknown'}</td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center justify-center gap-2">
-                              <div className="w-16 bg-gray-200 rounded-full h-2 overflow-hidden">
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex flex-col items-end gap-1.5">
+                              <div className="font-medium">{project.hoursWorked} hrs</div>
+                              <div className="text-xs text-gray-500">
+                                of {project.plannedHours} planned
+                              </div>
+                              <div className="w-full bg-gray-200 rounded-full h-2.5 max-w-[100px] shadow-inner overflow-hidden">
                                 <div
-                                  className={`h-2 rounded-full transition-all ${
+                                  className={`h-full rounded-full transition-all duration-300 ease-in-out shadow-sm ${
                                     (project.actualHours || 0) > project.plannedHours
-                                      ? 'bg-red-500'
-                                      : 'bg-primary-600'
+                                      ? 'bg-gradient-to-r from-red-500 to-red-600'
+                                      : 'bg-gradient-to-r from-green-500 to-green-600'
                                   }`}
-                                  style={{ width: `${Math.min(progress, 100)}%` }}
+                                  style={{
+                                    width: `${Math.min(
+                                      Math.max(
+                                        project.plannedHours > 0
+                                          ? ((project.actualHours || 0) / project.plannedHours) * 100
+                                          : 0,
+                                        2
+                                      ),
+                                      100
+                                    )}%`
+                                  }}
                                 />
                               </div>
-                              <span className={`font-semibold w-8 text-right text-xs ${
-                                (project.actualHours || 0) > project.plannedHours ? 'text-red-600' : 'text-gray-900'
-                              }`}>
-                                {progress.toFixed(0)}%
-                              </span>
                             </div>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <span className="font-medium text-primary-600">{project.hoursWorked} hrs</span>
                           </td>
                           <td className="px-6 py-4 text-center">
                             <span

@@ -2,7 +2,8 @@ import { Router, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { Project } from '../entities/Project';
 import { Timesheet } from '../entities/Timesheet';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { authenticate, authorize, AuthRequest } from '../middleware/auth';
+import { UserRole } from '../entities/User';
 import { body, validationResult } from 'express-validator';
 
 const router = Router();
@@ -31,7 +32,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const userId = req.user?.id;
     const userRoles = req.user?.roles || [];
     const isPrivileged = userRoles.some((r: string) =>
-      ['admin', 'managing_director', 'manager', 'principal_engineer', 'senior_engineer', 'engineer'].includes(r)
+      ['admin', 'managing-director', 'manager', 'principal-engineer', 'senior-engineer', 'engineer'].includes(r)
     );
 
     let query = timesheetRepo.createQueryBuilder('timesheet')
@@ -107,16 +108,32 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 /**
  * GET /api/timesheets/:id
  * Get single timesheet
+ * Authorization: Users can only view their own timesheets, unless they are managers or above
  */
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const timesheetRepo = AppDataSource.getRepository(Timesheet);
     const timesheet = await timesheetRepo.findOne({
       where: { id: req.params.id },
+      relations: ['engineer', 'project'],
     });
 
     if (!timesheet) {
       return res.status(404).json({ error: 'Timesheet not found' });
+    }
+
+    // Authorization check: Users can only view their own timesheets unless they are managers or above
+    const userId = req.user?.id;
+    const userRoles = req.user?.roles || [];
+    const isPrivileged = userRoles.some((r: string) =>
+      ['admin', 'managing-director', 'manager', 'principal-engineer', 'senior-engineer'].includes(r)
+    );
+    const isOwner = timesheet.engineer_id === userId;
+
+    if (!isOwner && !isPrivileged) {
+      return res.status(403).json({
+        error: 'You do not have permission to view this timesheet'
+      });
     }
 
     res.json(timesheet);
@@ -183,8 +200,9 @@ router.post(
  * PUT /api/timesheets/:id
  * Update timesheet - Only the engineer who created the timesheet can update it
  * Uses transaction to ensure atomicity of timesheet and project hours update
+ * Authorization: Engineers and above (ownership verified in handler)
  */
-router.put('/:id', async (req: AuthRequest, res: Response) => {
+router.put('/:id', authorize(UserRole.ENGINEER, UserRole.SENIOR_ENGINEER, UserRole.PRINCIPAL_ENGINEER, UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const timesheetRepo = AppDataSource.getRepository(Timesheet);
     const projectRepo = AppDataSource.getRepository(Project);
@@ -257,8 +275,9 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
  * DELETE /api/timesheets/:id
  * Delete timesheet - Only the engineer who created the timesheet can delete it
  * Uses transaction to ensure atomicity of timesheet deletion and project hours update
+ * Authorization: Engineers and above (ownership verified in handler)
  */
-router.delete('/:id', async (req: AuthRequest, res: Response) => {
+router.delete('/:id', authorize(UserRole.ENGINEER, UserRole.SENIOR_ENGINEER, UserRole.PRINCIPAL_ENGINEER, UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const timesheetRepo = AppDataSource.getRepository(Timesheet);
     const projectRepo = AppDataSource.getRepository(Project);

@@ -1,0 +1,37 @@
+RewriteEngine On
+
+# HTTPS redirect
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN
+PassengerAppRoot "/home/mycaet40/mycaetracker-backend"
+PassengerBaseURI "/api"
+PassengerNodejs "/home/mycaet40/nodevenv/mycaetracker-backend/20/bin/node"
+PassengerAppType node
+PassengerStartupFile dist/server.js
+PassengerAppEnv production
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END
+
+# IMPORTANT: Exclude assets from React Router fallback
+# Allow direct access to CSS, JS, images, fonts, etc.
+RewriteCond %{REQUEST_URI} \.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|map)$ [NC]
+RewriteRule ^ - [L]
+
+# React Router fallback - only for non-file, non-directory, non-api, non-asset routes
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} !^/api
+RewriteRule ^ index.html [L]
+
+# Security headers
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+  Header set X-Frame-Options "SAMEORIGIN"
+  Header set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+# Gzip compression
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json
+</IfModule>

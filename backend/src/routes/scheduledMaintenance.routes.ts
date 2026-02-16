@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { authenticate } from '../middleware/auth';
+import { authenticate, authorize } from '../middleware/auth';
+import { UserRole } from '../entities/User';
 import { MaintenanceSchedulerService } from '../services/maintenanceScheduler.service';
 import { MaintenanceType, InventoryAction } from '../entities/ScheduledMaintenance';
 import { triggerManualReminderCheck } from '../services/maintenanceReminderScheduler.service';
@@ -121,9 +122,9 @@ router.get('/:id', async (req: Request, res: Response) => {
 
 /**
  * POST /api/scheduled-maintenance
- * Create new scheduled maintenance
+ * Create new scheduled maintenance - Engineers and above
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', authorize(UserRole.ENGINEER, UserRole.SENIOR_ENGINEER, UserRole.PRINCIPAL_ENGINEER, UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN), async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;
     const { item_id, maintenance_type, description, scheduled_date, inventory_action, quantity_affected } = req.body;
@@ -158,9 +159,9 @@ router.post('/', async (req: Request, res: Response) => {
 
 /**
  * PUT /api/scheduled-maintenance/:id
- * Update scheduled maintenance
+ * Update scheduled maintenance - Engineers and above
  */
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', authorize(UserRole.ENGINEER, UserRole.SENIOR_ENGINEER, UserRole.PRINCIPAL_ENGINEER, UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { maintenance_type, description, scheduled_date, inventory_action, quantity_affected } = req.body;
@@ -190,9 +191,9 @@ router.put('/:id', async (req: Request, res: Response) => {
 
 /**
  * DELETE /api/scheduled-maintenance/:id
- * Delete scheduled maintenance
+ * Delete scheduled maintenance - Engineers and above
  */
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authorize(UserRole.ENGINEER, UserRole.SENIOR_ENGINEER, UserRole.PRINCIPAL_ENGINEER, UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -207,9 +208,9 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
 /**
  * POST /api/scheduled-maintenance/:id/complete
- * Mark scheduled maintenance as completed
+ * Mark scheduled maintenance as completed - Engineers and above
  */
-router.post('/:id/complete', async (req: Request, res: Response) => {
+router.post('/:id/complete', authorize(UserRole.ENGINEER, UserRole.SENIOR_ENGINEER, UserRole.PRINCIPAL_ENGINEER, UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const user = (req as any).user;
@@ -225,9 +226,9 @@ router.post('/:id/complete', async (req: Request, res: Response) => {
 
 /**
  * POST /api/scheduled-maintenance/:id/create-ticket
- * Create a maintenance ticket from scheduled maintenance
+ * Create a maintenance ticket from scheduled maintenance - Engineers and above
  */
-router.post('/:id/create-ticket', async (req: Request, res: Response) => {
+router.post('/:id/create-ticket', authorize(UserRole.ENGINEER, UserRole.SENIOR_ENGINEER, UserRole.PRINCIPAL_ENGINEER, UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const user = (req as any).user;
@@ -245,15 +246,8 @@ router.post('/:id/create-ticket', async (req: Request, res: Response) => {
  * POST /api/scheduled-maintenance/trigger-reminders
  * Manually trigger reminder check (admin only)
  */
-router.post('/trigger-reminders', async (req: Request, res: Response) => {
+router.post('/trigger-reminders', authorize(UserRole.ADMIN), async (req: Request, res: Response) => {
   try {
-    const user = (req as any).user;
-
-    // Check admin permission
-    if (!user.roles?.includes('admin') && user.role !== 'admin') {
-      return res.status(403).json({ message: 'Admin access required' });
-    }
-
     await triggerManualReminderCheck();
 
     res.json({ message: 'Reminder check triggered successfully' });

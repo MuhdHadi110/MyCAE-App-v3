@@ -107,7 +107,7 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-xl transition-all duration-200 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                className="w-full bg-primary-600 hover:bg-primary-700 text-white font-medium py-3 px-6 rounded-xl transition-all duration-200 disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
                 {loading ? 'Sending...' : 'Send Reset Link'}
               </button>
@@ -142,7 +142,7 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
 
               <button
                 onClick={handleClose}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-xl transition-all duration-200"
+                className="w-full bg-primary-600 hover:bg-primary-700 text-white font-medium py-3 px-6 rounded-xl transition-all duration-200"
               >
                 Close
               </button>

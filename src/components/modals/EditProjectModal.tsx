@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, CheckCircle2, Users } from 'lucide-react';
+import { X, Calendar, CheckCircle2, Users, Building2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import type { Project, ProjectStatus } from '../../types/project.types';
 import { useTeamStore } from '../../store/teamStore';
+import { useCompanyStore } from '../../store/companyStore';
 
 interface EditProjectModalProps {
   isOpen: boolean;
@@ -19,10 +20,12 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
 }) => {
   const [formData, setFormData] = useState<Partial<Project>>({});
   const { teamMembers, fetchTeamMembers } = useTeamStore();
+  const { companies, fetchCompanies, loading: companiesLoading } = useCompanyStore();
 
   useEffect(() => {
     fetchTeamMembers();
-  }, [fetchTeamMembers]);
+    fetchCompanies();
+  }, [fetchTeamMembers, fetchCompanies]);
 
   useEffect(() => {
     if (project) {
@@ -173,6 +176,63 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
               )}
             </div>
 
+            {/* Company & Contact Section */}
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-green-600" />
+                Company & Contact
+              </h3>
+
+              <div className="grid grid-cols-1 gap-4">
+                {/* Contact Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Contact *
+                  </label>
+                  <select
+                    value={formData.contactId || ''}
+                    onChange={(e) => {
+                      const contactId = e.target.value;
+                      // Find the company that has this contact
+                      const company = companies.find(c => c.contacts.some(contact => contact.id === contactId));
+                      const selectedContact = company?.contacts.find(c => c.id === contactId);
+                      setFormData({
+                        ...formData,
+                        contactId: contactId,
+                        companyId: company?.id || '',
+                        companyName: company?.name || ''
+                      });
+                    }}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent grouped-select"
+                    disabled={companiesLoading}
+                  >
+                    <option value="">
+                      {companiesLoading ? 'Loading contacts...' : companies.length === 0 ? 'No contacts available' : 'Select Contact'}
+                    </option>
+                    {companies.map((company) => (
+                      <optgroup key={company.id} label={company.name}>
+                        {company.contacts.map((contact) => (
+                          <option key={contact.id} value={contact.id}>
+                            {contact.name} {contact.position ? `(${contact.position})` : ''}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Display Selected Company (Read-only) */}
+                {formData.companyName && (
+                  <div className="p-3 bg-white rounded-lg border border-green-200">
+                    <p className="text-xs font-medium text-gray-600 mb-1">Selected Company:</p>
+                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">
+                      🏢 {formData.companyName}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Status & Dates */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Status Dropdown */}
@@ -206,6 +266,57 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
               </div>
             </div>
 
+            {/* Billing Type */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                Billing Type
+              </h3>
+              
+              {/* Check if project has POs (simplified check - you may need to pass this as a prop) */}
+              {project.poFileUrl ? (
+                <div className="p-4 bg-white rounded-lg border border-blue-200">
+                  <p className="text-sm text-gray-700">
+                    <span className="font-medium">Current Billing Type:</span>{' '}
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                      formData.billingType === 'lump_sum' 
+                        ? 'bg-purple-100 text-purple-800' 
+                        : 'bg-blue-100 text-blue-800'
+                    }`}>
+                      {formData.billingType === 'lump_sum' ? 'Lump Sum' : 'Hourly Rate'}
+                    </span>
+                  </p>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Billing type cannot be changed after PO has been created.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="billingType"
+                      value="hourly"
+                      checked={formData.billingType === 'hourly'}
+                      onChange={(e) => setFormData({ ...formData, billingType: e.target.value as 'hourly' | 'lump_sum' })}
+                      className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+                    />
+                    <span className="text-sm text-gray-700">Hourly Rate</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="billingType"
+                      value="lump_sum"
+                      checked={formData.billingType === 'lump_sum'}
+                      onChange={(e) => setFormData({ ...formData, billingType: e.target.value as 'hourly' | 'lump_sum' })}
+                      className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+                    />
+                    <span className="text-sm text-gray-700">Lump Sum</span>
+                  </label>
+                </div>
+              )}
+            </div>
+
             {/* Project Details */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -219,38 +330,26 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
               />
             </div>
 
-            {/* Hourly Rate */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Hourly Rate (MYR)
-                <span className="text-xs text-gray-500 font-normal ml-2">(Optional)</span>
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.dailyRate || ''}
-                onChange={(e) => setFormData({ ...formData, dailyRate: parseFloat(e.target.value) || null })}
-                placeholder="e.g., 500"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Leave blank to use default RM 437.50/hr
-              </p>
-            </div>
-
-            {/* Remarks */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Remarks
-              </label>
-              <textarea
-                value={formData.remarks || ''}
-                onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-                rows={4}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                placeholder="Add any notes or remarks about this project..."
-              />
-            </div>
+            {/* Hourly Rate - Only show for hourly billing */}
+            {formData.billingType === 'hourly' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Hourly Rate (MYR)
+                  <span className="text-xs text-gray-500 font-normal ml-2">(Optional)</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.dailyRate || ''}
+                  onChange={(e) => setFormData({ ...formData, dailyRate: parseFloat(e.target.value) || null })}
+                  placeholder="e.g., 500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Leave blank to use default RM 437.50/hr
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Footer */}

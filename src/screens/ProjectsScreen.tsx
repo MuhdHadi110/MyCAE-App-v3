@@ -112,11 +112,10 @@ export const ProjectsScreen: React.FC = () => {
         });
       }
 
-      // Update other allowed fields (title, planned hours, remarks, etc.)
+      // Update other allowed fields (title, planned hours, etc.)
       const allowedUpdates: Partial<Project> = {};
       if (updatedProject.title) allowedUpdates.title = updatedProject.title;
       if (updatedProject.plannedHours !== undefined) allowedUpdates.plannedHours = updatedProject.plannedHours;
-      if (updatedProject.remarks !== undefined) allowedUpdates.remarks = updatedProject.remarks;
       if (updatedProject.categories !== undefined) allowedUpdates.categories = updatedProject.categories;
 
       // Add lead engineer and manager if changed

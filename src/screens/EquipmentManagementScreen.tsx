@@ -1,14 +1,22 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { Search, Package, Clock, User, Calendar, MapPin, Building2, TrendingUp, Box, BarChart3, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Search, Package, Clock, User, Calendar, MapPin, Building2, TrendingUp, Box, BarChart3, ChevronUp, ChevronDown, ChevronsUpDown, Plus, X } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { useCheckoutStore } from '../store/checkoutStore';
 import { useInventoryStore } from '../store/inventoryStore';
+import { useTeamStore } from '../store/teamStore';
 import { useResponsive } from '../hooks/useResponsive';
 import { getCurrentUser } from '../lib/auth';
-import type { CheckoutStatus } from '../types/checkout.types';
+import { toast } from 'react-hot-toast';
+import inventoryService from '../services/inventory.service';
+import type { CheckoutStatus, ExtendedCheckout } from '../types/checkout.types';
+import type { InventoryItem } from '../types/inventory.types';
+import { ItemSelector } from '../components/checkout/ItemSelector';
+import { CheckoutCart, CheckoutFormData } from '../components/checkout/CheckoutCart';
+import { ActiveCheckoutsList } from '../components/checkout/ActiveCheckoutsList';
+import { PartialReturnModal, ReturnData } from '../components/checkout/PartialReturnModal';
 
 type ViewMode = 'transactions' | 'locations';
 
@@ -47,6 +55,13 @@ export const EquipmentManagementScreen: React.FC = () => {
   const [filterType, setFilterType] = useState<'all' | 'person' | 'site'>('all');
   const [locationSortColumn, setLocationSortColumn] = useState<string>('location');
   const [locationSortDirection, setLocationSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  // Checkout flow state
+  const [showCheckoutFlow, setShowCheckoutFlow] = useState(false);
+  const [checkoutStep, setCheckoutStep] = useState<'select' | 'review'>('select');
+  const [selectedItems, setSelectedItems] = useState<InventoryItem[]>([]);
+  const [showPartialReturnModal, setShowPartialReturnModal] = useState(false);
+  const [selectedCheckout, setSelectedCheckout] = useState<ExtendedCheckout | null>(null);
 
   const loading = checkoutsLoading || inventoryLoading;
 
@@ -176,13 +191,19 @@ export const EquipmentManagementScreen: React.FC = () => {
     const totalLocations = locationSummaries.length;
     const uniqueUsers = new Set(locationSummaries.map(s => s.checkedOutByEmail)).size;
     const totalInventoryItems = Array.isArray(items) ? items.reduce((sum, item) => sum + item.quantity, 0) : 0;
+    
+    // Count received items (newly added inventory)
+    const receivedItems = filteredCheckouts.filter(c => c.status === 'received').length;
+    
+    // Count actual checkouts (exclude received items)
+    const actualCheckouts = filteredCheckouts.filter(c => c.status !== 'received').length;
 
     return {
       totalEquipmentOut,
       totalLocations,
       uniqueUsers,
-      totalInWarehouse: totalInventoryItems - totalEquipmentOut,
-      totalCheckouts: filteredCheckouts.length,
+      totalInWarehouse: totalInventoryItems - totalEquipmentOut + receivedItems,
+      totalCheckouts: actualCheckouts,
     };
   }, [locationSummaries, items, filteredCheckouts]);
 
@@ -196,6 +217,8 @@ export const EquipmentManagementScreen: React.FC = () => {
         return <Badge variant="danger">Overdue</Badge>;
       case 'fully-returned':
         return <Badge variant="default">Returned</Badge>;
+      case 'received':
+        return <Badge className="bg-green-100 text-green-800 border-green-200">Received</Badge>;
       default:
         return null;
     }
@@ -299,6 +322,134 @@ export const EquipmentManagementScreen: React.FC = () => {
     });
   }, [filteredCheckouts, transactionSortColumn, transactionSortDirection]);
 
+  // Checkout handlers
+  const handleStartCheckout = () => {
+    setShowCheckoutFlow(true);
+    setCheckoutStep('select');
+    setSelectedItems([]);
+  };
+
+  const handleCancelCheckout = () => {
+    setShowCheckoutFlow(false);
+    setCheckoutStep('select');
+    setSelectedItems([]);
+  };
+
+  const handleConfirmCheckout = async (formData: CheckoutFormData) => {
+    try {
+      // Generate master barcode
+      const timestamp = Date.now();
+      const masterBarcode = `CHK-${timestamp}`;
+      
+      // Prepare items for bulk checkout
+      const checkoutItems = selectedItems.map(item => ({
+        barcode: item.barcode || item.sku,
+        quantity: item.quantity,
+      }));
+      
+      // Create the checkout payload
+      const checkoutData = {
+        masterBarcode,
+        items: checkoutItems,
+        checkedOutBy: formData.engineerName,
+        checkedOutDate: new Date().toISOString(),
+        expectedReturnDate: formData.expectedReturnDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        purpose: formData.purpose,
+        notes: formData.notes,
+      };
+      
+      // Call API to create checkout
+      await inventoryService.createBulkCheckout(checkoutData);
+      
+      toast.success(`Successfully checked out ${selectedItems.length} items!`);
+      
+      // Reset and close
+      setShowCheckoutFlow(false);
+      setCheckoutStep('select');
+      setSelectedItems([]);
+      
+      // Refresh data
+      await fetchCheckouts();
+    } catch (error: any) {
+      console.error('Checkout failed:', error);
+      toast.error('Failed to checkout items: ' + (error.message || 'Unknown error'));
+    }
+  };
+
+  const handleReturnAll = async (checkoutId: string) => {
+    try {
+      // Find the checkout to get masterBarcode
+      const checkout = filteredCheckouts.find(c => c.id === checkoutId);
+      if (!checkout) {
+        toast.error('Checkout not found');
+        return;
+      }
+
+      // Call API to return all items
+      await inventoryService.checkInBulk({
+        masterBarcode: checkout.masterBarcode,
+        returnType: 'full',
+        items: checkout.items
+          .filter(item => item.returnStatus === 'checked-out')
+          .map(item => ({
+            itemId: item.itemId,
+            quantityToReturn: item.remainingQuantity,
+          })),
+      });
+
+      toast.success('All items returned successfully!');
+      await fetchCheckouts();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'Failed to return items');
+    }
+  };
+
+  const handlePartialReturn = (checkout: ExtendedCheckout) => {
+    setSelectedCheckout(checkout);
+    setShowPartialReturnModal(true);
+  };
+
+  const handleConfirmPartialReturn = async (returnData: ReturnData) => {
+    try {
+      if (!selectedCheckout) return;
+
+      // Call API to return selected items
+      await inventoryService.checkInBulk({
+        masterBarcode: selectedCheckout.masterBarcode,
+        returnType: 'partial',
+        items: returnData.items.map(item => ({
+          itemId: item.itemId,
+          quantityToReturn: item.quantityToReturn,
+        })),
+        notes: returnData.notes,
+      });
+
+      toast.success('Items returned successfully!');
+      setShowPartialReturnModal(false);
+      setSelectedCheckout(null);
+      await fetchCheckouts();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'Failed to return items');
+    }
+  };
+
+  // Get team members for checkout form
+  const { teamMembers, fetchTeamMembers } = useTeamStore();
+  
+  // Fetch team members on mount
+  useEffect(() => {
+    fetchTeamMembers({ status: 'active' });
+  }, [fetchTeamMembers]);
+  
+  // Map team members to format expected by CheckoutCart
+  const checkoutTeamMembers = useMemo(() => {
+    return teamMembers.map(tm => ({
+      id: tm.id,
+      name: tm.name,
+      email: tm.email,
+    }));
+  }, [teamMembers]);
+
   return (
     <div className="min-h-full bg-gray-50">
       <div className="p-4 md:p-6  space-y-6">
@@ -367,28 +518,39 @@ export const EquipmentManagementScreen: React.FC = () => {
 
         {/* View Mode Tabs - Clean Header */}
         <div className="border-b border-gray-200">
-          <div className="flex gap-2 px-4 md:px-6">
+          <div className="flex items-center justify-between px-4 md:px-6">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setViewMode('transactions')}
+                className={`px-4 py-4 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
+                  viewMode === 'transactions'
+                    ? 'border-primary-600 text-primary-600'
+                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Clock className="w-4 h-4 inline mr-2" />
+                Transactions
+              </button>
+              <button
+                onClick={() => setViewMode('locations')}
+                className={`px-4 py-4 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
+                  viewMode === 'locations'
+                    ? 'border-primary-600 text-primary-600'
+                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <MapPin className="w-4 h-4 inline mr-2" />
+                Locations
+              </button>
+            </div>
+            
+            {/* New Checkout Button */}
             <button
-              onClick={() => setViewMode('transactions')}
-              className={`px-4 py-4 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
-                viewMode === 'transactions'
-                  ? 'border-primary-600 text-primary-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900'
-              }`}
+              onClick={handleStartCheckout}
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2 font-medium text-sm"
             >
-              <Clock className="w-4 h-4 inline mr-2" />
-              Transactions
-            </button>
-            <button
-              onClick={() => setViewMode('locations')}
-              className={`px-4 py-4 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
-                viewMode === 'locations'
-                  ? 'border-primary-600 text-primary-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <MapPin className="w-4 h-4 inline mr-2" />
-              Locations
+              <Plus className="w-4 h-4" />
+              New Checkout
             </button>
           </div>
         </div>
@@ -503,57 +665,52 @@ export const EquipmentManagementScreen: React.FC = () => {
 
             {!loading && displayCheckouts.length > 0 && !isMobile && (
               <div className="px-4 md:px-6">
-                <Card variant="bordered" padding="none">
-                  <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 border-b border-gray-200">
-                      <tr>
-                        <th onClick={() => handleTransactionSort('masterBarcode')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors">Master Barcode {getTransactionSortIcon('masterBarcode')}</th>
-                        <th onClick={() => handleTransactionSort('checkedOutBy')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors">Checked Out By {getTransactionSortIcon('checkedOutBy')}</th>
-                        <th onClick={() => handleTransactionSort('purpose')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors">Purpose {getTransactionSortIcon('purpose')}</th>
-                        <th onClick={() => handleTransactionSort('items')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors">Items {getTransactionSortIcon('items')}</th>
-                        <th onClick={() => handleTransactionSort('dueDate')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors">Due Date {getTransactionSortIcon('dueDate')}</th>
-                        <th onClick={() => handleTransactionSort('status')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors">Status {getTransactionSortIcon('status')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {displayCheckouts.map((checkout) => {
-                        const daysInfo = getDaysInfo(checkout.expectedReturnDate);
-                        const isOwnCheckout = checkout.checkedOutByEmail === currentUser.email;
+                
+                
+                
+                
+                
+                <ActiveCheckoutsList
+                  checkouts={displayCheckouts.filter(c => c.status !== 'received')}
+                  onReturnAll={handleReturnAll}
+                  onPartialReturn={handlePartialReturn}
+                  loading={loading}
+                />
+              </div>
+            )}
 
-                        return (
-                          <tr key={checkout.id} className="border-b border-gray-200 hover:bg-gray-50">
-                            <td className="px-6 py-4">
-                              <p className="font-mono text-sm text-gray-900">{checkout.masterBarcode}</p>
-                            </td>
-                            <td className="px-6 py-4">
-                              <p className="text-sm text-gray-900">{isOwnCheckout ? 'You' : checkout.checkedOutBy}</p>
-                            </td>
-                            <td className="px-6 py-4">
-                              <p className="text-sm text-gray-900">{checkout.purpose || '-'}</p>
-                            </td>
-                            <td className="px-6 py-4">
-                              <p className="text-sm text-gray-900">
-                                {checkout.status === 'partial-return'
-                                  ? `${checkout.remainingItems}/${checkout.totalItems}`
-                                  : checkout.totalItems}
-                              </p>
-                            </td>
-                            <td className="px-6 py-4">
-                              {daysInfo ? (
-                                <p className={`text-sm font-medium ${daysInfo.className}`}>{daysInfo.text}</p>
-                              ) : (
-                                <p className="text-sm text-gray-500">-</p>
-                              )}
-                            </td>
-                            <td className="px-6 py-4">{getStatusBadge(checkout.status)}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  </div>
-                </Card>
+            {/* RECEIVED Items Section */}
+            {!loading && displayCheckouts.filter(c => c.status === 'received').length > 0 && (
+              <div className="px-4 md:px-6 mt-8">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <Package className="w-5 h-5 text-green-600" />
+                  Recently Received Items
+                </h3>
+                <div className="space-y-3">
+                  {displayCheckouts
+                    .filter(c => c.status === 'received')
+                    .map((checkout) => (
+                      <div
+                        key={checkout.id}
+                        className="bg-white rounded-lg border border-green-200 p-4 flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                            <Package className="w-5 h-5 text-green-600" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900">{checkout.purpose}</p>
+                            <p className="text-sm text-gray-500">
+                              {checkout.masterBarcode} • {new Date(checkout.checkedOutDate).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <Badge className="bg-green-100 text-green-800 border-green-200">
+                          Received
+                        </Badge>
+                      </div>
+                    ))}
+                </div>
               </div>
             )}
           </div>
@@ -730,6 +887,60 @@ export const EquipmentManagementScreen: React.FC = () => {
             )}
           </div>
         )}
+
+        {/* Checkout Flow Modal */}
+        {showCheckoutFlow && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-primary-50 to-primary-100">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {checkoutStep === 'select' ? 'Select Items' : 'Review Checkout'}
+                </h2>
+                <button
+                  onClick={handleCancelCheckout}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto p-6">
+                {checkoutStep === 'select' ? (
+                  <ItemSelector
+                    items={items}
+                    selectedItems={selectedItems}
+                    onSelectItems={setSelectedItems}
+                    onClose={() => setCheckoutStep('review')}
+                  />
+                ) : (
+                  <CheckoutCart
+                    selectedItems={selectedItems}
+                    onRemoveItem={(itemId) => {
+                      setSelectedItems(selectedItems.filter(i => i.id !== itemId));
+                    }}
+                    onCheckout={handleConfirmCheckout}
+                    onCancel={() => setCheckoutStep('select')}
+                    teamMembers={checkoutTeamMembers}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Partial Return Modal */}
+        <PartialReturnModal
+          checkout={selectedCheckout}
+          isOpen={showPartialReturnModal}
+          onClose={() => {
+            setShowPartialReturnModal(false);
+            setSelectedCheckout(null);
+          }}
+          onConfirm={handleConfirmPartialReturn}
+        />
+
       </div>
     </div>
   );

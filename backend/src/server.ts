@@ -62,8 +62,16 @@ const validateProductionEnv = () => {
     process.exit(1);
   }
 
+  // Validate JWT_SECRET strength
+  const jwtSecret = process.env.JWT_SECRET;
+  if (jwtSecret && jwtSecret.length < 32) {
+    console.error('FATAL: JWT_SECRET must be at least 32 characters long for security');
+    console.error(`  Current length: ${jwtSecret.length} characters`);
+    process.exit(1);
+  }
+
   // Warn about optional but recommended vars
-  const recommended = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASSWORD', 'RECAPTCHA_SECRET_KEY'];
+  const recommended = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASSWORD', 'SUPPORT_EMAIL', 'RECAPTCHA_SECRET_KEY'];
   const missingRecommended = recommended.filter(v => !process.env[v]);
   if (missingRecommended.length > 0) {
     console.warn('WARNING: Missing recommended environment variables:');
@@ -156,7 +164,7 @@ app.use('/api/health', healthRoutes);
 
 // API Routes with appropriate rate limiting
 
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes); // Apply strict rate limiting to auth routes
 app.use('/api/', apiLimiter); // Apply to all other API routes
 app.use('/api/users', usersRoutes);
 app.use('/api/inventory', inventoryRoutes);

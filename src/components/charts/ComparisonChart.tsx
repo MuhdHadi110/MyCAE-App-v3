@@ -141,7 +141,7 @@ export const ComparisonChart: React.FC<ComparisonChartProps> = ({
           onClick={() => handleTypeChange('week')}
           className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
             comparison === 'week'
-              ? 'bg-blue-600 text-white'
+              ? 'bg-primary-600 text-white'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
@@ -151,7 +151,7 @@ export const ComparisonChart: React.FC<ComparisonChartProps> = ({
           onClick={() => handleTypeChange('month')}
           className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
             comparison === 'month'
-              ? 'bg-blue-600 text-white'
+              ? 'bg-primary-600 text-white'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
@@ -161,7 +161,7 @@ export const ComparisonChart: React.FC<ComparisonChartProps> = ({
           onClick={() => handleTypeChange('quarter')}
           className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
             comparison === 'quarter'
-              ? 'bg-blue-600 text-white'
+              ? 'bg-primary-600 text-white'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >

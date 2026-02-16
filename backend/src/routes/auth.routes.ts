@@ -226,9 +226,19 @@ router.post(
         // 'active' and 'on-leave' are allowed to log in
       }
 
+      // Check if password has expired (for temp passwords)
+      if (user.is_temp_password && user.temp_password_expires) {
+        const now = new Date();
+        if (now > user.temp_password_expires) {
+          return res.status(403).json({
+            error: 'Your temporary password has expired. Please contact your administrator to reset your password.'
+          });
+        }
+      }
+
       // Check if this is first-time login (user has never changed password)
-      // We check if the user has a reset_token set (indicates temp password was assigned)
-      const isFirstTimeLogin = user.reset_token !== null && user.reset_token !== undefined;
+      // We check if the user has a reset_token set or is_temp_password flag (indicates temp password was assigned)
+      const isFirstTimeLogin = user.is_temp_password || (user.reset_token !== null && user.reset_token !== undefined);
 
       // Generate token
       const token = generateToken(user.id, user.email, user.name, user.roles);
@@ -309,6 +319,8 @@ router.post(
       user.password_hash = newPasswordHash;
       user.reset_token = undefined; // Clear to mark user as having changed password
       user.reset_token_expires = undefined;
+      user.is_temp_password = false; // Clear temp password flag
+      user.temp_password_expires = undefined; // Clear temp password expiry
       await userRepo.save(user);
 
       res.json({
@@ -366,7 +378,7 @@ router.post(
 
       // Send email with reset link
       try {
-        // await emailService.sendPasswordResetEmail(user.email, user.name, resetToken);
+        await emailService.sendPasswordResetEmail(user.email, user.name, resetToken);
         console.log(`✅ Password reset email sent to ${user.email}`);
       } catch (emailError: any) {
         console.error('Failed to send password reset email:', emailError);
@@ -434,7 +446,7 @@ router.post(
 
       // Send confirmation email
       try {
-        // await emailService.sendPasswordResetConfirmation(user.email, user.name);
+        await emailService.sendPasswordResetConfirmation(user.email, user.name);
         console.log(`✅ Password reset confirmation sent to ${user.email}`);
       } catch (emailError: any) {
         console.error('Failed to send confirmation email:', emailError);

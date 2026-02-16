@@ -31,10 +31,10 @@ const variantStyles = {
   },
   info: {
     icon: Info,
-    iconBg: 'bg-blue-100',
-    iconColor: 'text-blue-600',
-    headerBg: 'from-blue-50 to-blue-100',
-    confirmButton: 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500',
+    iconBg: 'bg-primary-100',
+    iconColor: 'text-primary-600',
+    headerBg: 'from-primary-50 to-primary-100',
+    confirmButton: 'bg-primary-600 hover:bg-primary-700 focus:ring-primary-500',
   },
 };
 

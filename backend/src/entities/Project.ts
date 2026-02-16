@@ -20,6 +20,11 @@ export enum ProjectStatus {
   COMPLETED = 'completed',
 }
 
+export enum BillingType {
+  HOURLY = 'hourly',
+  LUMP_SUM = 'lump_sum',
+}
+
 @Entity('projects')
 export class Project {
   @PrimaryColumn('varchar', { length: 36 })
@@ -70,6 +75,14 @@ export class Project {
   })
   status: ProjectStatus;
 
+  @Column({
+    type: 'enum',
+    enum: BillingType,
+    default: BillingType.HOURLY,
+    name: 'billing_type',
+  })
+  billing_type: BillingType;
+
   @Column({ type: 'datetime', nullable: true })
   inquiry_date?: Date;
 
@@ -112,7 +125,7 @@ export class Project {
   manager: User;
 
   @Column({ type: 'text', nullable: true })
-  remarks?: string;
+  description?: string;
 
   @Column({ type: 'json', nullable: true })
   categories?: string[];

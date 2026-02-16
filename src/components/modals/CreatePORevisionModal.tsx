@@ -129,7 +129,7 @@ export const CreatePORevisionModal: React.FC<CreatePORevisionModalProps> = ({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-primary-50 to-primary-100 dark:from-gray-800 dark:to-gray-700">
           <div className="flex items-center space-x-3">
             <TrendingUp className="w-6 h-6 text-blue-600" />
             <div>
@@ -326,7 +326,7 @@ export const CreatePORevisionModal: React.FC<CreatePORevisionModalProps> = ({
           <button
             onClick={handleSubmit}
             disabled={loading || formData.revisionReason.trim().length < 10}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Creating...' : 'Create Revision'}
           </button>

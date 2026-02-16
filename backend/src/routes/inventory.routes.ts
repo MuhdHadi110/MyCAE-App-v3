@@ -146,7 +146,7 @@ router.post(
         quantity: item.quantity,
         returned_quantity: item.quantity, // Fully "returned" to warehouse = in stock
         checkout_date: new Date(),
-        status: CheckoutStatus.RETURNED, // Status is RETURNED means it's in warehouse
+        status: CheckoutStatus.RECEIVED, // Status is RECEIVED means it's newly added to warehouse
         location: 'Warehouse', // Default location for new items
         purpose: `Item received: ${item.title}`,
       });
@@ -177,38 +177,44 @@ router.put('/:id', authorize(...INVENTORY_MODIFY_ROLES), async (req: AuthRequest
 
     const oldQuantity = item.quantity;
     const oldStatus = item.status;
+    const manuallySetStatus = req.body.status;
 
     // Update item
     inventoryRepo.merge(item, req.body);
 
-    // Update status based on quantity
-    if (item.quantity === 0) {
-      item.status = InventoryStatus.OUT_OF_STOCK;
-    } else if (item.quantity <= item.minimumStock) {
-      item.status = InventoryStatus.LOW_STOCK;
-    } else {
-      item.status = InventoryStatus.AVAILABLE;
+    // Only auto-update status if user didn't manually set it (except for discontinued which should be preserved)
+    if (!manuallySetStatus || manuallySetStatus === oldStatus) {
+      // Update status based on quantity
+      if (item.quantity === 0) {
+        item.status = InventoryStatus.OUT_OF_STOCK;
+      } else if (item.quantity <= item.minimumStock) {
+        item.status = InventoryStatus.LOW_STOCK;
+      } else {
+        item.status = InventoryStatus.AVAILABLE;
+      }
     }
 
     await inventoryRepo.save(item);
 
-    // Trigger low stock alert if newly low
-    if (
-      oldStatus !== InventoryStatus.LOW_STOCK &&
-      item.status === InventoryStatus.LOW_STOCK
-    ) {
-      // Trigger n8n workflow
-      await n8nService.onLowStockAlert({
-        itemId: item.id,
-        itemName: item.title,
-        sku: item.sku,
-        currentStock: item.quantity,
-        minimumStock: item.minimumStock,
-      });
+      // Trigger low stock alert if newly low
+      if (
+        oldStatus !== InventoryStatus.LOW_STOCK &&
+        item.status === InventoryStatus.LOW_STOCK
+      ) {
+        // Trigger n8n workflow (non-blocking)
+        n8nService.onLowStockAlert({
+          itemId: item.id,
+          itemName: item.title,
+          sku: item.sku,
+          currentStock: item.quantity,
+          minimumStock: item.minimumStock,
+        }).catch((err) => {
+          console.error('n8n low stock alert error (non-blocking):', err.message);
+        });
 
-      // Send email notification (you'll need admin email configuration)
-      // await emailService.sendLowStockAlert(adminEmail, item.title, item.quantity, item.minimumStock);
-    }
+        // Send email notification (you'll need admin email configuration)
+        // await emailService.sendLowStockAlert(adminEmail, item.title, item.quantity, item.minimumStock);
+      }
 
     res.json(item);
   } catch (error: any) {

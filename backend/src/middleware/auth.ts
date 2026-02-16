@@ -1,6 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt, { SignOptions } from 'jsonwebtoken';
+import jwt, { SignOptions, JwtPayload } from 'jsonwebtoken';
 import { UserRole } from '../entities/User';
+
+// Extended JWT payload interface with our custom fields
+interface CustomJWTPayload extends JwtPayload {
+  id: string;
+  email: string;
+  name?: string;
+  role?: UserRole;
+  roles?: UserRole[];
+}
 
 export interface AuthRequest extends Request {
   user?: {
@@ -35,7 +44,12 @@ export const authenticate = (
       return res.status(500).json({ error: 'Server configuration error' });
     }
 
-    const decoded = jwt.verify(token, secret) as any;
+    const decoded = jwt.verify(token, secret) as CustomJWTPayload;
+
+    // Validate required fields in token
+    if (!decoded.id || !decoded.email) {
+      return res.status(401).json({ error: 'Invalid token: missing required fields' });
+    }
 
     // Support both old tokens (single role) and new tokens (roles array)
     const roles = decoded.roles || (decoded.role ? [decoded.role] : [UserRole.ENGINEER]);

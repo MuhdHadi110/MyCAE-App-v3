@@ -87,6 +87,7 @@ export function csvRowToInventoryItem(
     supplier: rowObj.supplier || '',
     status: (rowObj.status as 'Active' | 'Inactive' | 'Discontinued') || 'Active',
     notes: rowObj.notes || '',
+    lastCalibratedDate: rowObj.lastCalibratedDate || undefined,
     lastUpdated: new Date().toISOString(),
     createdBy: currentUser.displayName,
   };

@@ -173,7 +173,7 @@ export const EditTeamMemberModal: React.FC<EditTeamMemberModalProps> = ({
       <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" onClick={onClose} />
       <div className="flex min-h-full items-center justify-center p-4">
         <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full">
-          <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100">
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-primary-50 to-primary-100 dark:from-gray-800 dark:to-gray-700">
             <h2 className="text-2xl font-bold text-gray-900">Edit Team Member</h2>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
               <X className="w-6 h-6" />

@@ -216,8 +216,9 @@ router.post(
 /**
  * PUT /api/purchase-orders/:id
  * Update purchase order
+ * Authorization: Senior Engineer and above
  */
-router.put('/:id', async (req: AuthRequest, res: Response) => {
+router.put('/:id', authorize(UserRole.SENIOR_ENGINEER, UserRole.PRINCIPAL_ENGINEER, UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const {
       poNumber,

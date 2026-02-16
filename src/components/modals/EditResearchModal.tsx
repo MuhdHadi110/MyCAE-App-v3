@@ -104,7 +104,7 @@ export const EditResearchModal: React.FC<EditResearchModalProps> = ({ isOpen, on
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-lg max-w-md w-full max-h-screen overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-primary-50 to-primary-100 dark:from-gray-800 dark:to-gray-700">
           <div className="flex items-center gap-3">
             <FlaskConical className="w-5 h-5 text-cyan-600" />
             <h2 className="text-lg font-semibold text-gray-900">Edit Research Project</h2>

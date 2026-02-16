@@ -256,7 +256,7 @@ export const PurchaseOrdersScreen: React.FC = () => {
                             href={po.fileUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                            className="inline-flex items-center gap-1 text-xs text-primary-600 hover:text-primary-800 hover:underline"
                           >
                             <Download className="w-3 h-3" />
                             View Document
@@ -272,7 +272,7 @@ export const PurchaseOrdersScreen: React.FC = () => {
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleEditClick(po)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                            className="p-2 text-primary-600 hover:bg-primary-50 rounded transition-colors"
                             title="Edit"
                           >
                             <Edit2 className="w-4 h-4" />
@@ -578,7 +578,7 @@ const CreateEditPOModal: React.FC<CreateEditPOModalProps> = ({ isOpen, po, onClo
                     href={formData.fileUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="p-2 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                    className="p-2 text-primary-600 hover:bg-primary-100 rounded transition-colors"
                     title="View Document"
                   >
                     <Download className="w-4 h-4" />
@@ -642,7 +642,7 @@ const CreateEditPOModal: React.FC<CreateEditPOModalProps> = ({ isOpen, po, onClo
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="px-4 py-2 bg-primary-600 text-white font-semibold rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
             >
               {isSubmitting ? 'Saving...' : po ? 'Update PO' : 'Create PO'}
             </button>

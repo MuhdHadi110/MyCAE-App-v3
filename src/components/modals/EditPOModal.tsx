@@ -96,7 +96,7 @@ export const EditPOModal: React.FC<EditPOModalProps> = ({ isOpen, po, onClose, o
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b border-gray-200 sticky top-0 bg-white">
+        <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gradient-to-r from-primary-50 to-primary-100 dark:from-gray-800 dark:to-gray-700">
           <h2 className="text-xl font-semibold text-gray-900">Edit Purchase Order</h2>
           <button
             onClick={onClose}
@@ -294,7 +294,7 @@ export const EditPOModal: React.FC<EditPOModalProps> = ({ isOpen, po, onClose, o
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center gap-2"
             >
               {isSubmitting ? 'Saving...' : 'Update PO'}
             </button>

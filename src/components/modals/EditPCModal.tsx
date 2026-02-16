@@ -41,10 +41,10 @@ export const EditPCModal: React.FC<EditPCModalProps> = ({
       <div className="flex min-h-full items-center justify-center p-4">
         <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full">
           {/* Header with Gradient */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100">
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-primary-50 to-primary-100 dark:from-gray-800 dark:to-gray-700">
             <div>
               <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <Edit2 className="w-6 h-6 text-blue-600" />
+                <Edit2 className="w-6 h-6 text-primary-600" />
                 Edit {pc.name}
               </h2>
               <p className="text-sm text-gray-600 mt-1">Update PC properties</p>

@@ -155,7 +155,7 @@ export const AddReceivedInvoiceModal: React.FC<AddReceivedInvoiceModalProps> = (
 
         <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-primary-50 to-primary-100 dark:from-gray-800 dark:to-gray-700">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-primary-100 rounded-lg">
                 <FileText className="w-5 h-5 text-primary-600" />

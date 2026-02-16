@@ -47,6 +47,7 @@ export const SingleInventoryRow: React.FC<SingleInventoryRowProps> = ({
                 onClick={() => onEditItem(item)}
                 className="p-1.5 hover:bg-blue-100 text-blue-600 rounded transition-colors"
                 title="Edit item"
+                aria-label={`Edit ${item.title}`}
               >
                 <Edit2 className="w-4 h-4" />
               </button>
@@ -54,6 +55,7 @@ export const SingleInventoryRow: React.FC<SingleInventoryRowProps> = ({
                 onClick={() => onDeleteItem(item.id)}
                 className="p-1.5 hover:bg-red-100 text-red-600 rounded transition-colors"
                 title="Delete item"
+                aria-label={`Delete ${item.title}`}
               >
                 <Trash2 className="w-4 h-4" />
               </button>

@@ -2,8 +2,8 @@ import express, { Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { AppDataSource } from '../config/database';
 import { ResearchProject } from '../entities/ResearchProject';
-import { User } from '../entities/User';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { User, UserRole } from '../entities/User';
+import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 
 const router = express.Router();
 
@@ -244,8 +244,8 @@ router.get('/timesheets', async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Create new research project
-router.post('/projects', async (req: AuthRequest, res: Response) => {
+// Create new research project - Managers and above only
+router.post('/projects', authorize(UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const {
       researchCode, title, description, status,
@@ -292,8 +292,8 @@ router.post('/projects', async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Update research project
-router.put('/projects/:id', async (req: AuthRequest, res: Response) => {
+// Update research project - Managers and above only
+router.put('/projects/:id', authorize(UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const {
@@ -339,8 +339,8 @@ router.put('/projects/:id', async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Delete research project
-router.delete('/projects/:id', async (req: AuthRequest, res: Response) => {
+// Delete research project - Managers and above only
+router.delete('/projects/:id', authorize(UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -369,7 +369,22 @@ router.post('/timesheets', async (req: AuthRequest, res: Response) => {
   try {
     const { projectId, teamMemberId, date, hoursLogged, description, researchCategory } = req.body;
     const id = uuidv4();
-    const engineerId = teamMemberId || req.user!.id; // Use teamMemberId if provided, otherwise current user
+    
+    // Prevent IDOR: Engineers can only log hours for themselves
+    // Only managers and above can log hours for other users
+    const currentUser = req.user!;
+    const isManagerOrAbove = [UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN].includes(currentUser.role);
+    
+    // If teamMemberId is provided and user is not a manager, reject or use current user
+    let engineerId: string;
+    if (teamMemberId && teamMemberId !== currentUser.id) {
+      if (!isManagerOrAbove) {
+        return res.status(403).json({ error: 'You can only log hours for yourself' });
+      }
+      engineerId = teamMemberId;
+    } else {
+      engineerId = currentUser.id;
+    }
 
     const query = `
       INSERT INTO research_timesheets
@@ -394,8 +409,8 @@ router.post('/timesheets', async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Approve timesheet entry
-router.put('/timesheets/:id/approve', async (req: AuthRequest, res: Response) => {
+// Approve timesheet entry - Managers and above only
+router.put('/timesheets/:id/approve', authorize(UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { approvedBy } = req.body;
@@ -415,10 +430,28 @@ router.put('/timesheets/:id/approve', async (req: AuthRequest, res: Response) =>
   }
 });
 
-// Delete timesheet entry
+// Delete timesheet entry - Users can delete their own, managers can delete any
 router.delete('/timesheets/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const currentUser = req.user!;
+    const isManagerOrAbove = [UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN].includes(currentUser.role);
+
+    // Check ownership before deletion (prevent IDOR)
+    if (!isManagerOrAbove) {
+      const timesheet = await AppDataSource.query(
+        `SELECT engineer_id FROM research_timesheets WHERE id = ?`,
+        [id]
+      );
+      
+      if (timesheet.length === 0) {
+        return res.status(404).json({ error: 'Timesheet entry not found' });
+      }
+      
+      if (timesheet[0].engineer_id !== currentUser.id) {
+        return res.status(403).json({ error: 'You can only delete your own timesheet entries' });
+      }
+    }
 
     // Delete timesheet entry
     await AppDataSource.query(`DELETE FROM research_timesheets WHERE id = ?`, [id]);

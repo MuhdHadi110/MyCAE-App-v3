@@ -19,8 +19,10 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { getPermissions, getRoleInfo } from '../../lib/permissions';
 import { UserRole, ROLE_HIERARCHY } from '../../types/auth.types';
+import { SlideToggle } from '../ui/SlideToggle';
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -48,6 +50,7 @@ const navItems = [
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose }) => {
   const { user } = useAuth();
+  const { resolvedTheme, toggleTheme } = useTheme();
 
   if (!user) {
     return null;
@@ -305,6 +308,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose }) => {
                 </div>
               </div>
             </div>
+
+            {/* Dark Mode Toggle */}
+            <div className="flex items-center justify-between px-3 py-2">
+              <span className="text-xs font-medium text-slate-600 dark:text-gray-400">
+                Dark Mode
+              </span>
+              <SlideToggle
+                isDark={resolvedTheme === 'dark'}
+                onToggle={toggleTheme}
+                size="sm"
+              />
+            </div>
+
             {/* Version Info */}
             <div className="text-xs text-slate-500 dark:text-gray-500">
               <p className="font-medium">v1.0.0</p>

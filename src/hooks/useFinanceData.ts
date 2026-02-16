@@ -191,7 +191,7 @@ function calculateProjectSummaries(
     const projectCodes = [project.projectCode];
 
     // If this is a parent project, include all VO codes
-    if (!project.isVariationOrder && project.variationOrders?.length > 0) {
+    if (!project.isVariationOrder && project.variationOrders && project.variationOrders.length > 0) {
       project.variationOrders.forEach(vo => {
         projectCodes.push(vo.projectCode);
       });
@@ -326,7 +326,9 @@ function calculateProjectSummaries(
     });
 
     // Build engineer breakdown with costs
-    // Using fixed hourly rate of RM 437.50/hour (RM 3,500/day / 8 hours)
+    // Use project's custom hourly rate if available, otherwise use fixed rate
+    const projectHourlyRate = project.dailyRate || FIXED_HOURLY_RATE;
+    
     const engineerBreakdown: EngineerCost[] = Object.entries(engineerHoursMap).map(
       ([engineerId, data]) => {
         const engineer = data.engineer;
@@ -336,8 +338,8 @@ function calculateProjectSummaries(
           engineerName: engineer?.name || 'Unknown',
           role: engineer?.role || 'engineer',
           hours: data.hours,
-          hourlyRate: FIXED_HOURLY_RATE,
-          totalCost: data.hours * FIXED_HOURLY_RATE,
+          hourlyRate: projectHourlyRate,
+          totalCost: data.hours * projectHourlyRate,
         };
       }
     );

@@ -607,6 +607,7 @@ router.post('/:id/approve',
  * Authorization: Creator only
  */
 router.post('/:id/withdraw',
+  authorize(UserRole.ADMIN, UserRole.MANAGING_DIRECTOR, UserRole.MANAGER, UserRole.SENIOR_ENGINEER, UserRole.PRINCIPAL_ENGINEER, UserRole.ENGINEER),
   async (req: AuthRequest, res: Response) => {
     try {
       const invoiceRepo = AppDataSource.getRepository(Invoice);
@@ -868,8 +869,28 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response) => {
         filename = parts[parts.length - 1];
       }
 
+      // SECURITY: Validate filename to prevent path traversal attacks
+      // Only allow alphanumeric characters, hyphens, underscores, and dots
+      const safeFilenamePattern = /^[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]+$/;
+      if (!safeFilenamePattern.test(filename)) {
+        console.error('Invalid filename detected:', filename);
+        return res.status(400).json({ error: 'Invalid filename format' });
+      }
+
       const uploadsDir = path.join(__dirname, '../../uploads');
       const filePath = path.join(uploadsDir, filename);
+
+      // SECURITY: Ensure the resolved path is within the uploads directory
+      const resolvedPath = path.resolve(filePath);
+      const resolvedUploadsDir = path.resolve(uploadsDir);
+      if (!resolvedPath.startsWith(resolvedUploadsDir)) {
+        console.error('Path traversal attempt detected:', {
+          filename,
+          resolvedPath,
+          resolvedUploadsDir
+        });
+        return res.status(403).json({ error: 'Access denied' });
+      }
 
       console.log('Resolved file path:', {
         fileUrl: invoice.file_url,
@@ -917,8 +938,14 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response) => {
 
 /**
  * Debug endpoint to check company settings
+ * Only available in development mode
  */
 router.get('/debug-settings', async (req: AuthRequest, res: Response) => {
+  // Only allow in development mode
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
   try {
     const { CompanySettingsService } = await import('../services/companySettings.service');
     const settings = await CompanySettingsService.getSettings();
@@ -941,8 +968,13 @@ router.get('/debug-settings', async (req: AuthRequest, res: Response) => {
 
 /**
  * Test specific invoice PDF generation with size reporting
+ * Only available in development mode
  */
 router.get('/test-invoice-size/:invoiceId', async (req: AuthRequest, res: Response) => {
+  // Only allow in development mode
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(404).json({ error: 'Not found' });
+  }
   try {
     const invoiceRepo = AppDataSource.getRepository(Invoice);
     const invoice = await invoiceRepo.findOne({ where: { id: req.params.invoiceId } });

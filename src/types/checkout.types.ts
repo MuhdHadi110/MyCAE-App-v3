@@ -1,4 +1,4 @@
-export type CheckoutStatus = 'active' | 'partial-return' | 'fully-returned' | 'overdue';
+export type CheckoutStatus = 'active' | 'partial-return' | 'fully-returned' | 'overdue' | 'received';
 
 export type ItemReturnStatus = 'checked-out' | 'returned';
 

@@ -1,0 +1,85 @@
+### Test Variation Order API
+### Use this file with VS Code REST Client extension or copy to Postman
+
+### Variables (UPDATE THESE WITH YOUR VALUES)
+@baseUrl = http://localhost:3001
+@token = YOUR_AUTH_TOKEN_HERE
+@parentProjectId = YOUR_PARENT_PROJECT_ID
+@companyId = YOUR_COMPANY_ID
+@managerId = YOUR_MANAGER_ID
+
+###
+### Test 1: Create a Parent Project First
+POST {{baseUrl}}/api/projects
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "projectCode": "J26001",
+  "title": "Test Parent Project for VOs",
+  "companyId": "{{companyId}}",
+  "managerId": "{{managerId}}",
+  "plannedHours": 100,
+  "status": "ongoing"
+}
+
+###
+### Test 2: Create First VO (should get code J26001_1)
+POST {{baseUrl}}/api/projects/{{parentProjectId}}/create-vo
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "VO: Additional Works - Phase 1"
+}
+
+###
+### Test 3: Create Second VO (should get code J26001_2)
+POST {{baseUrl}}/api/projects/{{parentProjectId}}/create-vo
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "VO: Extended Scope - Phase 2",
+  "plannedHours": 50
+}
+
+###
+### Test 4: Get All VOs for Parent
+GET {{baseUrl}}/api/projects/{{parentProjectId}}/variation-orders
+Authorization: Bearer {{token}}
+
+###
+### Test 5: Get Project with VOs
+GET {{baseUrl}}/api/projects/{{parentProjectId}}/with-vos
+Authorization: Bearer {{token}}
+
+###
+### Test 6: Get All Projects (should include VOs)
+GET {{baseUrl}}/api/projects
+Authorization: Bearer {{token}}
+
+###
+### Test 7: Try to Delete Parent with VOs (should fail)
+DELETE {{baseUrl}}/api/projects/{{parentProjectId}}
+Authorization: Bearer {{token}}
+
+###
+### Test 8: Try to Create VO without Parent (should fail)
+POST {{baseUrl}}/api/projects
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "projectCode": "J26999_1",
+  "title": "This Should Fail - No Parent",
+  "companyId": "{{companyId}}",
+  "managerId": "{{managerId}}",
+  "plannedHours": 10
+}
+
+###
+### Test 9: Try to Create VO under VO (should fail)
+### First get a VO id from Test 4, then try:
+# POST {{baseUrl}}/api/projects/<VO_ID_HERE>/create-vo
+# Should return error: "Cannot create a VO under another VO"

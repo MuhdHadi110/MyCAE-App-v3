@@ -362,7 +362,6 @@ export const ProjectOverviewDashboard: React.FC = () => {
                     <th className="px-6 py-3 text-left font-semibold text-gray-700">Project</th>
                     <th className="px-6 py-3 text-left font-semibold text-gray-700">Client</th>
                     <th className="px-6 py-3 text-left font-semibold text-gray-700">Engineer</th>
-                    <th className="px-6 py-3 text-center font-semibold text-gray-700">Progress</th>
                     <th className="px-6 py-3 text-right font-semibold text-gray-700">Hours</th>
                     <th className="px-6 py-3 text-center font-semibold text-gray-700">Status</th>
                   </tr>
@@ -390,29 +389,33 @@ export const ProjectOverviewDashboard: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 text-gray-700">{client?.name || 'Unknown'}</td>
                         <td className="px-6 py-4 text-gray-700">{engineerName}</td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center justify-center gap-2">
-                            <div className="w-16 bg-gray-200 rounded-full h-2 overflow-hidden">
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex flex-col items-end gap-1.5">
+                            <div className="font-medium">{project.actualHours || 0} hrs</div>
+                            <div className="text-xs text-gray-500">
+                              of {project.plannedHours} planned
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2.5 max-w-[100px] shadow-inner overflow-hidden">
                               <div
-                                className={`h-2 rounded-full transition-all ${
+                                className={`h-full rounded-full transition-all duration-300 ease-in-out shadow-sm ${
                                   (project.actualHours || 0) > project.plannedHours
-                                    ? 'bg-red-500'
-                                    : 'bg-primary-600'
+                                    ? 'bg-gradient-to-r from-red-500 to-red-600'
+                                    : 'bg-gradient-to-r from-green-500 to-green-600'
                                 }`}
-                                style={{ width: `${Math.min(progress, 100)}%` }}
+                                style={{
+                                  width: `${Math.min(
+                                    Math.max(
+                                      project.plannedHours > 0
+                                        ? ((project.actualHours || 0) / project.plannedHours) * 100
+                                        : 0,
+                                      2
+                                    ),
+                                    100
+                                  )}%`
+                                }}
                               />
                             </div>
-                            <span className={`font-semibold w-8 text-right text-xs ${
-                              (project.actualHours || 0) > project.plannedHours ? 'text-red-600' : 'text-gray-900'
-                            }`}>
-                              {progress.toFixed(0)}%
-                            </span>
                           </div>
-                        </td>
-                        <td className="px-6 py-4 text-right text-gray-700">
-                          <span className="font-medium">{project.actualHours}</span>
-                          <span className="text-gray-400 mx-1">/</span>
-                          <span className="text-gray-500">{project.plannedHours}</span>
                         </td>
                         <td className="px-6 py-4 text-center">
                           <span

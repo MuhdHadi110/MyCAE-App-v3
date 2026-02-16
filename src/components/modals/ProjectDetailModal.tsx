@@ -104,6 +104,24 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
 
           {/* Project Details Grid */}
           <div className="grid grid-cols-2 gap-4">
+            {/* Billing Type */}
+            <Card variant="bordered" padding="md">
+              <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Billing Type</p>
+              <p className="text-sm font-medium text-gray-900">
+                {project.billingType === 'lump_sum' ? (
+                  <span className="inline-flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                    Lump Sum (Fixed Amount)
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                    Hourly Rate
+                  </span>
+                )}
+              </p>
+            </Card>
+
             {/* Company */}
             <Card variant="bordered" padding="md">
               <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Company</p>

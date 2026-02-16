@@ -96,6 +96,12 @@ export class User {
   @Column({ type: 'timestamp', nullable: true })
   reset_token_expires?: Date;
 
+  @Column({ type: 'timestamp', nullable: true })
+  temp_password_expires?: Date;
+
+  @Column({ type: 'boolean', default: false })
+  is_temp_password: boolean;
+
   @CreateDateColumn()
   created_at: Date;
 

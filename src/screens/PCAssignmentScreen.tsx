@@ -187,7 +187,7 @@ export const PCAssignmentScreen: React.FC = () => {
                       <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded">Available</span>
                     )}
                     {pc.status === 'assigned' && (
-                      <span className="px-2 py-1 bg-blue-600 text-white text-xs font-medium rounded">Assigned</span>
+                      <span className="px-2 py-1 bg-primary-600 text-white text-xs font-medium rounded">Assigned</span>
                     )}
                     {pc.status === 'maintenance' && (
                       <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded">Maintenance</span>
@@ -200,7 +200,7 @@ export const PCAssignmentScreen: React.FC = () => {
               {pc.status === 'assigned' && (
                 <div className="mb-4 p-4 bg-gray-50 rounded-lg">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+                    <div className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center flex-shrink-0">
                       <span className="text-white font-semibold text-sm">
                         {pc.assignedTo ? pc.assignedTo.charAt(0).toUpperCase() : '?'}
                       </span>

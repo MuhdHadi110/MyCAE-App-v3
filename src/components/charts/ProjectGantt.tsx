@@ -103,7 +103,7 @@ export const ProjectGantt: React.FC<ProjectGanttProps> = ({
           onClick={() => onZoomChange?.('day')}
           className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
             zoomLevel === 'day'
-              ? 'bg-blue-600 text-white'
+              ? 'bg-primary-600 text-white'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
@@ -113,7 +113,7 @@ export const ProjectGantt: React.FC<ProjectGanttProps> = ({
           onClick={() => onZoomChange?.('week')}
           className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
             zoomLevel === 'week'
-              ? 'bg-blue-600 text-white'
+              ? 'bg-primary-600 text-white'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
@@ -123,7 +123,7 @@ export const ProjectGantt: React.FC<ProjectGanttProps> = ({
           onClick={() => onZoomChange?.('month')}
           className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
             zoomLevel === 'month'
-              ? 'bg-blue-600 text-white'
+              ? 'bg-primary-600 text-white'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >

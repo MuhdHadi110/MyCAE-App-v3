@@ -32,6 +32,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
     managerId: '',
     plannedHours: '',
     hourlyRate: '',
+    billingType: 'hourly' as 'hourly' | 'lump_sum',
     workTypes: [] as string[],
     description: '',
     status: 'pre-lim' as const,
@@ -113,6 +114,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
         plannedHours: parseFloat(formData.plannedHours) || 0,
         hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
         companyName: selectedCompany?.name || '', // Include company name so it's stored in the project
+        billingType: formData.billingType, // Use selected billing type from form
       };
       const result = await addProject(projectPayload);
 
@@ -164,6 +166,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
         managerId: '',
         plannedHours: '',
         hourlyRate: '',
+        billingType: 'hourly' as const,
         workTypes: [] as string[],
         description: '',
         status: 'pre-lim' as const,
@@ -279,6 +282,37 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
                   required
                   autoComplete="off"
                 />
+              </div>
+
+              {/* Billing Type - Radio Buttons */}
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                  Billing Type <span className="text-red-500">*</span>
+                </h3>
+                <div className="flex gap-6">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="billingType"
+                      value="hourly"
+                      checked={formData.billingType === 'hourly'}
+                      onChange={(e) => setFormData({ ...formData, billingType: e.target.value as 'hourly' | 'lump_sum' })}
+                      className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+                    />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Hourly Rate</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="billingType"
+                      value="lump_sum"
+                      checked={formData.billingType === 'lump_sum'}
+                      onChange={(e) => setFormData({ ...formData, billingType: e.target.value as 'hourly' | 'lump_sum' })}
+                      className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+                    />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Lump Sum</span>
+                  </label>
+                </div>
               </div>
 
               {/* Contact, Manager, Lead Engineer */}
@@ -406,25 +440,27 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
                 />
               </div>
 
-              {/* Hourly Rate */}
-              <div>
-                <label htmlFor="hourlyRate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Hourly Rate (MYR)
-                  <span className="text-xs text-gray-500 font-normal ml-2">(Optional)</span>
-                </label>
-                <input
-                  id="hourlyRate"
-                  type="number"
-                  step="0.01"
-                  value={formData.hourlyRate}
-                  onChange={(e) => setFormData({ ...formData, hourlyRate: e.target.value })}
-                  placeholder="e.g., 500"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Leave blank to use default RM 437.50/hr
-                </p>
-              </div>
+              {/* Hourly Rate - Only show for hourly billing */}
+              {formData.billingType === 'hourly' && (
+                <div>
+                  <label htmlFor="hourlyRate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Hourly Rate (MYR)
+                    <span className="text-xs text-gray-500 font-normal ml-2">(Optional)</span>
+                  </label>
+                  <input
+                    id="hourlyRate"
+                    type="number"
+                    step="0.01"
+                    value={formData.hourlyRate}
+                    onChange={(e) => setFormData({ ...formData, hourlyRate: e.target.value })}
+                    placeholder="e.g., 500"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Leave blank to use default RM 437.50/hr
+                  </p>
+                </div>
+              )}
 
               {/* Description */}
               <div>

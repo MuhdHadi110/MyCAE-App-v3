@@ -3,7 +3,8 @@ import { AppDataSource } from '../config/database';
 import { MaintenanceTicket, TicketStatus, TicketPriority } from '../entities/MaintenanceTicket';
 import { InventoryItem, InventoryStatus } from '../entities/InventoryItem';
 import { InventoryAction } from '../entities/ScheduledMaintenance';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { authenticate, authorize, AuthRequest } from '../middleware/auth';
+import { UserRole } from '../entities/User';
 import { body, validationResult } from 'express-validator';
 import { MaintenanceSchedulerService } from '../services/maintenanceScheduler.service';
 import { logger } from '../utils/logger';
@@ -177,8 +178,9 @@ router.post(
 /**
  * PUT /api/maintenance/:id
  * Update maintenance ticket
+ * Authorization: Engineers and above
  */
-router.put('/:id', async (req: AuthRequest, res: Response) => {
+router.put('/:id', authorize(UserRole.ENGINEER, UserRole.SENIOR_ENGINEER, UserRole.PRINCIPAL_ENGINEER, UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const maintenanceRepo = AppDataSource.getRepository(MaintenanceTicket);
     const inventoryRepo = AppDataSource.getRepository(InventoryItem);

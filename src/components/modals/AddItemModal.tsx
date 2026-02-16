@@ -25,9 +25,10 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onS
     cost: 0,
     price: 0,
     supplier: '',
-    status: 'Active' as const,
+    status: 'Available' as const,
     barcode: '',
     notes: '',
+    lastCalibratedDate: '',
     lastAction: 'added' as const,
     lastActionDate: new Date().toISOString(),
   });
@@ -46,9 +47,10 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onS
         cost: initialData.cost || 0,
         price: initialData.price || 0,
         supplier: initialData.supplier || '',
-        status: (initialData.status as any) || 'Active',
+        status: (initialData.status as any) || 'Available',
         barcode: initialData.barcode || '',
         notes: initialData.notes || '',
+        lastCalibratedDate: initialData.lastCalibratedDate || '',
         lastAction: (initialData.lastAction || 'added') as any,
         lastActionDate: initialData.lastActionDate || new Date().toISOString(),
       });
@@ -130,9 +132,10 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onS
       cost: 0,
       price: 0,
       supplier: '',
-      status: 'Active',
+      status: 'Available',
       barcode: '',
       notes: '',
+      lastCalibratedDate: '',
       lastAction: 'added',
       lastActionDate: new Date().toISOString(),
     });
@@ -380,10 +383,29 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onS
                 onChange={(e) => handleInputChange('status', e.target.value)}
                 className="w-full px-4 py-2.5 min-h-[44px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-                <option value="Discontinued">Discontinued</option>
+                <option value="Available">Available</option>
+                <option value="Inactive">Inactive (Temporary)</option>
+                <option value="Discontinued">Discontinued (Permanent)</option>
               </select>
+            </div>
+
+            {/* Last Calibrated Date */}
+            <div>
+              <label htmlFor="item-lastCalibrated" className="block text-sm font-medium text-gray-700 mb-2">
+                Last Calibrated
+                <span className="text-gray-400 ml-1 text-xs">(Optional)</span>
+              </label>
+              <input
+                type="date"
+                id="item-lastCalibrated"
+                value={formData.lastCalibratedDate}
+                onChange={(e) => handleInputChange('lastCalibratedDate', e.target.value)}
+                max={new Date().toISOString().split('T')[0]}
+                className="w-full px-4 py-2.5 min-h-[44px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Enter the date when this item was last calibrated (if known)
+              </p>
             </div>
 
             {/* Notes */}

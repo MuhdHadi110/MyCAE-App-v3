@@ -264,7 +264,7 @@ export const ReceivedInvoicesTab: React.FC<ReceivedInvoicesTabProps> = ({
         {(inv.status === 'pending' || inv.status === 'disputed') && canVerify && onVerify && (
           <Button
             size="sm"
-            className="bg-blue-600 hover:bg-blue-700 text-white"
+            className="bg-primary-600 hover:bg-primary-700 text-white"
             onClick={(e) => {
               e.stopPropagation();
               onVerify(inv.id);

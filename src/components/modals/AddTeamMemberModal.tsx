@@ -16,6 +16,8 @@ interface SuccessData {
   name: string;
   email: string;
   message?: string;
+  emailStatus?: 'sent' | 'failed';
+  emailError?: string;
 }
 
 export const AddTeamMemberModal: React.FC<AddTeamMemberModalProps> = ({ isOpen, onClose, onSuccess }) => {
@@ -63,6 +65,8 @@ export const AddTeamMemberModal: React.FC<AddTeamMemberModalProps> = ({ isOpen, 
             name: formData.name,
             email: formData.email,
             message: data.message,
+            emailStatus: data.emailStatus,
+            emailError: data.emailError,
           });
         } else {
           toast.success(`Team member ${formData.name} added successfully!`);
@@ -115,64 +119,51 @@ export const AddTeamMemberModal: React.FC<AddTeamMemberModalProps> = ({ isOpen, 
     onClose();
   };
 
-  // Success screen showing temporary password
+  // Success screen showing confirmation (password was emailed)
   if (successData) {
     return (
       <div className="fixed inset-0 z-50 overflow-y-auto">
         <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" onClick={onClose} />
         <div className="flex min-h-full items-center justify-center p-4">
-          <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full">
+          <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full">
             <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-green-50 to-green-100">
-              <h2 className="text-2xl font-bold text-gray-900">✅ Team Member Created</h2>
+              <h2 className="text-xl font-bold text-gray-900">✅ Team Member Created</h2>
               <button onClick={handleDoneWithSuccess} className="text-gray-400 hover:text-gray-600">
                 <X className="w-6 h-6" />
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <p className="text-green-800">{successData.message}</p>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm font-medium text-gray-700 mb-2">Team Member Name</p>
-                  <p className="text-lg font-semibold text-gray-900">{successData.name}</p>
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium text-gray-700 mb-2">Email Address</p>
-                  <p className="text-lg font-semibold text-gray-900">{successData.email}</p>
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium text-gray-700 mb-2">Temporary Password</p>
-                  <div className="flex gap-2 items-center">
-                    <input
-                      type="text"
-                      value={successData.tempPassword}
-                      readOnly
-                      className="flex-1 px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg font-mono text-sm"
-                    />
-                    <button
-                      onClick={() => copyToClipboard(successData.tempPassword!)}
-                      className="p-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-                      title="Copy to clipboard"
-                    >
-                      {copiedPassword ? (
-                        <Check className="w-4 h-4" />
-                      ) : (
-                        <Copy className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    Share this password with the team member. They must change it on first login.
+            <div className="p-6 space-y-4">
+              <div className={`border rounded-lg p-4 ${successData.emailStatus === 'sent' ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                <p className={`text-sm ${successData.emailStatus === 'sent' ? 'text-green-800' : 'text-yellow-800'}`}>
+                  {successData.message}
+                </p>
+                {successData.emailStatus === 'failed' && successData.emailError && (
+                  <p className="text-xs text-yellow-700 mt-2">
+                    Error: {successData.emailError}
                   </p>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Team Member Name</p>
+                  <p className="text-base font-semibold text-gray-900">{successData.name}</p>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Email Address</p>
+                  <p className="text-base font-semibold text-gray-900">{successData.email}</p>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-6 border-t border-gray-200">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-sm text-blue-800">
+                  <strong>📧 Email Sent:</strong> Login credentials have been sent to {successData.email}. The user must change their password on first login.
+                </p>
+              </div>
+
+              <div className="flex justify-end pt-4 border-t border-gray-200">
                 <button
                   onClick={handleDoneWithSuccess}
                   className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"

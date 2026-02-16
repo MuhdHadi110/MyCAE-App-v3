@@ -6,6 +6,7 @@ import { Contact } from './company.types';
 
 export type ProjectStatus = 'pre-lim' | 'ongoing' | 'on-hold' | 'open' | 'closed' | 'completed';
 export type WorkCategory = 'engineering' | 'project-management' | 'measurement-site' | 'measurement-office';
+export type BillingType = 'hourly' | 'lump_sum';
 
 export interface Project {
   id: string;
@@ -16,6 +17,7 @@ export interface Project {
   contactId?: string;
   contact?: Contact; // populated with company data
   status: ProjectStatus;
+  billingType: BillingType;
   inquiryDate?: string;
   poReceivedDate?: string;
   poFileUrl?: string;
@@ -31,7 +33,6 @@ export interface Project {
   engineerName?: string;
   managerId: string;
   managerName?: string;
-  remarks?: string;
   description?: string;
   createdDate: string;
   lastUpdated: string;
