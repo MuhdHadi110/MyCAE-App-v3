@@ -23,7 +23,7 @@ router.use(authenticate);
 
 /**
  * GET /api/invoices/next-number
- * Get next available invoice number
+ * Get the next available invoice number
  */
 router.get('/next-number', async (req: AuthRequest, res: Response) => {
   try {
@@ -112,10 +112,8 @@ router.get('/project/:projectCode/context', async (req: AuthRequest, res: Respon
 /**
  * GET /api/invoices
  * Get all invoices with filters
- * Authorization: Managers, MDs, Admins, and Senior Engineers can view all invoices
- * Regular engineers can only view invoices they created
  */
-router.get('/', authorize(UserRole.SENIOR_ENGINEER, UserRole.PRINCIPAL_ENGINEER, UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN), async (req: AuthRequest, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const { status, project_code, limit = 100, offset = 0 } = req.query;
     const invoiceRepo = AppDataSource.getRepository(Invoice);
@@ -234,7 +232,7 @@ router.post(
       const previousTotal = existingInvoices.reduce((sum, inv) => sum + Number(inv.percentage_of_total), 0);
       const cumulativePercentage = previousTotal + Number(percentage_of_total);
 
-      // Create invoice
+      // Create the invoice
       const invoice = invoiceRepo.create({
         invoice_number,
         project_code,
@@ -293,7 +291,7 @@ router.post(
  * PUT /api/invoices/:id
  * Update invoice
  */
-router.put('/:id',
+router.put('/:id', 
   authorize(UserRole.ADMIN, UserRole.MANAGING_DIRECTOR, UserRole.MANAGER, UserRole.SENIOR_ENGINEER),
   [
     body('invoiceNumber').optional().notEmpty().withMessage('Invoice number is required'),
@@ -304,98 +302,97 @@ router.put('/:id',
     body('remark').optional().isString().withMessage('Remark must be text'),
   ],
   async (req: AuthRequest, res: Response) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
 
-      const invoiceRepo = AppDataSource.getRepository(Invoice);
-      const invoice = await invoiceRepo.findOne({
-        where: { id: req.params.id },
-        relations: ['project'],
+    const invoiceRepo = AppDataSource.getRepository(Invoice);
+    const invoice = await invoiceRepo.findOne({
+      where: { id: req.params.id },
+      relations: ['project'],
+    });
+
+    if (!invoice) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+
+    // Status-based edit restrictions
+    if (invoice.status === InvoiceStatus.APPROVED || invoice.status === InvoiceStatus.SENT) {
+      return res.status(403).json({
+        error: `Cannot edit ${invoice.status} invoices`
       });
+    }
 
-      if (!invoice) {
-        return res.status(404).json({ error: 'Invoice not found' });
-      }
-
-      // Status-based edit restrictions
-      if (invoice.status === InvoiceStatus.APPROVED || invoice.status === InvoiceStatus.SENT) {
+    if (invoice.status === InvoiceStatus.PENDING_APPROVAL) {
+      // Only creator can edit pending invoices
+      if (invoice.created_by !== req.user!.id && !req.user?.roles.includes(UserRole.ADMIN)) {
         return res.status(403).json({
-          error: `Cannot edit ${invoice.status} invoices`
+          error: 'Only the invoice creator can edit invoices pending approval'
         });
       }
-
-      if (invoice.status === InvoiceStatus.PENDING_APPROVAL) {
-        // Only creator can edit pending invoices
-        if (invoice.created_by !== req.user!.id && !req.user?.roles.includes(UserRole.ADMIN)) {
-          return res.status(403).json({
-            error: 'Only the invoice creator can edit invoices pending approval'
-          });
-        }
-      }
-
-      // Prevent editing paid invoices (except for admin)
-      if (invoice.status === InvoiceStatus.PAID && !req.user?.roles.includes(UserRole.ADMIN)) {
-        return res.status(403).json({ error: 'Paid invoices cannot be edited' });
-      }
-
-      // Store original values for audit logging
-      const originalValues = { ...invoice };
-
-      const {
-        invoiceNumber,
-        projectName,
-        amount,
-        invoiceDate,
-        percentageOfTotal,
-        remark,
-        status,
-        fileUrl,
-      } = req.body;
-
-      // Update fields if provided
-      if (invoiceNumber !== undefined) invoice.invoice_number = invoiceNumber;
-      if (projectName !== undefined) invoice.project_name = projectName;
-      if (amount !== undefined) invoice.amount = parseFloat(amount);
-      if (invoiceDate !== undefined) invoice.invoice_date = new Date(invoiceDate);
-      if (percentageOfTotal !== undefined) {
-        // Recalculate cumulative if percentage changed
-        const existingInvoices = await invoiceRepo
-          .createQueryBuilder('invoice')
-          .where('invoice.project_code LIKE :code', { code: `%${invoice.project_code}%` })
-          .andWhere('invoice.id != :id', { id: invoice.id })
-          .getMany();
-
-        const previousTotal = existingInvoices.reduce((sum, inv) => sum + Number(inv.percentage_of_total), 0);
-        invoice.percentage_of_total = parseFloat(percentageOfTotal);
-        invoice.cumulative_percentage = previousTotal + parseFloat(percentageOfTotal);
-      }
-      if (remark !== undefined) invoice.remark = remark;
-      if (status !== undefined) invoice.status = status as InvoiceStatus;
-      if (fileUrl !== undefined) invoice.file_url = fileUrl;
-
-      const updatedInvoice = await invoiceRepo.save(invoice);
-
-      // Log invoice changes for audit trail
-      await ActivityService.logInvoiceUpdate(
-        req.user!.id,
-        originalValues,
-        req.body,
-        updatedInvoice
-      );
-
-      res.json({
-        message: 'Invoice updated successfully',
-        data: updatedInvoice,
-      });
-    } catch (error: any) {
-      logger.error('Error updating invoice', { error });
-      res.status(500).json({ error: 'Failed to update invoice' });
     }
+
+    // Prevent editing paid invoices (except for admin)
+    if (invoice.status === InvoiceStatus.PAID && !req.user?.roles.includes(UserRole.ADMIN)) {
+      return res.status(403).json({ error: 'Paid invoices cannot be edited' });
+    }
+
+    // Store original values for audit logging
+    const originalValues = { ...invoice };
+
+    const {
+      invoiceNumber,
+      projectName,
+      amount,
+      invoiceDate,
+      percentageOfTotal,
+      remark,
+      status,
+      fileUrl,
+    } = req.body;
+
+    // Update fields if provided
+    if (invoiceNumber !== undefined) invoice.invoice_number = invoiceNumber;
+    if (projectName !== undefined) invoice.project_name = projectName;
+    if (amount !== undefined) invoice.amount = parseFloat(amount);
+    if (invoiceDate !== undefined) invoice.invoice_date = new Date(invoiceDate);
+    if (percentageOfTotal !== undefined) {
+      // Recalculate cumulative if percentage changed
+      const existingInvoices = await invoiceRepo
+        .createQueryBuilder('invoice')
+        .where('invoice.project_code LIKE :code', { code: `%${invoice.project_code}%` })
+        .andWhere('invoice.id != :id', { id: invoice.id })
+        .getMany();
+
+      const previousTotal = existingInvoices.reduce((sum, inv) => sum + Number(inv.percentage_of_total), 0);
+      invoice.percentage_of_total = parseFloat(percentageOfTotal);
+      invoice.cumulative_percentage = previousTotal + parseFloat(percentageOfTotal);
+    }
+    if (remark !== undefined) invoice.remark = remark;
+    if (status !== undefined) invoice.status = status as InvoiceStatus;
+    if (fileUrl !== undefined) invoice.file_url = fileUrl;
+
+    const updatedInvoice = await invoiceRepo.save(invoice);
+
+    // Log the changes for audit trail
+    await ActivityService.logInvoiceUpdate(
+      req.user!.id,
+      originalValues,
+      req.body,
+      updatedInvoice
+    );
+
+    res.json({
+      message: 'Invoice updated successfully',
+      data: updatedInvoice,
+    });
+  } catch (error: any) {
+    logger.error('Error updating invoice', { error });
+    res.status(500).json({ error: 'Failed to update invoice' });
   }
-);
+});
 
 /**
  * DELETE /api/invoices/:id
@@ -405,23 +402,22 @@ router.put('/:id',
 router.delete('/:id',
   authorize(UserRole.SENIOR_ENGINEER, UserRole.PRINCIPAL_ENGINEER, UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN),
   async (req: AuthRequest, res: Response) => {
-    try {
-      const invoiceRepo = AppDataSource.getRepository(Invoice);
-      const invoice = await invoiceRepo.findOne({ where: { id: req.params.id } });
+  try {
+    const invoiceRepo = AppDataSource.getRepository(Invoice);
+    const invoice = await invoiceRepo.findOne({ where: { id: req.params.id } });
 
-      if (!invoice) {
-        return res.status(404).json({ error: 'Invoice not found' });
-      }
-
-      await invoiceRepo.remove(invoice);
-
-      res.json({ message: 'Invoice deleted successfully' });
-    } catch (error: any) {
-      logger.error('Error deleting invoice', { error });
-      res.status(500).json({ error: 'Failed to delete invoice' });
+    if (!invoice) {
+      return res.status(404).json({ error: 'Invoice not found' });
     }
+
+    await invoiceRepo.remove(invoice);
+
+    res.json({ message: 'Invoice deleted successfully' });
+  } catch (error: any) {
+    logger.error('Error deleting invoice', { error });
+    res.status(500).json({ error: 'Failed to delete invoice' });
   }
-);
+});
 
 /**
  * POST /api/invoices/:id/submit-for-approval
@@ -463,7 +459,7 @@ router.post('/:id/submit-for-approval',
           { status: InvoiceStatus.PENDING_APPROVAL },
           updatedInvoice
         );
-       } catch (activityError) {
+        } catch (activityError) {
         logger.error('Activity logging failed', { error: activityError });
         // Don't fail the request if activity logging fails
       }
@@ -559,7 +555,7 @@ router.post('/:id/approve',
           updatedInvoice
         );
       } catch (activityError) {
-        logger.error('Activity logging failed', { error: activityError });
+        console.error('Activity logging failed:', activityError);
         // Don't fail the request if activity logging fails
       }
 
@@ -655,7 +651,7 @@ router.post('/:id/withdraw',
           updatedInvoice
         );
       } catch (activityError) {
-        logger.error('Activity logging failed', { error: activityError });
+        console.error('Activity logging failed:', activityError);
         // Don't fail the request if activity logging fails
       }
 
@@ -889,6 +885,11 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response) => {
       const resolvedPath = path.resolve(filePath);
       const resolvedUploadsDir = path.resolve(uploadsDir);
       if (!resolvedPath.startsWith(resolvedUploadsDir)) {
+        logger.error('Path traversal attempt detected', {
+          filename,
+          resolvedPath,
+          resolvedUploadsDir
+        });
         return res.status(403).json({ error: 'Access denied' });
       }
 
@@ -924,6 +925,56 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response) => {
       logger.debug('No document uploaded for invoice', { invoiceNumber: invoice.invoice_number });
       return res.status(404).json({ error: 'No document uploaded for this invoice' });
     }
+
+      // SECURITY: Validate filename to prevent path traversal attacks
+      // Only allow alphanumeric characters, hyphens, underscores, and dots
+      const safeFilenamePattern = /^[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]+$/;
+      if (!safeFilenamePattern.test(filename)) {
+        logger.error('Invalid filename detected', { filename });
+        return res.status(400).json({ error: 'Invalid filename format' });
+      }
+
+      const uploadsDir = path.join(__dirname, '../../uploads');
+      const filePath = path.join(uploadsDir, filename);
+
+      // SECURITY: Ensure the resolved path is within the uploads directory
+      const resolvedPath = path.resolve(filePath);
+      const resolvedUploadsDir = path.resolve(uploadsDir);
+      if (!resolvedPath.startsWith(resolvedUploadsDir)) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      logger.debug('Resolved file path', {
+        fileUrl: invoice.file_url,
+        filename,
+        uploadsDir,
+        fullPath: filePath,
+        exists: fs.existsSync(filePath)
+      });
+      // Check if file exists
+      if (!fs.existsSync(filePath)) {
+        logger.error('Uploaded file not found on disk', {
+          filePath,
+          uploadsDir,
+          filesInDir: fs.existsSync(uploadsDir) ? fs.readdirSync(uploadsDir).length : 0
+        });
+        return res.status(404).json({
+          error: 'Document file not found on server',
+          details: `Looking for: ${filename}`
+        });
+      }
+
+      // Set headers and send file
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="invoice-${invoice.invoice_number}.pdf"`);
+
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.pipe(res);
+    } else {
+      // No file uploaded - return error message
+      logger.debug('No document uploaded for invoice', { invoiceNumber: invoice.invoice_number });
+      return res.status(404).json({ error: 'No document uploaded for this invoice' });
+    }
   } catch (error: any) {
     logger.error('Error serving invoice document', {
       error: error.message,
@@ -933,6 +984,7 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: `Failed to serve invoice document: ${error.message}` });
   }
 });
+
 
 /**
  * Debug endpoint to check company settings
@@ -947,7 +999,7 @@ router.get('/debug-settings', async (req: AuthRequest, res: Response) => {
   try {
     const { CompanySettingsService } = await import('../services/companySettings.service');
     const settings = await CompanySettingsService.getSettings();
-
+    
     res.json({
       success: true,
       settings: {
@@ -955,7 +1007,7 @@ router.get('/debug-settings', async (req: AuthRequest, res: Response) => {
         logo_url: settings.logo_url,
         logo_size: settings.logo_size,
         header_position: settings.header_position,
-        page_margin: settings.page_margin
+        page_margin: settings.        page_margin
       }
     });
   } catch (error: any) {
@@ -973,7 +1025,6 @@ router.get('/test-invoice-size/:invoiceId', async (req: AuthRequest, res: Respon
   if (process.env.NODE_ENV === 'production') {
     return res.status(404).json({ error: 'Not found' });
   }
-
   try {
     const invoiceRepo = AppDataSource.getRepository(Invoice);
     const invoice = await invoiceRepo.findOne({ where: { id: req.params.invoiceId } });
@@ -1014,8 +1065,8 @@ router.get('/test-invoice-size/:invoiceId', async (req: AuthRequest, res: Respon
         invoiceNumber: invoice.invoice_number,
         amount: invoice.amount,
         sizeBytes: pdfBuffer.length,
-        sizeKB: parseFloat(sizeKB.toFixed(2)),
-        sizeMB: parseFloat(sizeMB),
+        sizeKB: sizeKB.toFixed(2),
+        sizeMB: sizeMB,
         recommendedViewer: parseFloat(sizeMB) > 1.0 ? 'Browser Viewer Recommended' : 'React-PDF Should Work'
       }
     });

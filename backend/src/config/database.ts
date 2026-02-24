@@ -1,5 +1,6 @@
 import { DataSource } from 'typeorm';
 import dotenv from 'dotenv';
+import { logger } from '../utils/logger';
 
 // Import all entities explicitly for TypeORM to recognize them
 import { Activity } from '../entities/Activity';
@@ -17,6 +18,7 @@ import { MaintenanceTicket } from '../entities/MaintenanceTicket';
 import { ReceivedInvoice } from '../entities/ReceivedInvoice';
 import { Project } from '../entities/Project';
 import { ProjectHourlyRate } from '../entities/ProjectHourlyRate';
+import { ProjectTeamMember } from '../entities/ProjectTeamMember';
 import { PurchaseOrder } from '../entities/PurchaseOrder';
 import { ResearchProject } from '../entities/ResearchProject';
 import { ScheduledMaintenance } from '../entities/ScheduledMaintenance';
@@ -42,6 +44,7 @@ const entities = [
   ReceivedInvoice,
   Project,
   ProjectHourlyRate,
+  ProjectTeamMember,
   PurchaseOrder,
   ResearchProject,
   ScheduledMaintenance,
@@ -79,20 +82,20 @@ export const AppDataSource = new DataSource({
 export const initializeDatabase = async () => {
   try {
     await AppDataSource.initialize();
-    console.log('✅ Database connection established successfully');
+    logger.info('Database connection established successfully');
 
     // Run pending migrations
     try {
-      console.log('Running pending migrations...');
+      logger.info('Running pending migrations');
       await AppDataSource.runMigrations();
-      console.log('✅ Migrations completed successfully');
+      logger.info('Migrations completed successfully');
     } catch (migrationError) {
-      console.warn('⚠️ Migration check/run note:', (migrationError as any).message);
+      logger.warn('Migration check/run note', { error: (migrationError as any).message });
     }
 
     return AppDataSource;
   } catch (error) {
-    console.error('❌ Error connecting to database:', error);
+    logger.error('Error connecting to database', { error });
     throw error;
   }
 };

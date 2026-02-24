@@ -7,6 +7,7 @@ import emailService from './email.service';
 import { OnboardingPdfService } from './onboardingPdf.service';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { logger } from '../utils/logger';
 
 /**
  * Generate a secure random temporary password
@@ -301,12 +302,12 @@ export class TeamService {
           user.temp_password_expires!,
           pdfBuffer
         );
-        
+
         emailSent = true;
-        console.log(`✅ Welcome email sent to ${email}`);
+        logger.info('Welcome email sent', { email });
       } catch (err: any) {
         emailError = err.message;
-        console.error(`❌ Failed to send welcome email to ${email}:`, err.message);
+        logger.error('Failed to send welcome email', { email, error: err.message });
       }
     }
 

@@ -27,10 +27,14 @@ const TEAM_MANAGE_ROLES = [
  */
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
-    const { status = 'active', department, search, limit = 100, offset = 0 } = req.query;
+    const { status, department, search, limit = 100, offset = 0 } = req.query;
+
+    // If status is 'all', don't filter by status (return all members)
+    // If status is not provided, default to 'active'
+    const statusFilter = status === 'all' ? undefined : (status as string) || 'active';
 
     const result = await teamService.getTeamMembers({
-      status: status as string,
+      status: statusFilter,
       department: department as string,
       search: search as string,
       limit: parseInt(limit as string),

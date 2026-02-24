@@ -36,9 +36,9 @@ export function calculateProjectFinances(
     projectTimesheets.forEach(ts => {
       const engineer = teamMembers.find(tm => tm.id === ts.engineerId.toString());
 
-      // Priority 1: Project daily rate (if set) - convert to hourly
-      const hourlyRate = project.dailyRate
-        ? (project.dailyRate as number) / 8 // Convert daily to hourly
+      // Priority 1: Project hourly rate (if set)
+      const hourlyRate = project.hourlyRate
+        ? (project.hourlyRate as number)
         : (
           // Priority 2: Engineer hourly rate (if set)
           projectRates[project.id]?.[ts.engineerId.toString()]

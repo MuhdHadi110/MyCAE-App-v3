@@ -4,6 +4,7 @@ import { AppDataSource } from '../config/database';
 import { ResearchProject } from '../entities/ResearchProject';
 import { User, UserRole } from '../entities/User';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
+import { logger } from '../utils/logger';
 
 const router = express.Router();
 
@@ -15,6 +16,12 @@ const validatePagination = (limit: unknown, offset: unknown) => ({
   limit: Math.min(Math.max(parseInt(String(limit)) || 100, 1), 500), // Max 500 records
   offset: Math.max(parseInt(String(offset)) || 0, 0)
 });
+
+// Validate UUID format
+const isValidUUID = (str: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+};
 
 // Get all research projects
 router.get('/projects', async (req: AuthRequest, res: Response) => {
@@ -33,7 +40,7 @@ router.get('/projects', async (req: AuthRequest, res: Response) => {
 
     // Get total hours for each project from research_timesheets
     const projectIds = projects.map(p => p.id);
-    console.log('Research projects found:', projectIds);
+    logger.debug('Research projects found', { count: projectIds.length });
     
     let hoursMap = new Map<string, number>();
     if (projectIds.length > 0) {
@@ -43,43 +50,33 @@ router.get('/projects', async (req: AuthRequest, res: Response) => {
           `SELECT COUNT(*) as count FROM information_schema.tables 
            WHERE table_schema = DATABASE() AND table_name = 'research_timesheets'`
         );
-        console.log('research_timesheets table exists:', tableExists);
+        logger.debug('research_timesheets table exists', { exists: tableExists[0]?.count > 0 });
         
         if (tableExists[0]?.count > 0) {
-          // Build the IN clause manually for MySQL
-          const placeholders = projectIds.map(() => '?').join(',');
+          // Use parameterized query with IN clause - safe from SQL injection
+          // TypeORM handles the parameterization automatically
+          const hoursQuery = await AppDataSource
+            .createQueryBuilder()
+            .select('research_project_id', 'projectId')
+            .addSelect('SUM(hours)', 'totalHours')
+            .from('research_timesheets', 'rt')
+            .where('rt.research_project_id IN (:...projectIds)', { projectIds })
+            .groupBy('rt.research_project_id')
+            .getRawMany();
           
-          // Get all timesheets for these projects
-          const hoursQuery = await AppDataSource.query(
-            `SELECT research_project_id as projectId, SUM(hours) as totalHours 
-             FROM research_timesheets 
-             WHERE research_project_id IN (${placeholders}) 
-             GROUP BY research_project_id`,
-            projectIds
-          );
-          console.log('Hours query result:', hoursQuery);
+          logger.debug('Hours query result', { count: hoursQuery.length });
           
           // Build hours map
           hoursQuery.forEach((row: any) => {
             hoursMap.set(row.projectId, parseFloat(row.totalHours) || 0);
           });
-          
-          // Also check raw data
-          const rawData = await AppDataSource.query(
-            `SELECT * FROM research_timesheets WHERE research_project_id IN (${placeholders})`,
-            projectIds
-          );
-          console.log('Raw timesheet data count:', rawData.length);
-          console.log('Raw timesheet data:', rawData);
-        } else {
-          console.log('research_timesheets table does not exist');
         }
       } catch (error) {
-        console.error('Error fetching hours:', error);
+        logger.error('Error fetching hours', { error });
       }
     }
     
-    console.log('Hours map:', Array.from(hoursMap.entries()));
+    logger.debug('Hours map built', { entries: hoursMap.size });
     
     // Transform to include lead researcher name and total hours
     const transformedProjects = projects.map(p => ({
@@ -88,7 +85,7 @@ router.get('/projects', async (req: AuthRequest, res: Response) => {
       totalHoursLogged: hoursMap.get(p.id) || 0,
     }));
     
-    console.log('Transformed projects with hours:', transformedProjects.map(p => ({ id: p.id, totalHoursLogged: p.totalHoursLogged })));
+    logger.debug('Transformed projects', { count: transformedProjects.length });
 
     res.json({
       data: transformedProjects,
@@ -97,7 +94,7 @@ router.get('/projects', async (req: AuthRequest, res: Response) => {
       offset: pagination.offset,
     });
   } catch (error) {
-    console.error('Error fetching research projects:', error);
+    logger.error('Error fetching research projects', { error });
     res.status(500).json({ error: 'Failed to fetch research projects' });
   }
 });
@@ -108,6 +105,12 @@ router.get('/projects/status/:status', async (req: AuthRequest, res: Response) =
     const { status } = req.params;
     const { limit = 100, offset = 0 } = req.query;
     const pagination = validatePagination(limit, offset);
+
+    // Validate status parameter
+    const validStatuses = ['planning', 'active', 'completed', 'on_hold', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid status parameter' });
+    }
 
     const projectRepo = AppDataSource.getRepository(ResearchProject);
     const [projects, total] = await projectRepo
@@ -126,7 +129,7 @@ router.get('/projects/status/:status', async (req: AuthRequest, res: Response) =
       offset: pagination.offset,
     });
   } catch (error) {
-    console.error('Error fetching research projects by status:', error);
+    logger.error('Error fetching research projects by status', { error });
     res.status(500).json({ error: 'Failed to fetch research projects' });
   }
 });
@@ -136,43 +139,51 @@ router.get('/summary', async (req: AuthRequest, res: Response) => {
   try {
     const { engineerId } = req.query;
 
-    let query = `
-      SELECT
-        SUM(rt.hoursLogged) as totalHours,
-        COUNT(DISTINCT rt.projectId) as activeProjects,
-        COUNT(DISTINCT rt.researchCategory) as categories,
-        COUNT(rt.id) as timesheetCount,
-        rt.researchCategory,
-        SUM(rt.hoursLogged) as categoryHours,
-        rp.id as projectId,
-        rp.title as projectTitle,
-        SUM(rt.hoursLogged) as projectHours
-      FROM research_timesheets rt
-      LEFT JOIN research_projects rp ON rt.projectId = rp.id
-    `;
-
-    if (engineerId) {
-      query += ` WHERE rt.teamMemberId = ?`;
+    // Validate engineerId if provided
+    if (engineerId && !isValidUUID(engineerId as string)) {
+      return res.status(400).json({ error: 'Invalid engineerId format' });
     }
 
-    query += ` GROUP BY rt.researchCategory, rp.id`;
+    // Use TypeORM QueryBuilder for safe parameterized queries
+    let queryBuilder = AppDataSource
+      .createQueryBuilder()
+      .select('SUM(rt.hours)', 'totalHours')
+      .addSelect('COUNT(DISTINCT rt.research_project_id)', 'activeProjects')
+      .addSelect('COUNT(DISTINCT rt.research_category)', 'categories')
+      .addSelect('COUNT(rt.id)', 'timesheetCount')
+      .addSelect('rt.research_category', 'researchCategory')
+      .addSelect('SUM(rt.hours)', 'categoryHours')
+      .addSelect('rp.id', 'projectId')
+      .addSelect('rp.title', 'projectTitle')
+      .from('research_timesheets', 'rt')
+      .leftJoin('research_projects', 'rp', 'rt.research_project_id = rp.id');
 
-    const rows = await AppDataSource.query(query, engineerId ? [engineerId] : []);
+    if (engineerId) {
+      queryBuilder = queryBuilder.where('rt.engineer_id = :engineerId', { engineerId });
+    }
+
+    const rows = await queryBuilder
+      .groupBy('rt.research_category, rp.id')
+      .getRawMany();
 
     // Process rows into summary format
     const totalHours = rows.reduce((sum: number, row: any) => sum + (parseFloat(row.totalHours) || 0), 0);
     const categoryBreakdown: Record<string, number> = {};
     const projectBreakdown: Record<string, { projectTitle: string; hours: number }> = {};
-    let timesheetCount = 0;
     const activeProjects = new Set<string>();
 
-    // Get timesheet count
-    let countQuery = `SELECT COUNT(id) as count FROM research_timesheets`;
+    // Get timesheet count with separate query
+    let countQueryBuilder = AppDataSource
+      .createQueryBuilder()
+      .select('COUNT(id)', 'count')
+      .from('research_timesheets', 'rt');
+
     if (engineerId) {
-      countQuery += ` WHERE teamMemberId = ?`;
+      countQueryBuilder = countQueryBuilder.where('rt.engineer_id = :engineerId', { engineerId });
     }
-    const countResult = await AppDataSource.query(countQuery, engineerId ? [engineerId] : []);
-    timesheetCount = countResult[0]?.count || 0;
+
+    const countResult = await countQueryBuilder.getRawOne();
+    const timesheetCount = countResult?.count || 0;
 
     // Build breakdown data
     rows.forEach((row: any) => {
@@ -196,7 +207,7 @@ router.get('/summary', async (req: AuthRequest, res: Response) => {
       timesheetCount,
     });
   } catch (error) {
-    console.error('Error fetching research timesheet summary:', error);
+    logger.error('Error fetching research timesheet summary', { error });
     res.status(500).json({ error: 'Failed to fetch research timesheet summary' });
   }
 });
@@ -206,40 +217,74 @@ router.get('/timesheets', async (req: AuthRequest, res: Response) => {
   try {
     const { projectId, teamMemberId, status, startDate, endDate } = req.query;
 
-    let query = `
-      SELECT
-        rt.id,
-        rt.research_project_id as projectId,
-        rt.engineer_id as teamMemberId,
-        u.name as teamMemberName,
-        rt.date,
-        rt.hours as hoursLogged,
-        rt.description,
-        rt.research_category as researchCategory,
-        rp.status as status,
-        rt.created_at as createdDate,
-        rt.updated_at as updatedAt,
-        rp.title as projectTitle,
-        rp.research_code as projectCode
-      FROM research_timesheets rt
-      LEFT JOIN research_projects rp ON rt.research_project_id = rp.id
-      LEFT JOIN users u ON rt.engineer_id = u.id
-      WHERE 1=1
-    `;
+    // Validate UUID parameters
+    if (projectId && !isValidUUID(projectId as string)) {
+      return res.status(400).json({ error: 'Invalid projectId format' });
+    }
+    if (teamMemberId && !isValidUUID(teamMemberId as string)) {
+      return res.status(400).json({ error: 'Invalid teamMemberId format' });
+    }
 
-    const params: any[] = [];
-    if (projectId) { query += ` AND rt.research_project_id = ?`; params.push(projectId); }
-    if (teamMemberId) { query += ` AND rt.engineer_id = ?`; params.push(teamMemberId); }
-    if (status) { query += ` AND rp.status = ?`; params.push(status); }
-    if (startDate) { query += ` AND rt.date >= ?`; params.push(startDate); }
-    if (endDate) { query += ` AND rt.date <= ?`; params.push(endDate); }
+    // Use TypeORM QueryBuilder for safe parameterized queries
+    let queryBuilder = AppDataSource
+      .createQueryBuilder()
+      .select('rt.id', 'id')
+      .addSelect('rt.research_project_id', 'projectId')
+      .addSelect('rt.engineer_id', 'teamMemberId')
+      .addSelect('u.name', 'teamMemberName')
+      .addSelect('rt.date', 'date')
+      .addSelect('rt.hours', 'hoursLogged')
+      .addSelect('rt.description', 'description')
+      .addSelect('rt.research_category', 'researchCategory')
+      .addSelect('rp.status', 'status')
+      .addSelect('rt.created_at', 'createdDate')
+      .addSelect('rt.updated_at', 'updatedAt')
+      .addSelect('rp.title', 'projectTitle')
+      .addSelect('rp.research_code', 'projectCode')
+      .from('research_timesheets', 'rt')
+      .leftJoin('research_projects', 'rp', 'rt.research_project_id = rp.id')
+      .leftJoin('users', 'u', 'rt.engineer_id = u.id');
 
-    query += ` ORDER BY rt.date DESC, rt.created_at DESC`;
+    // Add filters safely with parameterized queries
+    if (projectId) {
+      queryBuilder = queryBuilder.andWhere('rt.research_project_id = :projectId', { projectId });
+    }
+    if (teamMemberId) {
+      queryBuilder = queryBuilder.andWhere('rt.engineer_id = :teamMemberId', { teamMemberId });
+    }
+    if (status) {
+      // Validate status against allowed values
+      const validStatuses = ['planning', 'active', 'completed', 'on_hold', 'cancelled'];
+      if (!validStatuses.includes(status as string)) {
+        return res.status(400).json({ error: 'Invalid status parameter' });
+      }
+      queryBuilder = queryBuilder.andWhere('rp.status = :status', { status });
+    }
+    if (startDate) {
+      // Validate date format
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(startDate as string)) {
+        return res.status(400).json({ error: 'Invalid startDate format. Use YYYY-MM-DD' });
+      }
+      queryBuilder = queryBuilder.andWhere('rt.date >= :startDate', { startDate });
+    }
+    if (endDate) {
+      // Validate date format
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(endDate as string)) {
+        return res.status(400).json({ error: 'Invalid endDate format. Use YYYY-MM-DD' });
+      }
+      queryBuilder = queryBuilder.andWhere('rt.date <= :endDate', { endDate });
+    }
 
-    const timesheets = await AppDataSource.query(query, params);
+    const timesheets = await queryBuilder
+      .orderBy('rt.date', 'DESC')
+      .addOrderBy('rt.created_at', 'DESC')
+      .getRawMany();
+
     res.json(timesheets || []);
   } catch (error) {
-    console.error('Error fetching research timesheets:', error);
+    logger.error('Error fetching research timesheets', { error });
     res.status(500).json({ error: 'Failed to fetch research timesheets' });
   }
 });
@@ -287,7 +332,7 @@ router.post('/projects', authorize(UserRole.MANAGER, UserRole.MANAGING_DIRECTOR,
 
     res.status(201).json(transformedProject);
   } catch (error) {
-    console.error('Error creating research project:', error);
+    logger.error('Error creating research project', { error });
     res.status(500).json({ error: 'Failed to create research project' });
   }
 });
@@ -296,6 +341,12 @@ router.post('/projects', authorize(UserRole.MANAGER, UserRole.MANAGING_DIRECTOR,
 router.put('/projects/:id', authorize(UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    
+    // Validate UUID
+    if (!isValidUUID(id)) {
+      return res.status(400).json({ error: 'Invalid project ID format' });
+    }
+    
     const {
       title, description, status, startDate, plannedEndDate, actualEndDate,
       leadResearcherId, budget, fundingSource, category, objectives,
@@ -334,7 +385,7 @@ router.put('/projects/:id', authorize(UserRole.MANAGER, UserRole.MANAGING_DIRECT
 
     res.json(project);
   } catch (error) {
-    console.error('Error updating research project:', error);
+    logger.error('Error updating research project', { error });
     res.status(500).json({ error: 'Failed to update research project' });
   }
 });
@@ -343,6 +394,11 @@ router.put('/projects/:id', authorize(UserRole.MANAGER, UserRole.MANAGING_DIRECT
 router.delete('/projects/:id', authorize(UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    
+    // Validate UUID
+    if (!isValidUUID(id)) {
+      return res.status(400).json({ error: 'Invalid project ID format' });
+    }
 
     const projectRepo = AppDataSource.getRepository(ResearchProject);
     const project = await projectRepo.findOne({ where: { id } });
@@ -351,15 +407,23 @@ router.delete('/projects/:id', authorize(UserRole.MANAGER, UserRole.MANAGING_DIR
       return res.status(404).json({ error: 'Research project not found' });
     }
 
-    // Delete timesheets first (no entity, use raw SQL)
-    await AppDataSource.query(`DELETE FROM research_timesheets WHERE research_project_id = ?`, [id]);
+    // Use transaction to ensure atomicity
+    await AppDataSource.transaction(async (transactionalEntityManager) => {
+      // Delete timesheets first using QueryBuilder for safety
+      await transactionalEntityManager
+        .createQueryBuilder()
+        .delete()
+        .from('research_timesheets')
+        .where('research_project_id = :id', { id })
+        .execute();
 
-    // Then delete project
-    await projectRepo.remove(project);
+      // Then delete project
+      await transactionalEntityManager.remove(project);
+    });
 
     res.json({ message: 'Research project deleted successfully' });
   } catch (error) {
-    console.error('Error deleting research project:', error);
+    logger.error('Error deleting research project', { error });
     res.status(500).json({ error: 'Failed to delete research project' });
   }
 });
@@ -368,6 +432,32 @@ router.delete('/projects/:id', authorize(UserRole.MANAGER, UserRole.MANAGING_DIR
 router.post('/timesheets', async (req: AuthRequest, res: Response) => {
   try {
     const { projectId, teamMemberId, date, hoursLogged, description, researchCategory } = req.body;
+    
+    // Validate required fields
+    if (!projectId || !date || hoursLogged === undefined) {
+      return res.status(400).json({ error: 'Missing required fields: projectId, date, hoursLogged' });
+    }
+    
+    // Validate UUIDs
+    if (!isValidUUID(projectId)) {
+      return res.status(400).json({ error: 'Invalid projectId format' });
+    }
+    if (teamMemberId && !isValidUUID(teamMemberId)) {
+      return res.status(400).json({ error: 'Invalid teamMemberId format' });
+    }
+    
+    // Validate date format
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(date)) {
+      return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD' });
+    }
+    
+    // Validate hours
+    const hours = parseFloat(hoursLogged);
+    if (isNaN(hours) || hours < 0 || hours > 24) {
+      return res.status(400).json({ error: 'Hours must be between 0 and 24' });
+    }
+    
     const id = uuidv4();
     
     // Prevent IDOR: Engineers can only log hours for themselves
@@ -386,25 +476,25 @@ router.post('/timesheets', async (req: AuthRequest, res: Response) => {
       engineerId = currentUser.id;
     }
 
-    const query = `
-      INSERT INTO research_timesheets
-      (id, research_project_id, engineer_id, date, hours, research_category, description)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `;
-
-    await AppDataSource.query(query, [
-      id,
-      projectId,
-      engineerId,
-      date,
-      hoursLogged,
-      researchCategory || null,
-      description || null,
-    ]);
+    // Use TypeORM QueryBuilder for safe INSERT
+    await AppDataSource
+      .createQueryBuilder()
+      .insert()
+      .into('research_timesheets')
+      .values({
+        id,
+        research_project_id: projectId,
+        engineer_id: engineerId,
+        date,
+        hours: hoursLogged,
+        research_category: researchCategory || null,
+        description: description || null,
+      })
+      .execute();
 
     res.status(201).json({ id, projectId, engineerId, date, hoursLogged, description, researchCategory });
   } catch (error) {
-    console.error('Error logging timesheet hours:', error);
+    logger.error('Error logging timesheet hours', { error });
     res.status(500).json({ error: 'Failed to log timesheet hours' });
   }
 });
@@ -413,19 +503,27 @@ router.post('/timesheets', async (req: AuthRequest, res: Response) => {
 router.put('/timesheets/:id/approve', authorize(UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { approvedBy } = req.body;
+    
+    // Validate UUID
+    if (!isValidUUID(id)) {
+      return res.status(400).json({ error: 'Invalid timesheet ID format' });
+    }
 
-    const query = `
-      UPDATE research_timesheets
-      SET status = 'approved'
-      WHERE id = ?
-    `;
+    // Use TypeORM QueryBuilder for safe UPDATE
+    const result = await AppDataSource
+      .createQueryBuilder()
+      .update('research_timesheets')
+      .set({ status: 'approved' })
+      .where('id = :id', { id })
+      .execute();
 
-    await AppDataSource.query(query, [id]);
+    if (result.affected === 0) {
+      return res.status(404).json({ error: 'Timesheet entry not found' });
+    }
 
     res.json({ message: 'Timesheet entry approved' });
   } catch (error) {
-    console.error('Error approving timesheet entry:', error);
+    logger.error('Error approving timesheet entry', { error });
     res.status(500).json({ error: 'Failed to approve timesheet entry' });
   }
 });
@@ -434,31 +532,48 @@ router.put('/timesheets/:id/approve', authorize(UserRole.MANAGER, UserRole.MANAG
 router.delete('/timesheets/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    
+    // Validate UUID
+    if (!isValidUUID(id)) {
+      return res.status(400).json({ error: 'Invalid timesheet ID format' });
+    }
+    
     const currentUser = req.user!;
     const isManagerOrAbove = [UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN].includes(currentUser.role);
 
     // Check ownership before deletion (prevent IDOR)
     if (!isManagerOrAbove) {
-      const timesheet = await AppDataSource.query(
-        `SELECT engineer_id FROM research_timesheets WHERE id = ?`,
-        [id]
-      );
+      const timesheet = await AppDataSource
+        .createQueryBuilder()
+        .select('engineer_id', 'engineerId')
+        .from('research_timesheets', 'rt')
+        .where('rt.id = :id', { id })
+        .getRawOne();
       
-      if (timesheet.length === 0) {
+      if (!timesheet) {
         return res.status(404).json({ error: 'Timesheet entry not found' });
       }
       
-      if (timesheet[0].engineer_id !== currentUser.id) {
+      if (timesheet.engineerId !== currentUser.id) {
         return res.status(403).json({ error: 'You can only delete your own timesheet entries' });
       }
     }
 
-    // Delete timesheet entry
-    await AppDataSource.query(`DELETE FROM research_timesheets WHERE id = ?`, [id]);
+    // Delete timesheet entry using QueryBuilder
+    const result = await AppDataSource
+      .createQueryBuilder()
+      .delete()
+      .from('research_timesheets')
+      .where('id = :id', { id })
+      .execute();
+
+    if (result.affected === 0) {
+      return res.status(404).json({ error: 'Timesheet entry not found' });
+    }
 
     res.json({ message: 'Timesheet entry deleted successfully' });
   } catch (error) {
-    console.error('Error deleting timesheet entry:', error);
+    logger.error('Error deleting timesheet entry', { error });
     res.status(500).json({ error: 'Failed to delete timesheet entry' });
   }
 });

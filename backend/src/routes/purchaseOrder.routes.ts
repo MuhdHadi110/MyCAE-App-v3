@@ -6,6 +6,7 @@ import { User, UserRole } from '../entities/User';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { body, validationResult } from 'express-validator';
 import { upload, generateFileUrl, deleteFile } from '../utils/fileUpload';
+import { logger } from '../utils/logger';
 import { CurrencyService } from '../services/currency.service';
 import { PurchaseOrderService } from '../services/purchaseOrder.service';
 import emailService from '../services/email.service';
@@ -78,7 +79,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       });
     }
   } catch (error: any) {
-    console.error('Error fetching purchase orders:', error);
+    logger.error('Error fetching purchase orders', { error });
     res.status(500).json({ error: 'Failed to fetch purchase orders' });
   }
 });
@@ -97,7 +98,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 
     res.json(po);
   } catch (error: any) {
-    console.error('Error fetching purchase order:', error);
+    logger.error('Error fetching purchase order', { error });
     res.status(500).json({ error: 'Failed to fetch purchase order' });
   }
 });
@@ -205,11 +206,11 @@ router.post(
       res.status(201).json({
         message: 'Purchase order created successfully',
         data: fullPO,
-      });
-    } catch (error: any) {
-      console.error('Error creating purchase order:', error);
-      res.status(500).json({ error: error.message || 'Failed to create purchase order' });
-    }
+    });
+  } catch (error: any) {
+    logger.error('Error deleting purchase order', { error });
+    res.status(500).json({ error: 'Failed to delete purchase order' });
+  }
   }
 );
 
@@ -252,8 +253,8 @@ router.put('/:id', authorize(UserRole.SENIOR_ENGINEER, UserRole.PRINCIPAL_ENGINE
       data: updatedPO,
     });
   } catch (error: any) {
-    console.error('Error updating purchase order:', error);
-    res.status(500).json({ error: error.message || 'Failed to update purchase order' });
+    logger.error('Error updating purchase order', { error });
+    res.status(500).json({ error: 'Failed to update purchase order' });
   }
 });
 
@@ -305,7 +306,7 @@ router.post('/:id/upload', upload.single('file'), async (req: AuthRequest, res: 
       filename: req.file.filename,
     });
   } catch (error: any) {
-    console.error('Error uploading file:', error);
+    logger.error('Error uploading file', { error });
     res.status(500).json({ error: error.message || 'Failed to upload file' });
   }
 });
@@ -346,7 +347,7 @@ router.get('/download/:filename', async (req: AuthRequest, res: Response) => {
 
     res.download(filePath);
   } catch (error: any) {
-    console.error('Error downloading file:', error);
+    logger.error('Error downloading file', { error });
     res.status(500).json({ error: 'Failed to download file' });
   }
 });
@@ -370,11 +371,11 @@ router.get('/:poNumberBase/revisions', async (req: AuthRequest, res: Response) =
       data: revisions,
       total: revisions.length,
       activeRevision,
-    });
-  } catch (error: any) {
-    console.error('Error fetching PO revisions:', error);
-    res.status(500).json({ error: 'Failed to fetch PO revisions' });
-  }
+      });
+    } catch (error: any) {
+      logger.error('Error creating PO revision', { error });
+      res.status(500).json({ error: 'Failed to create PO revision' });
+    }
 });
 
 /**
@@ -416,11 +417,10 @@ router.post(
       res.status(201).json({
         message: 'PO revision created successfully',
         data: newRevision,
-      });
-    } catch (error: any) {
-      console.error('Error creating PO revision:', error);
-      res.status(500).json({ error: error.message || 'Failed to create PO revision' });
-    }
+        });
+      } catch (emailError: any) {
+        logger.error('Failed to send PO notification', { error: emailError.message });
+      }
   }
 );
 
@@ -455,10 +455,10 @@ router.patch(
       res.json({
         message: 'MYR amount adjusted successfully',
         data: updatedPO,
-      });
-    } catch (error: any) {
-      console.error('Error adjusting MYR amount:', error);
-      res.status(500).json({ error: error.message || 'Failed to adjust MYR amount' });
+    });
+  } catch (error: any) {
+      logger.error('Error adjusting MYR amount', { error });
+      res.status(500).json({ error: 'Failed to adjust MYR amount' });
     }
   }
 );

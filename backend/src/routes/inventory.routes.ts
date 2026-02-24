@@ -8,6 +8,7 @@ import { body, validationResult } from 'express-validator';
 import n8nService from '../services/n8n.service';
 import emailService from '../services/email.service';
 import { v4 as uuidv4 } from 'uuid';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
@@ -73,7 +74,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       offset: pagination.offset,
     });
   } catch (error: any) {
-    console.error('Error fetching inventory:', error);
+    logger.error('Error fetching inventory', { error });
     res.status(500).json({ error: 'Failed to fetch inventory' });
   }
 });
@@ -93,7 +94,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 
     res.json(item);
   } catch (error: any) {
-    console.error('Error fetching item:', error);
+    logger.error('Error fetching item', { error });
     res.status(500).json({ error: 'Failed to fetch item' });
   }
 });
@@ -208,9 +209,9 @@ router.put('/:id', authorize(...INVENTORY_MODIFY_ROLES), async (req: AuthRequest
           sku: item.sku,
           currentStock: item.quantity,
           minimumStock: item.minimumStock,
-        }).catch((err) => {
-          console.error('n8n low stock alert error (non-blocking):', err.message);
-        });
+      }).catch((err) => {
+        logger.warn('n8n low stock alert error (non-blocking)', { error: err.message });
+      });
 
         // Send email notification (you'll need admin email configuration)
         // await emailService.sendLowStockAlert(adminEmail, item.title, item.quantity, item.minimumStock);
@@ -243,17 +244,17 @@ router.delete('/:id', authorize(...INVENTORY_MODIFY_ROLES), async (req: AuthRequ
     // Delete all related checkout records first using raw query to bypass foreign key constraints
     const itemId = req.params.id;
     await AppDataSource.query('DELETE FROM checkouts WHERE item_id = ?', [itemId]);
-    console.log(`Deleted checkout records for item ${itemId}`);
+    logger.debug('Deleted checkout records', { itemId });
 
     // Then delete the inventory item
     await inventoryRepo.remove(item);
-    console.log(`Successfully deleted inventory item ${itemId}`);
+    logger.info('Item deleted successfully', { itemId });
 
     res.json({ message: 'Item deleted successfully' });
   } catch (error: any) {
-    console.error('Error deleting item:', error);
+    logger.error('Error deleting item', { error });
     res.status(500).json({ error: 'Failed to delete item' });
-  }
+    }
 });
 
 /**
@@ -308,8 +309,8 @@ router.post('/bulk/create', authorize(...INVENTORY_MODIFY_ROLES), async (req: Au
       items: created,
     });
   } catch (error: any) {
-    console.error('Error bulk creating items:', error);
-    res.status(500).json({ error: 'Failed to bulk create items' });
+    logger.error('Error bulk creating items', { error });
+    res.status(500).json({ error: 'Failed to create items' });
   }
 });
 

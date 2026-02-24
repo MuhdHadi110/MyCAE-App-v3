@@ -9,6 +9,7 @@ import { body, validationResult } from 'express-validator';
 import { verifyRecaptcha } from '../utils/recaptcha';
 import crypto from 'crypto';
 import emailService from '../services/email.service';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
@@ -141,7 +142,7 @@ router.post(
         },
       });
     } catch (error: any) {
-      console.error('Registration error:', error);
+      logger.error('Registration error', { error });
       res.status(500).json({ error: 'Registration failed' });
     }
   }
@@ -261,7 +262,7 @@ router.post(
 
       res.json(responseData);
     } catch (error: any) {
-      console.error('Login error:', error);
+      logger.error('Login error', { error });
       res.status(500).json({ error: 'Login failed' });
     }
   }
@@ -328,7 +329,7 @@ router.post(
         success: true,
       });
     } catch (error: any) {
-      console.error('Password change error:', error);
+      logger.error('Password change error', { error });
       res.status(500).json({ error: 'Password change failed' });
     }
   }
@@ -379,9 +380,9 @@ router.post(
       // Send email with reset link
       try {
         await emailService.sendPasswordResetEmail(user.email, user.name, resetToken);
-        console.log(`✅ Password reset email sent to ${user.email}`);
+        logger.info('Password reset email sent', { email: user.email });
       } catch (emailError: any) {
-        console.error('Failed to send password reset email:', emailError);
+        logger.error('Failed to send password reset email', { email: user.email, error: emailError.message });
         // Don't expose email sending failure to user
       }
 
@@ -390,7 +391,7 @@ router.post(
         success: true,
       });
     } catch (error: any) {
-      console.error('Forgot password error:', error);
+      logger.error('Forgot password error', { error });
       res.status(500).json({ error: 'Password reset request failed' });
     }
   }
@@ -447,9 +448,9 @@ router.post(
       // Send confirmation email
       try {
         await emailService.sendPasswordResetConfirmation(user.email, user.name);
-        console.log(`✅ Password reset confirmation sent to ${user.email}`);
+        logger.info('Password reset confirmation sent', { email: user.email });
       } catch (emailError: any) {
-        console.error('Failed to send confirmation email:', emailError);
+        logger.error('Failed to send confirmation email', { email: user.email, error: emailError.message });
         // Don't fail the reset if email fails
       }
 
@@ -458,7 +459,7 @@ router.post(
         success: true,
       });
     } catch (error: any) {
-      console.error('Password reset error:', error);
+      logger.error('Password reset error', { error });
       res.status(500).json({ error: 'Password reset failed' });
     }
   }
@@ -503,7 +504,7 @@ router.post(
         email: user.email,
       });
     } catch (error: any) {
-      console.error('Token verification error:', error);
+      logger.error('Token verification error', { error });
       res.status(500).json({ error: 'Token verification failed' });
     }
   }

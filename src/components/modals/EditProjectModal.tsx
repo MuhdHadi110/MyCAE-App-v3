@@ -4,6 +4,7 @@ import { toast } from 'react-hot-toast';
 import type { Project, ProjectStatus } from '../../types/project.types';
 import { useTeamStore } from '../../store/teamStore';
 import { useCompanyStore } from '../../store/companyStore';
+import { ProjectTeam } from '../projects/ProjectTeam';
 
 interface EditProjectModalProps {
   isOpen: boolean;
@@ -31,7 +32,7 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
     if (project) {
       setFormData({ 
         ...project,
-        dailyRate: (project as any).dailyRate || null
+        hourlyRate: project.hourlyRate || null
       });
     }
   }, [project]);
@@ -172,6 +173,13 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
                       </span>
                     )}
                   </div>
+                </div>
+              )}
+
+              {/* Full Project Team Management */}
+              {project?.id && (
+                <div className="mt-6 pt-6 border-t border-indigo-200">
+                  <ProjectTeam projectId={project.id} />
                 </div>
               )}
             </div>
@@ -340,8 +348,8 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
                 <input
                   type="number"
                   step="0.01"
-                  value={formData.dailyRate || ''}
-                  onChange={(e) => setFormData({ ...formData, dailyRate: parseFloat(e.target.value) || null })}
+                  value={formData.hourlyRate || ''}
+                  onChange={(e) => setFormData({ ...formData, hourlyRate: parseFloat(e.target.value) || null })}
                   placeholder="e.g., 500"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />

@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import { logger } from '../utils/logger';
 
 dotenv.config();
 
@@ -27,10 +28,10 @@ class EmailService {
   private async verifyConnection(): Promise<void> {
     try {
       await this.transporter.verify();
-      console.log('✅ SMTP Server connection verified');
+      logger.info('SMTP Server connection verified');
     } catch (error: any) {
-      console.error('❌ SMTP Connection Error:', error.message);
-      console.warn('⚠️  Email notifications will not work until SMTP is configured');
+      logger.error('SMTP Connection Error', { error: error.message });
+      logger.warn('Email notifications will not work until SMTP is configured');
     }
   }
 
@@ -45,9 +46,9 @@ class EmailService {
         subject,
         html,
       });
-      console.log(`✅ Email sent to ${to}`);
+      logger.debug('Email sent successfully', { recipient: to, subject });
     } catch (error: any) {
-      console.error(`❌ Failed to send email to ${to}:`, error.message);
+      logger.error('Failed to send email', { recipient: to, error: error.message });
       throw error;
     }
   }
@@ -618,9 +619,9 @@ class EmailService {
           md.name
         );
         await this.sendEmail(md.email, subject, personalizedHtml);
-        console.log(`✓ Email sent successfully to MD: ${md.name} (${md.email})`);
+        logger.debug('Invoice approval email sent', { recipient: md.name, email: md.email });
       } catch (error: any) {
-        console.error(`✗ Failed to send email to MD ${md.name}:`, error.message);
+        logger.error('Failed to send invoice approval email', { recipient: md.name, error: error.message });
       }
     }
   }
@@ -661,9 +662,9 @@ class EmailService {
           md.name
         );
         await this.sendEmail(md.email, subject, personalizedHtml);
-        console.log(`✓ PO notification sent to MD: ${md.name} (${md.email})`);
+        logger.debug('PO notification sent', { recipient: md.name, email: md.email });
       } catch (error: any) {
-        console.error(`✗ Failed to send PO notification to MD ${md.name}:`, error.message);
+        logger.error('Failed to send PO notification', { recipient: md.name, error: error.message });
       }
     }
   }
@@ -811,7 +812,7 @@ class EmailService {
     );
 
     await this.sendEmail(creatorEmail, subject, html);
-    console.log(`✓ Email sent successfully to creator: ${creatorName} (${creatorEmail}) - Invoice Approval Confirmation`);
+    logger.debug('Invoice approval confirmation sent', { recipient: creatorName, email: creatorEmail });
   }
 
   /**
@@ -896,9 +897,9 @@ class EmailService {
           md.name
         );
         await this.sendEmail(md.email, subject, personalizedHtml);
-        console.log(`✓ Email sent successfully to MD: ${md.name} (${md.email})`);
+        logger.debug('Invoice withdrawn notification sent', { recipient: md.name, email: md.email });
       } catch (error: any) {
-        console.error(`✗ Failed to send email to MD ${md.name}:`, error.message);
+        logger.error('Failed to send invoice withdrawn notification', { recipient: md.name, error: error.message });
       }
     }
   }
@@ -1008,9 +1009,9 @@ MyCAE Admin Team`;
           }
         ]
       });
-      console.log(`✅ Welcome email sent to ${userEmail}`);
+      logger.info('Welcome email sent', { email: userEmail });
     } catch (error: any) {
-      console.error(`❌ Failed to send welcome email to ${userEmail}:`, error.message);
+      logger.error('Failed to send welcome email', { email: userEmail, error: error.message });
       throw error;
     }
   }

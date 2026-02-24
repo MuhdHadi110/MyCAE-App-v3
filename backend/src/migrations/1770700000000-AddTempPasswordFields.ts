@@ -1,4 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
+import { logger } from '../utils/logger';
 
 /**
  * Migration to add temp password fields for new user onboarding
@@ -14,18 +15,18 @@ export class AddTempPasswordFields1770700000000 implements MigrationInterface {
 
     if (!hasTempPasswordExpires) {
       await queryRunner.query(`
-        ALTER TABLE users 
+        ALTER TABLE users
         ADD COLUMN temp_password_expires TIMESTAMP NULL
       `);
-      console.log('✅ Added temp_password_expires column to users table');
+      logger.info('Added temp_password_expires column to users table');
     }
 
     if (!hasIsTempPassword) {
       await queryRunner.query(`
-        ALTER TABLE users 
+        ALTER TABLE users
         ADD COLUMN is_temp_password BOOLEAN NOT NULL DEFAULT FALSE
       `);
-      console.log('✅ Added is_temp_password column to users table');
+      logger.info('Added is_temp_password column to users table');
     }
   }
 

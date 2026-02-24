@@ -40,7 +40,7 @@ export const PurchaseOrdersScreen: React.FC = () => {
   const totalByStatus = (status: string) => {
     return filteredPOs
       .filter(po => po.status === status)
-      .reduce((sum, po) => sum + (po.amount || 0), 0);
+      .reduce((sum, po) => sum + (po.amountMyrAdjusted || po.amountMyr || po.amount || 0), 0);
   };
 
   const getStatusColor = (status: string) => {

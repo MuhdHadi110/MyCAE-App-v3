@@ -13,6 +13,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { User } from './User';
 import { Contact } from './Contact';
 import { Company } from './Company';
+import { ProjectTeamMember } from './ProjectTeamMember';
 
 export enum ProjectStatus {
   PRE_LIM = 'pre-lim',
@@ -68,6 +69,9 @@ export class Project {
   @OneToMany(() => Project, (project) => project.parentProject)
   variationOrders?: Project[];
 
+  @OneToMany(() => ProjectTeamMember, (ptm) => ptm.project)
+  teamMembers?: ProjectTeamMember[];
+
   @Column({
     type: 'enum',
     enum: ProjectStatus,
@@ -105,7 +109,7 @@ export class Project {
   planned_hours: number;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
-  daily_rate: number | null;
+  hourly_rate: number | null;
 
   @Column({ type: 'int', default: 0 })
   actual_hours: number;

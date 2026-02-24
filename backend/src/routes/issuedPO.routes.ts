@@ -6,6 +6,7 @@ import { User, UserRole } from '../entities/User';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { body, validationResult } from 'express-validator';
 import { upload, generateFileUrl } from '../utils/fileUpload';
+import { logger } from '../utils/logger';
 import path from 'path';
 import fs from 'fs';
 
@@ -43,7 +44,7 @@ router.get('/next-number', async (req: AuthRequest, res: Response) => {
 
     res.json({ nextNumber });
   } catch (error: any) {
-    console.error('Error getting next issued PO number:', error);
+    logger.error('Error getting next issued PO number', { error });
     res.status(500).json({ error: 'Failed to get next issued PO number' });
   }
 });
@@ -81,7 +82,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       offset: parseInt(offset as string),
     });
   } catch (error: any) {
-    console.error('Error fetching issued POs:', error);
+    logger.error('Error fetching issued POs', { error });
     res.status(500).json({ error: 'Failed to fetch issued POs' });
   }
 });
@@ -103,7 +104,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 
     res.json(po);
   } catch (error: any) {
-    console.error('Error fetching issued PO:', error);
+    logger.error('Error fetching issued PO', { error });
     res.status(500).json({ error: 'Failed to fetch issued PO' });
   }
 });
@@ -180,11 +181,11 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
       res.status(201).json({
         message: 'Issued PO created successfully',
         data: savedPO,
-      });
-    } catch (error: any) {
-      console.error('Error creating issued PO:', error);
-      res.status(500).json({ error: 'Failed to create issued PO' });
-    }
+    });
+  } catch (error: any) {
+    logger.error('Error deleting issued PO', { error });
+    res.status(500).json({ error: 'Failed to delete issued PO' });
+  }
   }
 );
 
@@ -245,7 +246,7 @@ router.put('/:id', authorize(UserRole.SENIOR_ENGINEER, UserRole.PRINCIPAL_ENGINE
       data: updatedPO,
     });
   } catch (error: any) {
-    console.error('Error updating issued PO:', error);
+    logger.error('Error updating issued PO', { error });
     res.status(500).json({ error: 'Failed to update issued PO' });
   }
 });
@@ -308,9 +309,9 @@ router.post(
         message: 'File uploaded successfully',
         fileUrl,
         filename: req.file.filename,
-      });
-    } catch (error: any) {
-      console.error('Error uploading issued PO file:', error);
+    });
+  } catch (error: any) {
+      logger.error('Error uploading issued PO file', { error });
       res.status(500).json({ error: error.message || 'Failed to upload file' });
     }
   }
@@ -322,19 +323,19 @@ router.post(
  */
 router.get('/:id/pdf', async (req: AuthRequest, res: Response) => {
   try {
-    console.log('Fetching document for issued PO:', req.params.id);
+    logger.debug('Fetching document for issued PO', { issuedPOId: req.params.id });
 
     const issuedPORepo = AppDataSource.getRepository(IssuedPO);
     const po = await issuedPORepo.findOne({ where: { id: req.params.id } });
 
     if (!po) {
-      console.log('Issued PO not found:', req.params.id);
+      logger.debug('Issued PO not found', { issuedPOId: req.params.id });
       return res.status(404).json({ error: 'Issued PO not found' });
     }
 
     // Check if uploaded file exists
     if (po.file_url) {
-      console.log('Serving uploaded document:', po.file_url);
+      logger.debug('Serving uploaded document', { fileUrl: po.file_url });
 
       // Extract filename from URL
       const filename = path.basename(po.file_url);
@@ -343,7 +344,7 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response) => {
 
       // Check if file exists
       if (!fs.existsSync(filePath)) {
-        console.error('Uploaded file not found on disk:', filePath);
+        logger.error('Uploaded file not found on disk', { filePath });
         return res.status(404).json({ error: 'Document file not found' });
       }
 
@@ -355,13 +356,12 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response) => {
       fileStream.pipe(res);
     } else {
       // No file uploaded - return error message
-      console.log('No document uploaded for issued PO:', po.po_number);
+      logger.debug('No document uploaded for issued PO', { poNumber: po.po_number });
       return res.status(404).json({ error: 'No document uploaded for this issued PO' });
     }
   } catch (error: any) {
-    console.error('Error serving issued PO document:', {
-      message: error.message,
-      stack: error.stack,
+    logger.error('Error serving issued PO document', {
+      error: error.message,
       issuedPOId: req.params.id
     });
 

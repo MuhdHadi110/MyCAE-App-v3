@@ -1,9 +1,11 @@
-import React from 'react';
-import { X, Calendar, Users, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Calendar, Users, Clock, CheckCircle, AlertCircle, Crown } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { Avatar } from '../ui/Avatar';
 import type { Project } from '../../types/project.types';
+import projectTeamService from '../../services/projectTeam.service';
 
 interface ProjectDetailModalProps {
   isOpen: boolean;
@@ -16,6 +18,28 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
   onClose,
   project,
 }) => {
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [loadingTeam, setLoadingTeam] = useState(false);
+
+  useEffect(() => {
+    if (project?.id) {
+      loadTeamMembers();
+    }
+  }, [project?.id]);
+
+  const loadTeamMembers = async () => {
+    if (!project?.id) return;
+    try {
+      setLoadingTeam(true);
+      const team = await projectTeamService.getProjectTeam(project.id);
+      setTeamMembers(team);
+    } catch (error) {
+      console.error('Error loading team:', error);
+    } finally {
+      setLoadingTeam(false);
+    }
+  };
+
   if (!isOpen || !project) return null;
 
   const getStatusBadge = (status: string) => {
@@ -168,6 +192,41 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
               <p className="text-sm text-gray-700 leading-relaxed">{project.description}</p>
             </Card>
           )}
+
+          {/* Project Team */}
+          <Card variant="bordered" padding="md">
+            <p className="text-xs text-gray-500 uppercase font-semibold mb-4 flex items-center gap-1">
+              <Users className="w-4 h-4" />
+              Project Team ({teamMembers.length} members)
+            </p>
+            {loadingTeam ? (
+              <div className="flex justify-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"></div>
+              </div>
+            ) : teamMembers.length > 0 ? (
+              <div className="space-y-3">
+                {teamMembers.map((member) => (
+                  <div key={member.id} className="flex items-center gap-3">
+                    <Avatar src={member.avatar} alt={member.name} size="sm" />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-900">{member.name}</span>
+                        {member.role === 'lead_engineer' && (
+                          <span className="inline-flex items-center gap-1 text-xs text-primary-600 bg-primary-50 px-2 py-0.5 rounded">
+                            <Crown className="w-3 h-3" />
+                            Lead
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-sm text-gray-500">{member.email}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 italic">No team members assigned yet</p>
+            )}
+          </Card>
 
           {/* Hours Breakdown */}
           <Card variant="bordered" padding="md">

@@ -27,7 +27,7 @@ export interface Project {
   endDate?: string;
   plannedHours: number;
   actualHours?: number;
-  dailyRate?: number | null;
+  hourlyRate?: number | null;
   budget?: number;
   engineerId?: string;
   engineerName?: string;

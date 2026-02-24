@@ -12,6 +12,7 @@ import {
   getInventoryItem,
 } from '../utils/inventorySync';
 import n8nService from '../services/n8n.service';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
@@ -90,12 +91,12 @@ router.post(
         checkoutId: checkout.id,
         itemName: item.title,
         quantity,
-        checkedOutBy: req.user.name || 'Unknown User',
-        location,
-        purpose,
-      }).catch((err) => {
-        console.error('n8n webhook error (non-blocking):', err.message);
-      });
+          checkedOutBy: req.user.name || 'Unknown User',
+          location,
+          purpose,
+        }).catch((err) => {
+          logger.warn('n8n webhook error (non-blocking)', { error: err.message });
+        });
 
       res.status(201).json({
         success: true,
@@ -104,7 +105,7 @@ router.post(
         message: `Successfully checked out ${quantity} x ${item.title}`,
       });
     } catch (error: any) {
-      console.error('Error creating single checkout:', error);
+      logger.error('Error creating single checkout', { error });
       res.status(500).json({ error: 'Failed to create checkout' });
     }
   }
@@ -222,7 +223,7 @@ router.post(
         checkedOutBy: req.user.name || 'Unknown User',
         purpose,
       }).catch((err) => {
-        console.error('n8n webhook error (non-blocking):', err.message);
+        logger.warn('n8n webhook error (non-blocking)', { error: err.message });
       });
 
       res.status(201).json({
@@ -232,7 +233,7 @@ router.post(
         message: `Successfully checked out ${createdCheckouts.length} items`,
       });
     } catch (error: any) {
-      console.error('Error creating bulk checkout:', error);
+      logger.error('Error creating bulk checkout', { error });
       res.status(500).json({ error: 'Failed to create bulk checkout' });
     }
   }
@@ -319,7 +320,7 @@ router.post(
         remainingQuantity: activeCheckout.quantity - activeCheckout.returned_quantity,
       });
     } catch (error: any) {
-      console.error('Error checking in single item:', error);
+      logger.error('Error checking in single item', { error });
       res.status(500).json({ error: 'Failed to check in item' });
     }
   }
@@ -418,7 +419,7 @@ router.post(
         masterBarcode,
       });
     } catch (error: any) {
-      console.error('Error checking in bulk items:', error);
+      logger.error('Error checking in bulk items', { error });
       res.status(500).json({ error: 'Failed to check in items' });
     }
   }
@@ -502,7 +503,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
     res.json(result);
   } catch (error: any) {
-    console.error('Error fetching checkouts:', error);
+    logger.error('Error fetching checkouts', { error });
     res.status(500).json({ error: 'Failed to fetch checkouts' });
   }
 });
@@ -555,7 +556,7 @@ router.get('/:masterBarcode', async (req: AuthRequest, res: Response) => {
 
     res.json(response);
   } catch (error: any) {
-    console.error('Error fetching checkout:', error);
+    logger.error('Error fetching checkout', { error });
     res.status(500).json({ error: 'Failed to fetch checkout' });
   }
 });

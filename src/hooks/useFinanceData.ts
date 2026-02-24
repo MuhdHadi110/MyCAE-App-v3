@@ -327,7 +327,7 @@ function calculateProjectSummaries(
 
     // Build engineer breakdown with costs
     // Use project's custom hourly rate if available, otherwise use fixed rate
-    const projectHourlyRate = project.dailyRate || FIXED_HOURLY_RATE;
+    const projectHourlyRate = project.hourlyRate || FIXED_HOURLY_RATE;
     
     const engineerBreakdown: EngineerCost[] = Object.entries(engineerHoursMap).map(
       ([engineerId, data]) => {

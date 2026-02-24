@@ -51,7 +51,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const tickets = await query.getMany();
     res.json(tickets);
   } catch (error: any) {
-    console.error('Error fetching maintenance tickets:', error);
+    logger.error('Error fetching maintenance tickets', { error });
     res.status(500).json({ error: 'Failed to fetch maintenance tickets' });
   }
 });
@@ -74,7 +74,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 
     res.json(ticket);
   } catch (error: any) {
-    console.error('Error fetching maintenance ticket:', error);
+    logger.error('Error fetching maintenance ticket', { error });
     res.status(500).json({ error: 'Failed to fetch maintenance ticket' });
   }
 });
@@ -169,7 +169,7 @@ router.post(
 
       res.status(201).json(savedTicket);
     } catch (error: any) {
-      console.error('Error creating maintenance ticket:', error);
+      logger.error('Error creating maintenance ticket', { error });
       res.status(500).json({ error: 'Failed to create maintenance ticket' });
     }
   }
@@ -266,7 +266,7 @@ router.put('/:id', authorize(UserRole.ENGINEER, UserRole.SENIOR_ENGINEER, UserRo
 
     res.json(updatedTicket);
   } catch (error: any) {
-    console.error('Error updating maintenance ticket:', error);
+    logger.error('Error updating maintenance ticket', { error });
     res.status(500).json({ error: 'Failed to update maintenance ticket' });
   }
 });
@@ -274,8 +274,9 @@ router.put('/:id', authorize(UserRole.ENGINEER, UserRole.SENIOR_ENGINEER, UserRo
 /**
  * DELETE /api/maintenance/:id
  * Delete maintenance ticket
+ * Authorization: Admin only
  */
-router.delete('/:id', async (req: AuthRequest, res: Response) => {
+router.delete('/:id', authorize(UserRole.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const maintenanceRepo = AppDataSource.getRepository(MaintenanceTicket);
     const ticket = await maintenanceRepo.findOne({ where: { id: req.params.id } });
@@ -285,9 +286,9 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
     }
 
     await maintenanceRepo.remove(ticket);
-    res.json({ message: 'Maintenance ticket deleted successfully' });
+    res.json({ message: 'Maintenance ticket deleted successfully'     });
   } catch (error: any) {
-    console.error('Error deleting maintenance ticket:', error);
+    logger.error('Error deleting maintenance ticket', { error });
     res.status(500).json({ error: 'Failed to delete maintenance ticket' });
   }
 });

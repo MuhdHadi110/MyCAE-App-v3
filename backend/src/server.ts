@@ -29,6 +29,7 @@ import categoryRoutes from './routes/category.routes';
 import exchangeRateRoutes from './routes/exchangeRate.routes';
 import companySettingsRoutes from './routes/companySettings.routes';
 import scheduledMaintenanceRoutes from './routes/scheduledMaintenance.routes';
+import projectTeamRoutes from './routes/projectTeam.routes';
 import companyRoutes from './routes/company.routes';
 import contactRoutes from './routes/contact.routes';
 import receivedInvoiceRoutes from './routes/receivedInvoice.routes';
@@ -36,6 +37,7 @@ import healthRoutes from './routes/health.routes';
 import { startExchangeRateScheduler, stopExchangeRateScheduler } from './services/exchangeRateScheduler.service';
 import { startMaintenanceReminderScheduler, stopMaintenanceReminderScheduler } from './services/maintenanceReminderScheduler.service';
 import { AppDataSource } from './config/database';
+import { logger } from './utils/logger';
 
 // Load environment variables
 dotenv.config();
@@ -57,16 +59,14 @@ const validateProductionEnv = () => {
   const missing = requiredVars.filter(v => !process.env[v]);
 
   if (missing.length > 0) {
-    console.error('FATAL: Missing required environment variables in production:');
-    missing.forEach(v => console.error(`  - ${v}`));
+    logger.error('FATAL: Missing required environment variables in production', { missing });
     process.exit(1);
   }
 
   // Validate JWT_SECRET strength
   const jwtSecret = process.env.JWT_SECRET;
   if (jwtSecret && jwtSecret.length < 32) {
-    console.error('FATAL: JWT_SECRET must be at least 32 characters long for security');
-    console.error(`  Current length: ${jwtSecret.length} characters`);
+    logger.error('FATAL: JWT_SECRET must be at least 32 characters long for security', { length: jwtSecret.length });
     process.exit(1);
   }
 
@@ -74,8 +74,7 @@ const validateProductionEnv = () => {
   const recommended = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASSWORD', 'SUPPORT_EMAIL', 'RECAPTCHA_SECRET_KEY'];
   const missingRecommended = recommended.filter(v => !process.env[v]);
   if (missingRecommended.length > 0) {
-    console.warn('WARNING: Missing recommended environment variables:');
-    missingRecommended.forEach(v => console.warn(`  - ${v}`));
+    logger.warn('Missing recommended environment variables', { missing: missingRecommended });
   }
 };
 
@@ -95,7 +94,7 @@ const getAllowedOrigins = (): string[] => {
   // In production, CORS_ORIGINS is required
   if (isProduction) {
     if (!process.env.CORS_ORIGINS) {
-      console.error('FATAL: CORS_ORIGINS environment variable is required in production');
+      logger.error('FATAL: CORS_ORIGINS environment variable is required in production');
       process.exit(1);
     }
     return process.env.CORS_ORIGINS.split(',').map(o => o.trim());
@@ -169,6 +168,7 @@ app.use('/api/', apiLimiter); // Apply to all other API routes
 app.use('/api/users', usersRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/checkouts', checkoutRoutes);
+app.use('/api/projects', projectTeamRoutes); // Project team management routes - MUST be before projectRoutes
 app.use('/api/projects', projectRoutes);
 app.use('/api/timesheets', timesheetRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
@@ -196,7 +196,7 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Error:', err);
+  logger.error('Unhandled error', { error: err.message, path: req.path });
   res.status(err.status || 500).json({
     error: err.message || 'Internal server error',
   });
@@ -207,7 +207,7 @@ const startServer = async () => {
   try {
     // Initialize database connection
     await initializeDatabase();
-    console.log('✅ Database initialized successfully');
+    logger.info('Database initialized successfully');
 
     // Start exchange rate scheduler (auto-imports rates daily at 5 PM MYT)
     startExchangeRateScheduler();
@@ -217,21 +217,15 @@ const startServer = async () => {
 
     // Start server and store reference for graceful shutdown
     server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`
-╔═══════════════════════════════════════════════════════╗
-║                                                       ║
-║   🚀 MyCAE Equipment Tracker API Server              ║
-║                                                       ║
-║   Server running on: http://localhost:${PORT}       ║
-║   Environment: ${process.env.NODE_ENV || 'development'}                    ║
-║   Database: MySQL                                     ║
-║   Health check: /api/health                           ║
-║                                                       ║
-╚═══════════════════════════════════════════════════════╝
-      `);
+      logger.info(`Server started successfully`, {
+        port: PORT,
+        environment: process.env.NODE_ENV || 'development',
+        database: 'MySQL',
+        healthCheck: '/api/health'
+      });
     });
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
+    logger.error('Failed to start server', { error });
     process.exit(1);
   }
 };
@@ -244,44 +238,44 @@ let server: http.Server | null = null;
  * Properly closes all connections and stops schedulers
  */
 const gracefulShutdown = async (signal: string) => {
-  console.log(`\n${signal} received: Starting graceful shutdown...`);
+  logger.info(`${signal} received: Starting graceful shutdown...`);
 
   // Set a timeout for force exit
   const forceExitTimeout = setTimeout(() => {
-    console.error('Graceful shutdown timed out, forcing exit');
+    logger.error('Graceful shutdown timed out, forcing exit');
     process.exit(1);
   }, 30000); // 30 seconds timeout
 
   try {
     // 1. Stop accepting new connections
     if (server) {
-      console.log('Closing HTTP server...');
+      logger.info('Closing HTTP server...');
       await new Promise<void>((resolve, reject) => {
         server!.close((err: Error | undefined) => {
           if (err) reject(err);
           else resolve();
         });
       });
-      console.log('HTTP server closed');
+      logger.info('HTTP server closed');
     }
 
     // 2. Stop scheduled tasks
-    console.log('Stopping scheduled tasks...');
+    logger.info('Stopping scheduled tasks...');
     stopExchangeRateScheduler();
     stopMaintenanceReminderScheduler();
 
     // 3. Close database connections
     if (AppDataSource.isInitialized) {
-      console.log('Closing database connections...');
+      logger.info('Closing database connections...');
       await AppDataSource.destroy();
-      console.log('Database connections closed');
+      logger.info('Database connections closed');
     }
 
     clearTimeout(forceExitTimeout);
-    console.log('Graceful shutdown completed');
+    logger.info('Graceful shutdown completed');
     process.exit(0);
   } catch (error) {
-    console.error('Error during graceful shutdown:', error);
+    logger.error('Error during graceful shutdown', { error });
     clearTimeout(forceExitTimeout);
     process.exit(1);
   }
@@ -293,12 +287,12 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
+  logger.error('Uncaught Exception', { error });
   gracefulShutdown('uncaughtException');
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  logger.error('Unhandled Rejection', { reason });
 });
 
 // Start the server

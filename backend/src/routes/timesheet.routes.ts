@@ -5,6 +5,7 @@ import { Timesheet } from '../entities/Timesheet';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { UserRole } from '../entities/User';
 import { body, validationResult } from 'express-validator';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
@@ -100,8 +101,8 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       offset: pagination.offset,
     });
   } catch (error: any) {
-    console.error('Error fetching timesheets:', error);
-    res.status(500).json({ error: 'Failed to fetch timesheets' });
+    logger.error('Error deleting timesheet', { error });
+    res.status(500).json({ error: 'Failed to delete timesheet' });
   }
 });
 

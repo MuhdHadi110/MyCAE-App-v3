@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt, { SignOptions, JwtPayload } from 'jsonwebtoken';
 import { UserRole } from '../entities/User';
+import { logger } from '../utils/logger';
 
 // Extended JWT payload interface with our custom fields
 interface CustomJWTPayload extends JwtPayload {
@@ -40,7 +41,7 @@ export const authenticate = (
     const secret = process.env.JWT_SECRET;
 
     if (!secret) {
-      console.error('JWT_SECRET environment variable is not set');
+      logger.error('JWT_SECRET environment variable is not set');
       return res.status(500).json({ error: 'Server configuration error' });
     }
 

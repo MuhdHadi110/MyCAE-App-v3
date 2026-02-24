@@ -1,4 +1,5 @@
 import { httpClient, api } from './http-client';
+import { logger } from '../lib/logger';
 
 /**
  * Authentication Service
@@ -31,12 +32,11 @@ class AuthService {
    * Login user
    */
   async login(email: string, password: string, captchaToken?: string) {
-    console.log('🔵 AuthService: Sending login request', { email, hasCaptcha: !!captchaToken });
+    logger.debug('AuthService: Sending login request', { hasCaptcha: !!captchaToken });
 
     try {
       const response = await api.post('/auth/login', { email, password, captchaToken });
-      console.log('🟢 AuthService: Login response received', response);
-      console.log('🟢 AuthService: Response data', response.data);
+      logger.debug('AuthService: Login response received', { status: response.status });
 
       // Validate response structure
       if (!response?.data) {
@@ -44,21 +44,21 @@ class AuthService {
       }
 
       if (!response.data.token) {
-        console.warn('⚠️ AuthService: No token in response!');
+        logger.warn('AuthService: No token in response');
         throw new Error('Server did not return authentication token');
       }
 
       if (!response.data.user) {
-        console.warn('⚠️ AuthService: No user data in response!');
+        logger.warn('AuthService: No user data in response');
         throw new Error('Server did not return user data');
       }
 
-      console.log('🟢 AuthService: Token found, setting auth token');
+      logger.debug('AuthService: Token found, setting auth token');
       httpClient.setAuthToken(response.data.token);
 
       return response.data;
     } catch (error) {
-      console.error('🔴 AuthService: Login failed', error);
+      logger.axiosError('AuthService: Login failed', error);
       throw error;
     }
   }

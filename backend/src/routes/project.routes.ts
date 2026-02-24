@@ -293,7 +293,7 @@ router.post(
         status: ProjectStatus.PRE_LIM, // Always start with pre-lim status
         billing_type: req.body.billingType === 'lump_sum' ? BillingType.LUMP_SUM : BillingType.HOURLY,
         planned_hours: req.body.plannedHours || 0,
-        daily_rate: req.body.hourlyRate || null, // Map hourlyRate from frontend to daily_rate
+        hourly_rate: req.body.hourlyRate || null, // Hourly rate for the project
         actual_hours: 0,
         lead_engineer_id: leadEngineerUserId || null,
         manager_id: managerUserId,
@@ -490,6 +490,7 @@ router.put(
 
       if (req.body.title !== undefined) updates.title = req.body.title;
       if (req.body.plannedHours !== undefined) updates.planned_hours = req.body.plannedHours;
+      if (req.body.hourlyRate !== undefined) updates.hourly_rate = req.body.hourlyRate;
       if (req.body.categories !== undefined) updates.categories = req.body.categories;
       if (req.body.description !== undefined) updates.description = req.body.description;
       if (req.body.status !== undefined) updates.status = req.body.status;
@@ -585,19 +586,32 @@ router.delete(
         }
       }
 
-      // Delete PO file if exists
-      if (project.po_file_url) {
-        deleteFile(project.po_file_url);
-      }
+      // Use transaction to ensure atomic deletion
+      await AppDataSource.transaction(async (transactionalEntityManager) => {
+        // Delete PO file if exists (outside transaction since it's filesystem)
+        if (project.po_file_url) {
+          deleteFile(project.po_file_url);
+        }
 
-      // Delete related timesheets first to avoid foreign key constraint
-      await AppDataSource.createQueryBuilder()
-        .delete()
-        .from('timesheets')
-        .where('project_id = :projectId', { projectId: req.params.id })
-        .execute();
+        // Delete related timesheets first to avoid foreign key constraint
+        await transactionalEntityManager
+          .createQueryBuilder()
+          .delete()
+          .from('timesheets')
+          .where('project_id = :projectId', { projectId: req.params.id })
+          .execute();
 
-      await projectRepo.remove(project);
+        // Delete project team members
+        await transactionalEntityManager
+          .createQueryBuilder()
+          .delete()
+          .from('project_team_members')
+          .where('project_id = :projectId', { projectId: req.params.id })
+          .execute();
+
+        // Finally delete the project
+        await transactionalEntityManager.remove(project);
+      });
 
       res.json({ message: 'Project deleted successfully' });
     } catch (error: any) {

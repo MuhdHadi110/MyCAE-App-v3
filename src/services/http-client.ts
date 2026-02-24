@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
+import { logger } from '../lib/logger';
 
 /**
  * Base HTTP Client
@@ -43,7 +44,7 @@ class HttpClient {
   constructor() {
     // API base URL - uses environment variable in production, Vite proxy in development
     const baseURL = import.meta.env.VITE_API_URL || '/api';
-    console.log('🔧 HTTP Client initialized with baseURL:', baseURL);
+    logger.debug('HTTP Client initialized', { baseURL });
 
     this.api = axios.create({
       baseURL,

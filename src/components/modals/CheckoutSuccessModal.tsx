@@ -31,48 +31,72 @@ export function CheckoutSuccessModal({
     // Create a simple print window with the barcode
     const printWindow = window.open('', '', 'width=400,height=300');
     if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Master Barcode - ${masterBarcode}</title>
-            <style>
-              body {
-                font-family: Arial, sans-serif;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                height: 100vh;
-                margin: 0;
-              }
-              .barcode {
-                font-size: 32px;
-                font-weight: bold;
-                font-family: monospace;
-                margin: 20px 0;
-                letter-spacing: 3px;
-              }
-              .label {
-                font-size: 14px;
-                color: #666;
-                margin-bottom: 10px;
-              }
-              .info {
-                font-size: 12px;
-                color: #999;
-                margin-top: 20px;
-              }
-            </style>
-          </head>
-          <body>
-            <div class="label">MASTER BARCODE</div>
-            <div class="barcode">${masterBarcode}</div>
-            <div class="info">${itemCount} items checked out</div>
-            ${expectedReturnDate ? `<div class="info">Return by: ${new Date(expectedReturnDate).toLocaleDateString()}</div>` : ''}
-          </body>
-        </html>
-      `);
+      // Sanitize data to prevent XSS
+      const sanitizeHtml = (str: string): string => {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      };
+
+      const safeBarcode = sanitizeHtml(masterBarcode);
+      const safeItemCount = sanitizeHtml(String(itemCount));
+      const safeReturnDate = expectedReturnDate 
+        ? sanitizeHtml(new Date(expectedReturnDate).toLocaleDateString())
+        : '';
+
+      // Build DOM safely instead of using document.write with template literals
+      printWindow.document.open();
+      printWindow.document.write('<!DOCTYPE html><html><head><title>Master Barcode</title></head><body></body></html>');
       printWindow.document.close();
+
+      const doc = printWindow.document;
+      const body = doc.body;
+      
+      // Apply styles
+      body.style.fontFamily = 'Arial, sans-serif';
+      body.style.display = 'flex';
+      body.style.flexDirection = 'column';
+      body.style.alignItems = 'center';
+      body.style.justifyContent = 'center';
+      body.style.height = '100vh';
+      body.style.margin = '0';
+
+      // Create label
+      const label = doc.createElement('div');
+      label.textContent = 'MASTER BARCODE';
+      label.style.fontSize = '14px';
+      label.style.color = '#666';
+      label.style.marginBottom = '10px';
+      body.appendChild(label);
+
+      // Create barcode
+      const barcode = doc.createElement('div');
+      barcode.textContent = safeBarcode;
+      barcode.style.fontSize = '32px';
+      barcode.style.fontWeight = 'bold';
+      barcode.style.fontFamily = 'monospace';
+      barcode.style.margin = '20px 0';
+      barcode.style.letterSpacing = '3px';
+      body.appendChild(barcode);
+
+      // Create info
+      const info = doc.createElement('div');
+      info.textContent = `${safeItemCount} items checked out`;
+      info.style.fontSize = '12px';
+      info.style.color = '#999';
+      info.style.marginTop = '20px';
+      body.appendChild(info);
+
+      // Add return date if present
+      if (safeReturnDate) {
+        const returnInfo = doc.createElement('div');
+        returnInfo.textContent = `Return by: ${safeReturnDate}`;
+        returnInfo.style.fontSize = '12px';
+        returnInfo.style.color = '#999';
+        returnInfo.style.marginTop = '10px';
+        body.appendChild(returnInfo);
+      }
+
       printWindow.focus();
       printWindow.print();
       printWindow.close();
