@@ -1,48 +1,182 @@
-# Logs
-logs
+# ============================================
+# MyCAE Tracker - Comprehensive Git Ignore
+# NEVER COMMIT THESE FILES TO PUBLIC REPO
+# ============================================
+
+# ============================================
+# 1. ENVIRONMENT FILES (SECRETS)
+# ============================================
+# All .env files contain passwords, API keys, and secrets
+.env
+.env.local
+.env.development
+.env.production
+.env.*.local
+.env.*
+!.env.example
+!.env.production.example
+
+# Backend environment files
+backend/.env
+backend/.env.*
+backend/.env.local
+backend/.env.development
+backend/.env.production
+backend-production.env
+backend/.env.production
+
+# Root environment files
+*.env
+env-template.txt
+ENV_TEMPLATE.txt
+env-*.txt
+
+# ============================================
+# 2. DATABASE FILES (BACKUPS & SCRIPTS)
+# ============================================
+# SQL files often contain data dumps with passwords
+*.sql
+!backend/src/migrations/*.sql
+*.sql.gz
+*.sql.zip
+mycae_tracker_backup.sql
+database-migration-*.sql
+backup*.sql
+
+# Database backup folders
+backups/
+database-backups/
+OLD MYCAETECH/
+OLD_*/
+backup*/
+
+# ============================================
+# 3. SSH KEYS & CERTIFICATES
+# ============================================
+# Private keys should NEVER be shared
+github_key
+github_key.pub
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+known_hosts
+.ssh/
+
+# ============================================
+# 4. BUILD ARTIFACTS & DEPLOYMENT PACKAGES
+# ============================================
+# Compiled/built files
+node_modules/
+dist/
+dist-ssr/
+build/
+*.local
+
+# Deployment packages (contain built files)
+*.zip
+!backend/src/migrations/*.zip
+deployment-package/
+deployment-ready/
+deploy-node20/
+MycaeTracker-*.zip
+backend-*.zip
+frontend-*.zip
+assets-*.zip
+avatars-*.zip
+backend/*.zip
+
+# ============================================
+# 5. LOGS
+# ============================================
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-
-# System files
-nul
-
-# Deployment package (build artifacts)
-deployment-package/frontend/assets/*
-deployment-package/frontend/*.svg
-deployment-package/frontend/*.png
-deployment-package/mycae_tracker_backup.sql
-
-# Environment files (contain secrets)
-.env
-.env.local
-.env.development
-.env.production
-.env*.local
-backend/.env
-backend/.env.*
-backend-production.env
-!backend/.env.production.example
-
-# Logs directory (created by Winston in production)
-logs/
 backend/logs/
 
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
+# ============================================
+# 6. SYSTEM FILES
+# ============================================
 .DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+.vscode/*
+!.vscode/extensions.json
+.idea/
+nul
+
+# ============================================
+# 7. TEMPORARY & CACHE FILES
+# ============================================
+*.tmp
+*.temp
+.cache/
+tmp/
+temp/
+
+# ============================================
+# 8. UPLOADED FILES (User Data)
+# ============================================
+# User uploads should not be in git
+uploads/
+backend/uploads/
+*.pdf
+*.jpg
+*.jpeg
+*.png
+!backend/src/assets/**/*.png
+!backend/src/assets/**/*.jpg
+!src/assets/**/*.png
+!src/assets/**/*.jpg
+!public/**/*.png
+!public/**/*.jpg
+
+# ============================================
+# 9. LOCAL CONFIGURATION
+# ============================================
+# Files specific to local development
+setup-local-db.bat
+setup-local-db.sh
+
+# ============================================
+# 10. DOCUMENTATION WITH INTERNAL DETAILS
+# ============================================
+# Some docs may have internal URLs or details
+.opencode/
+.claude/
+.cursor/
+.github/
+
+# Security guides that show what to fix
+COMPLETE-FIX-GUIDE.md
+FIX-PASSWORD-LOOP.md
+BUG_FIXES_SUMMARY.md
+CONSOLE_LOGGING_EXECUTION_SUMMARY.md
+
+# ============================================
+# 11. TEST FILES
+# ============================================
+*.test.js.snap
+coverage/
+.nyc_output/
+
+# ============================================
+# 12. DEPENDENCY LOCK FILES (Optional)
+# ============================================
+# Uncomment if you don't want lock files in repo
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
