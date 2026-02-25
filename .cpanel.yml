@@ -1,0 +1,20 @@
+---
+deployment:
+  tasks:
+    # Deploy Frontend to public_html
+    - export DEPLOYPATH=/home/mycaet40/public_html/
+    - /bin/cp -R dist/* $DEPLOYPATH
+    - /bin/cp dist/index.html $DEPLOYPATH
+    - /bin/cp -R dist/assets $DEPLOYPATH
+    
+    # Deploy Backend
+    - export BACKENDPATH=/home/mycaet40/
+    - /bin/cp -R backend/dist $BACKENDPATH
+    - /bin/cp backend/package.json $BACKENDPATH
+    - /bin/cp backend/package-lock.json $BACKENDPATH
+    
+    # Ensure .env file exists (don't overwrite existing)
+    - if [ ! -f $BACKENDPATH.env ]; then /bin/cp backend/.env.example $BACKENDPATH.env; fi
+    
+    # Restart Node.js application (if using cPanel's Node.js selector)
+    - if [ -f /home/mycaet40/tmp/restart.txt ]; then /bin/touch /home/mycaet40/tmp/restart.txt; fi
