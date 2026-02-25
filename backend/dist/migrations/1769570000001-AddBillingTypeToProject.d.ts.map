@@ -1,0 +1,1 @@
+{"version":3,"file":"1769570000001-AddBillingTypeToProject.d.ts","sourceRoot":"","sources":["../../src/migrations/1769570000001-AddBillingTypeToProject.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,kBAAkB,EAAE,WAAW,EAAe,MAAM,SAAS,CAAC;AAEvE,qBAAa,oCAAqC,YAAW,kBAAkB;IAChE,EAAE,CAAC,WAAW,EAAE,WAAW,GAAG,OAAO,CAAC,IAAI,CAAC;IAa3C,IAAI,CAAC,WAAW,EAAE,WAAW,GAAG,OAAO,CAAC,IAAI,CAAC;CAG3D"}
