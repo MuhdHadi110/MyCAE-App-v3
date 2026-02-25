@@ -77,8 +77,9 @@ node_modules/
 dist/
 dist-ssr/
 build/
-# But we NEED backend/dist for deployment
+# But we NEED dist folders for deployment
 !backend/dist/
+!dist/
 *.local
 
 # Deployment packages (contain built files)

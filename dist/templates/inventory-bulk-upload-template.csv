@@ -1,0 +1,5 @@
+title,sku,barcode,category,quantity,minimumStock,location,unitOfMeasure,cost,price,supplier,status,notes,lastCalibratedDate
+Example Laptop,LAP-001,1234567890123,Electronics,10,5,Warehouse A,Unit,500.00,799.99,Dell,Active,High-performance laptop for office use,
+Example Printer,PRT-001,9876543210987,Office Supplies,5,2,Office Storage Room,Unit,200.00,349.99,HP,Active,Color laser printer,
+Example Paper Box,PAP-001,1112223334445,Office Supplies,100,20,Storage Closet,Box,5.00,12.99,Staples,Active,A4 size paper 500 sheets per box,
+Calibrated Item,CAL-001,9998887776665,Test Equipment,1,0,Lab Bench,Unit,1000.00,1500.99,Fluke,Active,Recently calibrated equipment,2025-01-15
