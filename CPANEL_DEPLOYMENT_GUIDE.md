@@ -72,11 +72,11 @@ NODE_ENV=production
 PORT=3001
 DB_HOST=localhost
 DB_PORT=3306
-DB_NAME=mycaet40_mycae_tracker
-DB_USER=mycaet40_mycaetracker_dbuser
+DB_NAME=your_database_name
+DB_USER=your_database_user
 DB_PASSWORD=YOUR_DB_PASSWORD
 JWT_SECRET=YOUR_JWT_SECRET
-FRONTEND_URL=https://mycaetech.com
+FRONTEND_URL=https://yourdomain.com
 ```
 
 **Note:** Copy values from your backed-up `.env` file
