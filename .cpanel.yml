@@ -7,8 +7,9 @@ deployment:
     - /bin/cp dist/index.html $DEPLOYPATH
     - /bin/cp -R dist/assets $DEPLOYPATH
     
-    # Deploy Backend
-    - export BACKENDPATH=/home/mycaet40/
+    # Deploy Backend to mycaetracker-backend subfolder
+    - export BACKENDPATH=/home/mycaet40/mycaetracker-backend/
+    - /bin/mkdir -p $BACKENDPATH
     - /bin/cp -R backend/dist $BACKENDPATH
     - /bin/cp backend/package.json $BACKENDPATH
     - /bin/cp backend/package-lock.json $BACKENDPATH
