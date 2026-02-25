@@ -18,7 +18,7 @@ DB_PASSWORD=YOUR_CPANEL_DB_PASSWORD_HERE   # Example: YourSecurePassword123!
 # JWT CONFIGURATION [KEEP AS IS]
 # ================================================
 # This is already secure - 128 characters, do not change
-JWT_SECRET=6aead50287f4504ef9f5fd658775a762c8246c4af334dca84cdc406a4bfc6eb3f591c2cb0040fdbaf2530b3fec20df61f7e69363ece3178fdac54eb749c36aa3
+JWT_SECRET=GENERATE_A_NEW_128_CHARACTER_HEX_SECRET_HERE
 JWT_EXPIRES_IN=7d
 
 # ================================================

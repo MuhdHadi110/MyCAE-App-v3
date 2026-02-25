@@ -76,7 +76,7 @@ echo DB_USER=root
 echo DB_PASSWORD=root
 echo.
 echo # JWT Configuration
-echo JWT_SECRET=8efe12c0b4b7c38f1ff654c4602b72b5da853d95950e166f97eaafe589cdf9c6
+echo JWT_SECRET=GENERATE_YOUR_OWN_JWT_SECRET_HERE
 echo JWT_EXPIRES_IN=7d
 echo.
 echo # Server Configuration
