@@ -146,9 +146,9 @@ if (hasTempPassword) {
 1. **Make sure backend .env points to production:**
    ```env
    DB_HOST=localhost
-   DB_NAME=mycaet40_mycae_tracker
-   DB_USER=mycaet40_mycaetracker_dbuser
-   DB_PASSWORD=o172oo8173
+   DB_NAME=your_database_name
+   DB_USER=your_database_user
+   DB_PASSWORD=YOUR_DB_PASSWORD_HERE
    ```
 
 2. **Run the smart fix:**
