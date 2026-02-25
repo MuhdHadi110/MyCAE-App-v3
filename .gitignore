@@ -24,6 +24,7 @@ deployment-package/mycae_tracker_backup.sql
 .env*.local
 backend/.env
 backend/.env.*
+backend-production.env
 !backend/.env.production.example
 
 # Logs directory (created by Winston in production)
