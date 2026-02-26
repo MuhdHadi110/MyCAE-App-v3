@@ -15,6 +15,38 @@ import { upload, generateFileUrl } from '../utils/fileUpload';
 import path from 'path';
 import fs from 'fs';
 import { logger } from '../utils/logger';
+import multer from 'multer';
+
+// Configure multer for invoice uploads
+const invoicesUploadDir = path.join(__dirname, '../../uploads/invoices');
+if (!fs.existsSync(invoicesUploadDir)) {
+  fs.mkdirSync(invoicesUploadDir, { recursive: true });
+}
+
+const invoiceStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, invoicesUploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, 'invoice-' + uniqueSuffix + ext);
+  }
+});
+
+const invoiceUpload = multer({
+  storage: invoiceStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['.pdf', '.png', '.jpg', '.jpeg', '.doc', '.docx'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowedTypes.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type'));
+    }
+  }
+});
 
 const router = Router();
 
@@ -811,7 +843,7 @@ router.post('/:id/mark-as-paid',
 router.post(
   '/:id/upload',
   authorize(UserRole.SENIOR_ENGINEER, UserRole.PRINCIPAL_ENGINEER, UserRole.MANAGER, UserRole.MANAGING_DIRECTOR, UserRole.ADMIN),
-  upload.single('file'),
+  invoiceUpload.single('file'),
   async (req: AuthRequest, res: Response) => {
     try {
       const { id } = req.params;
@@ -827,8 +859,10 @@ router.post(
         return res.status(400).json({ error: 'No file uploaded' });
       }
 
-      // Generate file URL
-      const fileUrl = generateFileUrl(req.file.filename, req);
+      // Generate file URL for invoices
+      const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+      const host = req.headers['host'] || req.get('host');
+      const fileUrl = `${protocol}://${host}/uploads/invoices/${req.file.filename}`;
 
       // Update invoice with file URL
       await invoiceRepo.update(id, { file_url: fileUrl });
@@ -882,7 +916,14 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response) => {
         return res.status(400).json({ error: 'Invalid filename format' });
       }
 
-      const uploadsDir = path.join(__dirname, '../../uploads');
+      // Determine the correct uploads directory based on file URL
+      let uploadsDir;
+      if (invoice.file_url.includes('/invoices/')) {
+        uploadsDir = path.join(__dirname, '../../uploads/invoices');
+      } else {
+        uploadsDir = path.join(__dirname, '../../uploads');
+      }
+      
       const filePath = path.join(uploadsDir, filename);
 
       // SECURITY: Ensure resolved path is within uploads directory
