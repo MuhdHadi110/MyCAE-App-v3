@@ -48,10 +48,39 @@ const express_validator_1 = require("express-validator");
 const invoice_pdf_service_1 = require("../services/invoice-pdf.service");
 const activity_service_1 = require("../services/activity.service");
 const email_service_1 = __importDefault(require("../services/email.service"));
-const fileUpload_1 = require("../utils/fileUpload");
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const logger_1 = require("../utils/logger");
+const multer_1 = __importDefault(require("multer"));
+// Configure multer for invoice uploads
+const invoicesUploadDir = path_1.default.join(__dirname, '../../uploads/invoices');
+if (!fs_1.default.existsSync(invoicesUploadDir)) {
+    fs_1.default.mkdirSync(invoicesUploadDir, { recursive: true });
+}
+const invoiceStorage = multer_1.default.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, invoicesUploadDir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = path_1.default.extname(file.originalname);
+        cb(null, 'invoice-' + uniqueSuffix + ext);
+    }
+});
+const invoiceUpload = (0, multer_1.default)({
+    storage: invoiceStorage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = ['.pdf', '.png', '.jpg', '.jpeg', '.doc', '.docx'];
+        const ext = path_1.default.extname(file.originalname).toLowerCase();
+        if (allowedTypes.includes(ext)) {
+            cb(null, true);
+        }
+        else {
+            cb(new Error('Invalid file type'));
+        }
+    }
+});
 const router = (0, express_1.Router)();
 // All invoice routes require authentication
 router.use(auth_1.authenticate);
@@ -658,7 +687,7 @@ router.post('/:id/mark-as-paid', (0, auth_1.authorize)(User_1.UserRole.ADMIN, Us
  * POST /api/invoices/:id/upload
  * Upload invoice document file
  */
-router.post('/:id/upload', (0, auth_1.authorize)(User_1.UserRole.SENIOR_ENGINEER, User_1.UserRole.PRINCIPAL_ENGINEER, User_1.UserRole.MANAGER, User_1.UserRole.MANAGING_DIRECTOR, User_1.UserRole.ADMIN), fileUpload_1.upload.single('file'), async (req, res) => {
+router.post('/:id/upload', (0, auth_1.authorize)(User_1.UserRole.SENIOR_ENGINEER, User_1.UserRole.PRINCIPAL_ENGINEER, User_1.UserRole.MANAGER, User_1.UserRole.MANAGING_DIRECTOR, User_1.UserRole.ADMIN), invoiceUpload.single('file'), async (req, res) => {
     try {
         const { id } = req.params;
         const invoiceRepo = database_1.AppDataSource.getRepository(Invoice_1.Invoice);
@@ -670,8 +699,10 @@ router.post('/:id/upload', (0, auth_1.authorize)(User_1.UserRole.SENIOR_ENGINEER
         if (!req.file) {
             return res.status(400).json({ error: 'No file uploaded' });
         }
-        // Generate file URL
-        const fileUrl = (0, fileUpload_1.generateFileUrl)(req.file.filename, req);
+        // Generate file URL for invoices
+        const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+        const host = req.headers['host'] || req.get('host');
+        const fileUrl = `${protocol}://${host}/uploads/invoices/${req.file.filename}`;
         // Update invoice with file URL
         await invoiceRepo.update(id, { file_url: fileUrl });
         res.status(200).json({
@@ -715,7 +746,14 @@ router.get('/:id/pdf', async (req, res) => {
                 logger_1.logger.error('Invalid filename detected', { filename });
                 return res.status(400).json({ error: 'Invalid filename format' });
             }
-            const uploadsDir = path_1.default.join(__dirname, '../../uploads');
+            // Determine the correct uploads directory based on file URL
+            let uploadsDir;
+            if (invoice.file_url.includes('/invoices/')) {
+                uploadsDir = path_1.default.join(__dirname, '../../uploads/invoices');
+            }
+            else {
+                uploadsDir = path_1.default.join(__dirname, '../../uploads');
+            }
             const filePath = path_1.default.join(uploadsDir, filename);
             // SECURITY: Ensure resolved path is within uploads directory
             const resolvedPath = path_1.default.resolve(filePath);
