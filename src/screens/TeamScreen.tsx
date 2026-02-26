@@ -314,14 +314,6 @@ export const TeamScreen: React.FC = () => {
                 </div>
               )}
 
-              {/* Stats */}
-              <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-primary-600">{member.activeProjects}</div>
-                  <div className="text-xs text-gray-600">Active Projects</div>
-                </div>
-              </div>
-
               {/* Action Buttons */}
               <div className="mt-4 flex gap-2">
                 {member.status === 'active' ? (
