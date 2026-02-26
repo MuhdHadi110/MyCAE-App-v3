@@ -1,13 +1,28 @@
 ---
 deployment:
   tasks:
+    # Set paths
     - export DEPLOYPATH=/home/mycaet40/public_html/
+    - export REPO_PATH=/home/mycaet40/repositories/MyCAE-App-v3
+    
+    # Build and deploy frontend
+    - cd $REPO_PATH
+    - npm install
+    - npm run build
     - /bin/cp -R dist/* $DEPLOYPATH
-    - /bin/cp dist/index.html $DEPLOYPATH
-    - /bin/cp -R dist/assets $DEPLOYPATH
+    
+    # Build backend
+    - cd $REPO_PATH/backend
+    - npm install
+    - npm run build
+    
+    # Copy backend files
     - export BACKENDPATH=/home/mycaet40/mycaetracker-backend/
     - /bin/mkdir -p $BACKENDPATH
-    - /bin/cp -R backend/dist $BACKENDPATH
-    - /bin/cp backend/package.json $BACKENDPATH
-    - /bin/cp backend/package-lock.json $BACKENDPATH
-    - if [ ! -f $BACKENDPATH.env ]; then /bin/cp backend/.env.example $BACKENDPATH.env; fi
+    - /bin/cp -R $REPO_PATH/backend/dist $BACKENDPATH
+    - /bin/cp $REPO_PATH/backend/package.json $BACKENDPATH
+    - /bin/cp $REPO_PATH/backend/package-lock.json $BACKENDPATH
+    - if [ ! -f $BACKENDPATH.env ]; then /bin/cp $REPO_PATH/backend/.env.example $BACKENDPATH.env; fi
+    
+    # Restart backend (optional - remove if not using PM2)
+    - /usr/local/bin/pm2 restart mycae-api 2>/dev/null || true
