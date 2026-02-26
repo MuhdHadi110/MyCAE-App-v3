@@ -902,10 +902,14 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response) => {
       // Extract filename from URL (handle both relative and absolute URLs)
       let filename = path.basename(invoice.file_url);
 
-      // Handle URLs like "/uploads/filename.pdf" or "http://domain/uploads/filename.pdf"
+      // Handle URLs like "/uploads/filename.pdf" or "http://domain/uploads/invoices/filename.pdf"
+      // The basename above should already extract just the filename, but if there's a subdirectory
+      // in the path after /uploads/, we need to handle that
       if (invoice.file_url.includes('/uploads/')) {
         const parts = invoice.file_url.split('/uploads/');
-        filename = parts[parts.length - 1];
+        const pathAfterUploads = parts[parts.length - 1];
+        // Extract just the filename, removing any subdirectory paths like "invoices/"
+        filename = path.basename(pathAfterUploads);
       }
 
       // SECURITY: Validate filename to prevent path traversal attacks
