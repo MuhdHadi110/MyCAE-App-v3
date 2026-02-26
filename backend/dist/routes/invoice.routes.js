@@ -225,8 +225,8 @@ router.post('/', [
             .where('invoice.project_code LIKE :code', { code: `%${project_code}%` })
             .getMany();
         const invoiceSequence = existingInvoices.length + 1;
-        const previousTotal = existingInvoices.reduce((sum, inv) => sum + Number(inv.percentage_of_total), 0);
-        const cumulativePercentage = previousTotal + Number(percentage_of_total);
+        const previousTotal = Math.round(existingInvoices.reduce((sum, inv) => sum + Number(inv.percentage_of_total), 0) * 100) / 100;
+        const cumulativePercentage = Math.round((previousTotal + Number(percentage_of_total)) * 100) / 100;
         // Create invoice
         const invoice = invoiceRepo.create({
             invoice_number,
@@ -339,9 +339,9 @@ router.put('/:id', (0, auth_1.authorize)(User_1.UserRole.ADMIN, User_1.UserRole.
                 .where('invoice.project_code LIKE :code', { code: `%${invoice.project_code}%` })
                 .andWhere('invoice.id != :id', { id: invoice.id })
                 .getMany();
-            const previousTotal = existingInvoices.reduce((sum, inv) => sum + Number(inv.percentage_of_total), 0);
-            invoice.percentage_of_total = parseFloat(percentageOfTotal);
-            invoice.cumulative_percentage = previousTotal + parseFloat(percentageOfTotal);
+            const previousTotal = Math.round(existingInvoices.reduce((sum, inv) => sum + Number(inv.percentage_of_total), 0) * 100) / 100;
+            invoice.percentage_of_total = Math.round(parseFloat(percentageOfTotal) * 100) / 100;
+            invoice.cumulative_percentage = Math.round((previousTotal + parseFloat(percentageOfTotal)) * 100) / 100;
         }
         if (remark !== undefined)
             invoice.remark = remark;

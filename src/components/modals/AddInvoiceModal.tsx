@@ -113,7 +113,7 @@ export const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ isOpen, onClos
     if (lastEditedField === 'percentage' && projectTotalValue > 0) {
       const percentage = parseFloat(formData.percentageOfTotal);
       if (!isNaN(percentage)) {
-        const calculatedAmount = (projectTotalValue * percentage) / 100;
+        const calculatedAmount = Math.round((projectTotalValue * percentage * 100)) / 10000;
         setFormData(prev => ({
           ...prev,
           amount: calculatedAmount.toFixed(2)
@@ -127,7 +127,7 @@ export const AddInvoiceModal: React.FC<AddInvoiceModalProps> = ({ isOpen, onClos
     if (lastEditedField === 'amount' && projectTotalValue > 0) {
       const amount = parseFloat(formData.amount);
       if (!isNaN(amount)) {
-        const calculatedPercentage = (amount / projectTotalValue) * 100;
+        const calculatedPercentage = Math.round((amount / projectTotalValue) * 100 * 100) / 100;
         setFormData(prev => ({
           ...prev,
           percentageOfTotal: calculatedPercentage.toFixed(2)

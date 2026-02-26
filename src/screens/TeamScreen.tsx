@@ -320,12 +320,6 @@ export const TeamScreen: React.FC = () => {
                   <div className="text-2xl font-bold text-primary-600">{member.activeProjects}</div>
                   <div className="text-xs text-gray-600">Active Projects</div>
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-gray-600">
-                    {member.totalHoursThisMonth}
-                  </div>
-                  <div className="text-xs text-gray-600">Hours This Month</div>
-                </div>
               </div>
 
               {/* Action Buttons */}
