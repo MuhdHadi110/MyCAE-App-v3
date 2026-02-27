@@ -15,6 +15,9 @@ export const SingleInventoryRow: React.FC<SingleInventoryRowProps> = ({
   onDeleteItem,
   canEdit,
 }) => {
+  const available = item.quantity - (item.checkedOut || 0);
+  const checkedOut = item.checkedOut || 0;
+
   return (
     <>
       <tr className="hover:bg-gray-50 transition-colors border-b border-gray-100">
@@ -33,6 +36,14 @@ export const SingleInventoryRow: React.FC<SingleInventoryRowProps> = ({
         <td className="px-4 py-3 text-center">
           <span className="font-medium text-gray-900">{item.quantity}</span>
           <span className="text-gray-500 text-xs block">qty</span>
+        </td>
+        <td className="px-4 py-3 text-center">
+          <span className="font-medium text-green-600">{available}</span>
+          <span className="text-gray-500 text-xs block">available</span>
+        </td>
+        <td className="px-4 py-3 text-center">
+          <span className="font-medium text-orange-600">{checkedOut}</span>
+          <span className="text-gray-500 text-xs block">checked out</span>
         </td>
         <td className="px-4 py-3">
           <span className="text-gray-700">{item.category}</span>

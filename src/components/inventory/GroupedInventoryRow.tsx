@@ -37,6 +37,10 @@ export const GroupedInventoryRow: React.FC<GroupedInventoryRowProps> = ({
   // Sort items by SKU for consistent display
   const sortedItems = [...items].sort((a, b) => a.sku.localeCompare(b.sku));
 
+  // Calculate total checked out and available for the group
+  const totalCheckedOut = items.reduce((sum, item) => sum + (item.checkedOut || 0), 0);
+  const totalAvailable = totalQuantity - totalCheckedOut;
+
   return (
     <>
       {/* Group Header Row */}
@@ -70,6 +74,14 @@ export const GroupedInventoryRow: React.FC<GroupedInventoryRowProps> = ({
               <div className="text-center">
                 <span className="block font-semibold text-gray-900">{totalQuantity}</span>
                 <span className="text-gray-500 text-xs">qty</span>
+              </div>
+              <div className="text-center">
+                <span className="block font-semibold text-green-600">{totalAvailable}</span>
+                <span className="text-gray-500 text-xs">available</span>
+              </div>
+              <div className="text-center">
+                <span className="block font-semibold text-orange-600">{totalCheckedOut}</span>
+                <span className="text-gray-500 text-xs">checked out</span>
               </div>
               <div className="text-center min-w-[120px]">
                 <span className="block text-gray-700">{category}</span>

@@ -666,16 +666,16 @@ export const InventoryScreen: React.FC = () => {
                   <p className="text-sm font-medium">{item.quantity} {item.unitOfMeasure}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Price</p>
-                  <p className="text-sm font-medium">{formatCurrency(item.price)}</p>
+                  <p className="text-xs text-gray-500">Available</p>
+                  <p className="text-sm font-medium text-green-600">{item.quantity - (item.checkedOut || 0)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Checked Out</p>
+                  <p className="text-sm font-medium text-orange-600">{item.checkedOut || 0}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Location</p>
                   <p className="text-sm font-medium">{item.location}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Category</p>
-                  <p className="text-sm font-medium">{item.category}</p>
                 </div>
               </div>
               <div className="flex items-center justify-between pt-3 border-t border-gray-100 mb-3">
@@ -727,6 +727,8 @@ export const InventoryScreen: React.FC = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Item</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700">SKUs</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700">Quantity</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700">Available</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700">Checked Out</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Category</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Location</th>
                   {canAdd && <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700">Actions</th>}

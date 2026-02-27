@@ -270,12 +270,12 @@ export const CheckoutsScreen: React.FC = () => {
                 {/* Header */}
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex-1">
-                    <p className="font-mono text-sm font-medium text-gray-900">
+                    <p className="font-semibold text-gray-900">
+                      {checkout.purpose || 'Untitled Checkout'}
+                    </p>
+                    <p className="font-mono text-sm text-gray-500 mt-0.5">
                       {checkout.masterBarcode}
                     </p>
-                    {checkout.purpose && (
-                      <p className="text-sm text-gray-600 mt-0.5">{checkout.purpose}</p>
-                    )}
                   </div>
                   {getStatusBadge(checkout.status)}
                 </div>
@@ -338,10 +338,9 @@ export const CheckoutsScreen: React.FC = () => {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th onClick={() => handleSort('masterBarcode')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Master Barcode {getSortIcon('masterBarcode')}</th>
+                  <th onClick={() => handleSort('purpose')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Purpose {getSortIcon('purpose')}</th>
                   <th onClick={() => handleSort('checkedOutBy')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Checked Out By {getSortIcon('checkedOutBy')}</th>
                   <th onClick={() => handleSort('items')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Items {getSortIcon('items')}</th>
-                  <th onClick={() => handleSort('purpose')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Purpose {getSortIcon('purpose')}</th>
                   <th onClick={() => handleSort('checkoutDate')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Checkout Date {getSortIcon('checkoutDate')}</th>
                   <th onClick={() => handleSort('dueDate')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Due Date {getSortIcon('dueDate')}</th>
                   <th onClick={() => handleSort('status')} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors">Status {getSortIcon('status')}</th>
@@ -358,9 +357,14 @@ export const CheckoutsScreen: React.FC = () => {
                       className="hover:bg-gray-50 transition-colors"
                     >
                       <td className="px-3 py-2">
-                        <p className="font-mono font-medium text-gray-900">
-                          {checkout.masterBarcode}
-                        </p>
+                        <div>
+                          <p className="font-medium text-gray-900">
+                            {checkout.purpose || 'Untitled Checkout'}
+                          </p>
+                          <p className="font-mono text-xs text-gray-500">
+                            {checkout.masterBarcode}
+                          </p>
+                        </div>
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-2">
@@ -379,11 +383,6 @@ export const CheckoutsScreen: React.FC = () => {
                               : `${checkout.totalItems}`}
                           </span>
                         </div>
-                      </td>
-                      <td className="px-3 py-2">
-                        <p className="text-gray-900 max-w-xs truncate">
-                          {checkout.purpose || '-'}
-                        </p>
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-2">

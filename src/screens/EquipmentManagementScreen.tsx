@@ -17,6 +17,7 @@ import { ItemSelector } from '../components/checkout/ItemSelector';
 import { CheckoutCart, CheckoutFormData } from '../components/checkout/CheckoutCart';
 import { ActiveCheckoutsList } from '../components/checkout/ActiveCheckoutsList';
 import { PartialReturnModal, ReturnData } from '../components/checkout/PartialReturnModal';
+import { CheckoutSuccessModal } from '../components/modals/CheckoutSuccessModal';
 
 type ViewMode = 'transactions' | 'locations';
 
@@ -62,6 +63,18 @@ export const EquipmentManagementScreen: React.FC = () => {
   const [selectedItems, setSelectedItems] = useState<InventoryItem[]>([]);
   const [showPartialReturnModal, setShowPartialReturnModal] = useState(false);
   const [selectedCheckout, setSelectedCheckout] = useState<ExtendedCheckout | null>(null);
+  
+  // Success modal state
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [lastCheckout, setLastCheckout] = useState<{
+    masterBarcode: string;
+    itemCount: number;
+    expectedReturnDate?: string;
+    purpose?: string;
+    engineerName?: string;
+    location?: string;
+    items?: Array<{ id: string; title: string; sku: string; quantity: number }>;
+  } | null>(null);
 
   const loading = checkoutsLoading || inventoryLoading;
 
@@ -359,14 +372,31 @@ export const EquipmentManagementScreen: React.FC = () => {
       };
       
       // Call API to create checkout
-      await inventoryService.createBulkCheckout(checkoutData);
+      const response = await inventoryService.createBulkCheckout(checkoutData);
       
-      toast.success(`Successfully checked out ${selectedItems.length} items!`);
+      // Store checkout data for success modal
+      setLastCheckout({
+        masterBarcode: response.masterBarcode,
+        itemCount: selectedItems.length,
+        expectedReturnDate: formData.expectedReturnDate,
+        purpose: formData.purpose,
+        engineerName: formData.engineerName,
+        location: formData.location,
+        items: selectedItems.map(item => ({
+          id: item.id,
+          title: item.title,
+          sku: item.sku,
+          quantity: item.quantity || 1,
+        })),
+      });
       
-      // Reset and close
+      // Reset checkout flow
       setShowCheckoutFlow(false);
       setCheckoutStep('select');
       setSelectedItems([]);
+      
+      // Show success modal
+      setShowSuccessModal(true);
       
       // Refresh data
       await fetchCheckouts();
@@ -431,6 +461,122 @@ export const EquipmentManagementScreen: React.FC = () => {
     } catch (error: any) {
       toast.error(error?.response?.data?.error || 'Failed to return items');
     }
+  };
+
+  // Handle print receipt
+  const handlePrintReceipt = (checkout: ExtendedCheckout) => {
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    if (!printWindow) {
+      toast.error('Unable to open print window. Please check your popup settings.');
+      return;
+    }
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Checkout Receipt - ${checkout.masterBarcode}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 40px; }
+          .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
+          .header h1 { margin: 0; color: #333; }
+          .header p { margin: 5px 0; color: #666; }
+          .section { margin-bottom: 20px; }
+          .section h2 { color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+          .detail-row { display: flex; justify-content: space-between; margin: 8px 0; }
+          .detail-label { font-weight: bold; color: #555; }
+          .detail-value { color: #333; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+          th { background-color: #f5f5f5; font-weight: bold; }
+          .barcode { text-align: center; margin: 30px 0; padding: 20px; border: 2px dashed #ccc; }
+          .barcode-text { font-family: monospace; font-size: 24px; font-weight: bold; letter-spacing: 3px; }
+          .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #666; font-size: 12px; }
+          @media print { body { margin: 20px; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>MyCAE Equipment Checkout</h1>
+          <p>Receipt / Packing List</p>
+        </div>
+
+        <div class="section">
+          <h2>Checkout Details</h2>
+          <div class="detail-row">
+            <span class="detail-label">Master Barcode:</span>
+            <span class="detail-value">${checkout.masterBarcode}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Date:</span>
+            <span class="detail-value">${new Date(checkout.checkedOutDate).toLocaleDateString()}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Project:</span>
+            <span class="detail-value">${checkout.purpose || 'N/A'}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Checked Out By:</span>
+            <span class="detail-value">${checkout.checkedOutBy}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Expected Return:</span>
+            <span class="detail-value">${checkout.expectedReturnDate ? new Date(checkout.expectedReturnDate).toLocaleDateString() : 'Not set'}</span>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Items</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>SKU/Barcode</th>
+                <th>Quantity</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${checkout.items.map(item => `
+                <tr>
+                  <td>${item.itemName}</td>
+                  <td>${item.barcode}</td>
+                  <td>${item.quantity}</td>
+                  <td>${item.returnStatus === 'checked-out' ? 'Checked Out' : 'Returned'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <p style="margin-top: 15px; text-align: right; font-weight: bold;">
+            Total Items: ${checkout.totalItems}
+          </p>
+        </div>
+
+        <div class="barcode">
+          <p style="margin: 0 0 10px 0; color: #666;">Master Barcode</p>
+          <div class="barcode-text">${checkout.masterBarcode}</div>
+        </div>
+
+        <div class="footer">
+          <p>Keep this receipt for your records. Use the master barcode to return items.</p>
+          <p>Generated on ${new Date().toLocaleString()}</p>
+        </div>
+
+        <script>
+          window.onload = function() {
+            window.print();
+            // Close window after print dialog (with delay to allow printing)
+            setTimeout(function() {
+              window.close();
+            }, 1000);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
   };
 
   // Get team members for checkout form
@@ -609,12 +755,12 @@ export const EquipmentManagementScreen: React.FC = () => {
                     <Card key={checkout.id} variant="bordered" padding="md">
                       <div className="flex justify-between items-start mb-3">
                         <div className="flex-1">
-                          <p className="font-mono text-sm font-medium text-gray-900">
+                          <p className="font-semibold text-gray-900">
+                            {checkout.purpose || 'Untitled Checkout'}
+                          </p>
+                          <p className="font-mono text-sm text-gray-500 mt-0.5">
                             {checkout.masterBarcode}
                           </p>
-                          {checkout.purpose && (
-                            <p className="text-sm text-gray-600 mt-0.5">{checkout.purpose}</p>
-                          )}
                         </div>
                         {getStatusBadge(checkout.status)}
                       </div>
@@ -674,6 +820,7 @@ export const EquipmentManagementScreen: React.FC = () => {
                   checkouts={displayCheckouts.filter(c => c.status !== 'received')}
                   onReturnAll={handleReturnAll}
                   onPartialReturn={handlePartialReturn}
+                  onPrintReceipt={handlePrintReceipt}
                   loading={loading}
                 />
               </div>
@@ -940,6 +1087,24 @@ export const EquipmentManagementScreen: React.FC = () => {
           }}
           onConfirm={handleConfirmPartialReturn}
         />
+
+        {/* Checkout Success Modal */}
+        {lastCheckout && (
+          <CheckoutSuccessModal
+            isOpen={showSuccessModal}
+            onClose={() => {
+              setShowSuccessModal(false);
+              setLastCheckout(null);
+            }}
+            masterBarcode={lastCheckout.masterBarcode}
+            itemCount={lastCheckout.itemCount}
+            expectedReturnDate={lastCheckout.expectedReturnDate}
+            purpose={lastCheckout.purpose}
+            engineerName={lastCheckout.engineerName}
+            location={lastCheckout.location}
+            items={lastCheckout.items}
+          />
+        )}
 
       </div>
     </div>

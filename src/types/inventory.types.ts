@@ -22,6 +22,7 @@ export interface InventoryItem {
   lastAction?: InventoryLastAction;
   lastActionDate?: string;
   lastActionBy?: string;
+  checkedOut?: number;
 }
 
 export interface Category {

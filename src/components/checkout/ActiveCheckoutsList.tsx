@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Package, User, MapPin, Calendar, Clock, RotateCcw, CheckCircle, AlertCircle } from 'lucide-react';
+import { Package, User, MapPin, Calendar, Clock, RotateCcw, CheckCircle, AlertCircle, Printer } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import type { ExtendedCheckout, CheckoutStatus } from '../../types/checkout.types';
 
@@ -7,6 +7,7 @@ interface ActiveCheckoutsListProps {
   checkouts: ExtendedCheckout[];
   onReturnAll: (checkoutId: string) => void;
   onPartialReturn: (checkout: ExtendedCheckout) => void;
+  onPrintReceipt?: (checkout: ExtendedCheckout) => void;
   loading?: boolean;
 }
 
@@ -14,6 +15,7 @@ export const ActiveCheckoutsList: React.FC<ActiveCheckoutsListProps> = ({
   checkouts,
   onReturnAll,
   onPartialReturn,
+  onPrintReceipt,
   loading,
 }) => {
   const [filter, setFilter] = useState<CheckoutStatus | 'all'>('all');
@@ -111,7 +113,8 @@ export const ActiveCheckoutsList: React.FC<ActiveCheckoutsListProps> = ({
                   <Package className="w-5 h-5 text-primary-600" />
                 </div>
                 <div>
-                  <p className="font-semibold text-gray-900">{checkout.masterBarcode}</p>
+                  <p className="font-semibold text-gray-900">{checkout.purpose || 'Untitled Checkout'}</p>
+                  <p className="text-sm text-gray-500 font-mono">{checkout.masterBarcode}</p>
                   <div className="flex items-center gap-2 mt-0.5">
                     {getStatusBadge(checkout.status)}
                     <span className="text-sm text-gray-500">
@@ -122,23 +125,35 @@ export const ActiveCheckoutsList: React.FC<ActiveCheckoutsListProps> = ({
                 </div>
               </div>
 
-              {/* Return Buttons - Only show if not fully returned */}
-              {checkout.status !== 'fully-returned' && (
-                <div className="flex gap-2">
+              {/* Action Buttons */}
+              <div className="flex gap-2">
+                {onPrintReceipt && (
                   <button
-                    onClick={() => onPartialReturn(checkout)}
-                    className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                    onClick={() => onPrintReceipt(checkout)}
+                    className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1"
+                    title="Print Receipt"
                   >
-                    Partial Return
+                    <Printer className="w-4 h-4" />
+                    Print
                   </button>
-                  <button
-                    onClick={() => onReturnAll(checkout.id)}
-                    className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-                  >
-                    Return All
-                  </button>
-                </div>
-              )}
+                )}
+                {checkout.status !== 'fully-returned' && (
+                  <>
+                    <button
+                      onClick={() => onPartialReturn(checkout)}
+                      className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Partial Return
+                    </button>
+                    <button
+                      onClick={() => onReturnAll(checkout.id)}
+                      className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                    >
+                      Return All
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Details */}

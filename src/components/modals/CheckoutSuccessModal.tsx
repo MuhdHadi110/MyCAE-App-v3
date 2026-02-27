@@ -2,12 +2,23 @@ import { CheckCircle, X, Copy, Printer, QrCode as QrCodeIcon } from 'lucide-reac
 import { Button } from '../ui/Button';
 import { useState } from 'react';
 
+interface CheckoutItem {
+  id: string;
+  title: string;
+  sku: string;
+  quantity: number;
+}
+
 interface CheckoutSuccessModalProps {
   isOpen: boolean;
   onClose: () => void;
   masterBarcode: string;
   itemCount: number;
   expectedReturnDate?: string;
+  purpose?: string;
+  engineerName?: string;
+  location?: string;
+  items?: CheckoutItem[];
 }
 
 export function CheckoutSuccessModal({
@@ -16,6 +27,10 @@ export function CheckoutSuccessModal({
   masterBarcode,
   itemCount,
   expectedReturnDate,
+  purpose,
+  engineerName,
+  location,
+  items,
 }: CheckoutSuccessModalProps) {
   const [copied, setCopied] = useState(false);
 
@@ -28,79 +43,119 @@ export function CheckoutSuccessModal({
   };
 
   const handlePrint = () => {
-    // Create a simple print window with the barcode
-    const printWindow = window.open('', '', 'width=400,height=300');
-    if (printWindow) {
-      // Sanitize data to prevent XSS
-      const sanitizeHtml = (str: string): string => {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-      };
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    if (!printWindow) return;
 
-      const safeBarcode = sanitizeHtml(masterBarcode);
-      const safeItemCount = sanitizeHtml(String(itemCount));
-      const safeReturnDate = expectedReturnDate 
-        ? sanitizeHtml(new Date(expectedReturnDate).toLocaleDateString())
-        : '';
+    const checkoutDate = new Date().toLocaleDateString();
+    const returnDate = expectedReturnDate ? new Date(expectedReturnDate).toLocaleDateString() : 'Not set';
 
-      // Build DOM safely instead of using document.write with template literals
-      printWindow.document.open();
-      printWindow.document.write('<!DOCTYPE html><html><head><title>Master Barcode</title></head><body></body></html>');
-      printWindow.document.close();
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Checkout Receipt - ${masterBarcode}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 40px; }
+          .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
+          .header h1 { margin: 0; color: #333; }
+          .header p { margin: 5px 0; color: #666; }
+          .section { margin-bottom: 20px; }
+          .section h2 { color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+          .detail-row { display: flex; justify-content: space-between; margin: 8px 0; }
+          .detail-label { font-weight: bold; color: #555; }
+          .detail-value { color: #333; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+          th { background-color: #f5f5f5; font-weight: bold; }
+          .barcode { text-align: center; margin: 30px 0; padding: 20px; border: 2px dashed #ccc; }
+          .barcode-text { font-family: monospace; font-size: 24px; font-weight: bold; letter-spacing: 3px; }
+          .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #666; font-size: 12px; }
+          @media print { body { margin: 20px; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>MyCAE Equipment Checkout</h1>
+          <p>Receipt / Packing List</p>
+        </div>
 
-      const doc = printWindow.document;
-      const body = doc.body;
-      
-      // Apply styles
-      body.style.fontFamily = 'Arial, sans-serif';
-      body.style.display = 'flex';
-      body.style.flexDirection = 'column';
-      body.style.alignItems = 'center';
-      body.style.justifyContent = 'center';
-      body.style.height = '100vh';
-      body.style.margin = '0';
+        <div class="section">
+          <h2>Checkout Details</h2>
+          <div class="detail-row">
+            <span class="detail-label">Master Barcode:</span>
+            <span class="detail-value">${masterBarcode}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Date:</span>
+            <span class="detail-value">${checkoutDate}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Project:</span>
+            <span class="detail-value">${purpose || 'N/A'}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Checked Out By:</span>
+            <span class="detail-value">${engineerName || 'N/A'}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Location:</span>
+            <span class="detail-value">${location || 'N/A'}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Expected Return:</span>
+            <span class="detail-value">${returnDate}</span>
+          </div>
+        </div>
 
-      // Create label
-      const label = doc.createElement('div');
-      label.textContent = 'MASTER BARCODE';
-      label.style.fontSize = '14px';
-      label.style.color = '#666';
-      label.style.marginBottom = '10px';
-      body.appendChild(label);
+        <div class="section">
+          <h2>Items</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>SKU</th>
+                <th>Quantity</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items?.map(item => `
+                <tr>
+                  <td>${item.title}</td>
+                  <td>${item.sku}</td>
+                  <td>${item.quantity}</td>
+                </tr>
+              `).join('') || `<tr><td colspan="3">${itemCount} items checked out</td></tr>`}
+            </tbody>
+          </table>
+          <p style="margin-top: 15px; text-align: right; font-weight: bold;">
+            Total Items: ${itemCount}
+          </p>
+        </div>
 
-      // Create barcode
-      const barcode = doc.createElement('div');
-      barcode.textContent = safeBarcode;
-      barcode.style.fontSize = '32px';
-      barcode.style.fontWeight = 'bold';
-      barcode.style.fontFamily = 'monospace';
-      barcode.style.margin = '20px 0';
-      barcode.style.letterSpacing = '3px';
-      body.appendChild(barcode);
+        <div class="barcode">
+          <p style="margin: 0 0 10px 0; color: #666;">Master Barcode</p>
+          <div class="barcode-text">${masterBarcode}</div>
+        </div>
 
-      // Create info
-      const info = doc.createElement('div');
-      info.textContent = `${safeItemCount} items checked out`;
-      info.style.fontSize = '12px';
-      info.style.color = '#999';
-      info.style.marginTop = '20px';
-      body.appendChild(info);
+        <div class="footer">
+          <p>Keep this receipt for your records. Use the master barcode to return items.</p>
+          <p>Generated on ${new Date().toLocaleString()}</p>
+        </div>
 
-      // Add return date if present
-      if (safeReturnDate) {
-        const returnInfo = doc.createElement('div');
-        returnInfo.textContent = `Return by: ${safeReturnDate}`;
-        returnInfo.style.fontSize = '12px';
-        returnInfo.style.color = '#999';
-        returnInfo.style.marginTop = '10px';
-        body.appendChild(returnInfo);
-      }
+        <script>
+          window.onload = function() {
+            window.print();
+            setTimeout(function() {
+              window.close();
+            }, 1000);
+          };
+        </script>
+      </body>
+      </html>
+    `;
 
-      printWindow.focus();
-      printWindow.print();
-      printWindow.close();
-    }
+    printWindow.document.write(printContent);
+    printWindow.document.close();
   };
 
   return (

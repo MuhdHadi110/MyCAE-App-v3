@@ -84,12 +84,12 @@ export function MyActiveCheckoutsWidget() {
                 {/* Header */}
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex-1">
-                    <p className="font-mono text-sm font-medium text-gray-900">
+                    <p className="font-semibold text-gray-900">
+                      {checkout.purpose || 'Untitled Checkout'}
+                    </p>
+                    <p className="font-mono text-xs text-gray-500 mt-0.5">
                       {checkout.masterBarcode}
                     </p>
-                    {checkout.purpose && (
-                      <p className="text-xs text-gray-600 mt-0.5">{checkout.purpose}</p>
-                    )}
                   </div>
                   {getStatusBadge(checkout.status)}
                 </div>
