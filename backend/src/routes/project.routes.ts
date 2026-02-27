@@ -161,6 +161,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 router.post(
   '/',
   authorize(
+    UserRole.ENGINEER,
     UserRole.SENIOR_ENGINEER,
     UserRole.PRINCIPAL_ENGINEER,
     UserRole.MANAGER,
@@ -624,8 +625,19 @@ router.delete(
 /**
  * POST /api/projects/:id/upload-po
  * Upload PO file for project
+ * Authorization: Senior Engineer and above only
  */
-router.post('/:id/upload-po', upload.single('poFile'), async (req: AuthRequest, res: Response) => {
+router.post(
+  '/:id/upload-po',
+  authorize(
+    UserRole.SENIOR_ENGINEER,
+    UserRole.PRINCIPAL_ENGINEER,
+    UserRole.MANAGER,
+    UserRole.MANAGING_DIRECTOR,
+    UserRole.ADMIN
+  ),
+  upload.single('poFile'),
+  async (req: AuthRequest, res: Response) => {
   try {
     const projectRepo = AppDataSource.getRepository(Project);
     const project = await projectRepo.findOne({ where: { id: req.params.id } });
@@ -664,8 +676,18 @@ router.post('/:id/upload-po', upload.single('poFile'), async (req: AuthRequest, 
 /**
  * DELETE /api/projects/:id/po-file
  * Delete PO file
+ * Authorization: Senior Engineer and above only
  */
-router.delete('/:id/po-file', async (req: AuthRequest, res: Response) => {
+router.delete(
+  '/:id/po-file',
+  authorize(
+    UserRole.SENIOR_ENGINEER,
+    UserRole.PRINCIPAL_ENGINEER,
+    UserRole.MANAGER,
+    UserRole.MANAGING_DIRECTOR,
+    UserRole.ADMIN
+  ),
+  async (req: AuthRequest, res: Response) => {
   try {
     const projectRepo = AppDataSource.getRepository(Project);
     const project = await projectRepo.findOne({ where: { id: req.params.id } });

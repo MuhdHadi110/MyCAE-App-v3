@@ -79,7 +79,7 @@ const getPermissionsForRole = (role: UserRole): RolePermissions => {
 
   return {
     // Project & Research
-    canAddProject: level >= ROLE_HIERARCHY['senior-engineer'], // Level 2+
+    canAddProject: level >= ROLE_HIERARCHY['engineer'], // Level 1+ (All engineers can create projects)
     canAddResearch: level >= ROLE_HIERARCHY.engineer, // Level 1+
     canAddBusinessContact: level >= ROLE_HIERARCHY.engineer, // Level 1+
 

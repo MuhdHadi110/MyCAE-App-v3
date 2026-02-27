@@ -145,7 +145,7 @@ router.get('/:id', async (req, res) => {
  * POST /api/projects
  * Create new project
  */
-router.post('/', (0, auth_1.authorize)(User_2.UserRole.SENIOR_ENGINEER, User_2.UserRole.PRINCIPAL_ENGINEER, User_2.UserRole.MANAGER, User_2.UserRole.MANAGING_DIRECTOR, User_2.UserRole.ADMIN), [
+router.post('/', (0, auth_1.authorize)(User_2.UserRole.ENGINEER, User_2.UserRole.SENIOR_ENGINEER, User_2.UserRole.PRINCIPAL_ENGINEER, User_2.UserRole.MANAGER, User_2.UserRole.MANAGING_DIRECTOR, User_2.UserRole.ADMIN), [
     (0, express_validator_1.body)('title').notEmpty().withMessage('Title is required'),
     (0, express_validator_1.body)('companyId').notEmpty().withMessage('Company is required'),
     (0, express_validator_1.body)('managerId').notEmpty().withMessage('Project Manager is required'),
@@ -516,8 +516,9 @@ router.delete('/:id', (0, auth_1.authorize)(User_2.UserRole.SENIOR_ENGINEER, Use
 /**
  * POST /api/projects/:id/upload-po
  * Upload PO file for project
+ * Authorization: Senior Engineer and above only
  */
-router.post('/:id/upload-po', fileUpload_1.upload.single('poFile'), async (req, res) => {
+router.post('/:id/upload-po', (0, auth_1.authorize)(User_2.UserRole.SENIOR_ENGINEER, User_2.UserRole.PRINCIPAL_ENGINEER, User_2.UserRole.MANAGER, User_2.UserRole.MANAGING_DIRECTOR, User_2.UserRole.ADMIN), fileUpload_1.upload.single('poFile'), async (req, res) => {
     try {
         const projectRepo = database_1.AppDataSource.getRepository(Project_1.Project);
         const project = await projectRepo.findOne({ where: { id: req.params.id } });
@@ -550,8 +551,9 @@ router.post('/:id/upload-po', fileUpload_1.upload.single('poFile'), async (req, 
 /**
  * DELETE /api/projects/:id/po-file
  * Delete PO file
+ * Authorization: Senior Engineer and above only
  */
-router.delete('/:id/po-file', async (req, res) => {
+router.delete('/:id/po-file', (0, auth_1.authorize)(User_2.UserRole.SENIOR_ENGINEER, User_2.UserRole.PRINCIPAL_ENGINEER, User_2.UserRole.MANAGER, User_2.UserRole.MANAGING_DIRECTOR, User_2.UserRole.ADMIN), async (req, res) => {
     try {
         const projectRepo = database_1.AppDataSource.getRepository(Project_1.Project);
         const project = await projectRepo.findOne({ where: { id: req.params.id } });
