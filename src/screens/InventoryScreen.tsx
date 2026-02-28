@@ -726,7 +726,6 @@ export const InventoryScreen: React.FC = () => {
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Item</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700">SKUs</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700">Quantity</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700">Available</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700">Checked Out</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Category</th>

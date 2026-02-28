@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Plus, Trash2, QrCode, Calendar } from 'lucide-react';
+import { X, Plus, Trash2, Calendar } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { generateMasterBarcode } from '../../lib/csvParser';
@@ -88,7 +88,7 @@ export function BulkCheckoutModal({ isOpen, onClose, onCheckout }: BulkCheckoutM
         <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gradient-to-r from-primary-50 to-primary-100">
           <div>
             <h2 className="text-xl font-semibold text-gray-900">Bulk Checkout</h2>
-            <p className="text-sm text-gray-600 mt-1">Check out multiple items with a single master barcode</p>
+            <p className="text-sm text-gray-600 mt-1">Check out multiple items at once</p>
           </div>
           <button
             onClick={handleClose}
@@ -100,20 +100,6 @@ export function BulkCheckoutModal({ isOpen, onClose, onCheckout }: BulkCheckoutM
 
         {/* Body */}
         <div className="p-6 space-y-6">
-          {/* Master Barcode */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-center gap-3">
-              <QrCode className="w-8 h-8 text-blue-600" />
-              <div>
-                <p className="text-sm font-medium text-blue-900">Master Barcode</p>
-                <p className="text-lg font-mono font-bold text-blue-700">{masterBarcode}</p>
-                <p className="text-xs text-blue-600 mt-1">
-                  Use this barcode to return all items together
-                </p>
-              </div>
-            </div>
-          </div>
-
           {/* Items List */}
           <div>
             <div className="flex justify-between items-center mb-3">

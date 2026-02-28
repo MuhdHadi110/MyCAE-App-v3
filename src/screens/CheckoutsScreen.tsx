@@ -34,7 +34,7 @@ export const CheckoutsScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('my-checkouts');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<CheckoutStatus | 'all'>('all');
-  const [sortColumn, setSortColumn] = useState<string>('masterBarcode');
+  const [sortColumn, setSortColumn] = useState<string>('purpose');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false);
   const [selectedCheckoutForCheckIn, setSelectedCheckoutForCheckIn] = useState<any>(null);
@@ -143,8 +143,6 @@ export const CheckoutsScreen: React.FC = () => {
     return [...baseCheckouts].sort((a, b) => {
       const getSortValue = (checkout: any) => {
         switch (sortColumn) {
-          case 'masterBarcode':
-            return checkout.masterBarcode.toLowerCase();
           case 'checkedOutBy':
             return checkout.checkedOutBy.toLowerCase();
           case 'items':
@@ -159,7 +157,7 @@ export const CheckoutsScreen: React.FC = () => {
             const statusOrder = { 'active': 0, 'partial-return': 1, 'overdue': 2, 'fully-returned': 3 };
             return statusOrder[checkout.status as keyof typeof statusOrder] ?? 4;
           default:
-            return checkout.masterBarcode.toLowerCase();
+            return (checkout.purpose || '').toLowerCase();
         }
       };
 
@@ -273,9 +271,6 @@ export const CheckoutsScreen: React.FC = () => {
                     <p className="font-semibold text-gray-900">
                       {checkout.purpose || 'Untitled Checkout'}
                     </p>
-                    <p className="font-mono text-sm text-gray-500 mt-0.5">
-                      {checkout.masterBarcode}
-                    </p>
                   </div>
                   {getStatusBadge(checkout.status)}
                 </div>
@@ -360,9 +355,6 @@ export const CheckoutsScreen: React.FC = () => {
                         <div>
                           <p className="font-medium text-gray-900">
                             {checkout.purpose || 'Untitled Checkout'}
-                          </p>
-                          <p className="font-mono text-xs text-gray-500">
-                            {checkout.masterBarcode}
                           </p>
                         </div>
                       </td>

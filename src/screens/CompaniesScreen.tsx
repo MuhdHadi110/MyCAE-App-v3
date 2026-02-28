@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { UserPlus, Plus, Mail, Phone, Briefcase, Trash2 } from 'lucide-react';
 import { useCompanyStore } from '../store/companyStore';
 import { Button } from '../components/ui/Button';
@@ -49,16 +49,18 @@ export const CompaniesScreen: React.FC = () => {
     setExpandedCompanyId(expandedCompanyId === companyId ? null : companyId);
   };
 
-  const filteredCompanies = companies.filter((company) => {
+  const filteredCompanies = useMemo(() => {
     const query = searchQuery.toLowerCase();
-    const companyMatch = company.name.toLowerCase().includes(query);
-    const contactMatch = company.contacts.some(
-      (contact) =>
-        contact.name.toLowerCase().includes(query) ||
-        contact.email.toLowerCase().includes(query)
-    );
-    return companyMatch || contactMatch;
-  });
+    return companies.filter((company) => {
+      const companyMatch = company.name.toLowerCase().includes(query);
+      const contactMatch = company.contacts.some(
+        (contact) =>
+          contact.name.toLowerCase().includes(query) ||
+          contact.email.toLowerCase().includes(query)
+      );
+      return companyMatch || contactMatch;
+    });
+  }, [companies, searchQuery]);
 
   return (
     <div className="min-h-full bg-gray-50">

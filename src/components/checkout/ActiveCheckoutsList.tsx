@@ -114,7 +114,6 @@ export const ActiveCheckoutsList: React.FC<ActiveCheckoutsListProps> = ({
                 </div>
                 <div>
                   <p className="font-semibold text-gray-900">{checkout.purpose || 'Untitled Checkout'}</p>
-                  <p className="text-sm text-gray-500 font-mono">{checkout.masterBarcode}</p>
                   <div className="flex items-center gap-2 mt-0.5">
                     {getStatusBadge(checkout.status)}
                     <span className="text-sm text-gray-500">

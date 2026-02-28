@@ -48,7 +48,7 @@ export const EquipmentManagementScreen: React.FC = () => {
   // Transaction view state
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<CheckoutStatus | 'all'>('all');
-  const [transactionSortColumn, setTransactionSortColumn] = useState<string>('masterBarcode');
+  const [transactionSortColumn, setTransactionSortColumn] = useState<string>('purpose');
   const [transactionSortDirection, setTransactionSortDirection] = useState<'asc' | 'desc'>('asc');
   
   // Location view state
@@ -302,8 +302,6 @@ export const EquipmentManagementScreen: React.FC = () => {
     return [...filteredCheckouts].sort((a, b) => {
       const getSortValue = (checkout: any) => {
         switch (transactionSortColumn) {
-          case 'masterBarcode':
-            return checkout.masterBarcode.toLowerCase();
           case 'checkedOutBy':
             return checkout.checkedOutBy.toLowerCase();
           case 'purpose':
@@ -316,7 +314,7 @@ export const EquipmentManagementScreen: React.FC = () => {
             const statusOrder = { 'active': 0, 'partial-return': 1, 'overdue': 2, 'fully-returned': 3 };
             return statusOrder[checkout.status] ?? 4;
           default:
-            return checkout.masterBarcode.toLowerCase();
+            return (checkout.purpose || '').toLowerCase();
         }
       };
 
@@ -475,7 +473,7 @@ export const EquipmentManagementScreen: React.FC = () => {
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Checkout Receipt - ${checkout.masterBarcode}</title>
+        <title>Checkout Receipt - ${checkout.purpose || 'Equipment Checkout'}</title>
         <style>
           body { font-family: Arial, sans-serif; margin: 40px; }
           .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
@@ -489,8 +487,6 @@ export const EquipmentManagementScreen: React.FC = () => {
           table { width: 100%; border-collapse: collapse; margin-top: 10px; }
           th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
           th { background-color: #f5f5f5; font-weight: bold; }
-          .barcode { text-align: center; margin: 30px 0; padding: 20px; border: 2px dashed #ccc; }
-          .barcode-text { font-family: monospace; font-size: 24px; font-weight: bold; letter-spacing: 3px; }
           .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #666; font-size: 12px; }
           @media print { body { margin: 20px; } }
         </style>
@@ -503,10 +499,6 @@ export const EquipmentManagementScreen: React.FC = () => {
 
         <div class="section">
           <h2>Checkout Details</h2>
-          <div class="detail-row">
-            <span class="detail-label">Master Barcode:</span>
-            <span class="detail-value">${checkout.masterBarcode}</span>
-          </div>
           <div class="detail-row">
             <span class="detail-label">Date:</span>
             <span class="detail-value">${new Date(checkout.checkedOutDate).toLocaleDateString()}</span>
@@ -531,7 +523,7 @@ export const EquipmentManagementScreen: React.FC = () => {
             <thead>
               <tr>
                 <th>Item</th>
-                <th>SKU/Barcode</th>
+                <th>SKU</th>
                 <th>Quantity</th>
                 <th>Status</th>
               </tr>
@@ -552,13 +544,8 @@ export const EquipmentManagementScreen: React.FC = () => {
           </p>
         </div>
 
-        <div class="barcode">
-          <p style="margin: 0 0 10px 0; color: #666;">Master Barcode</p>
-          <div class="barcode-text">${checkout.masterBarcode}</div>
-        </div>
-
         <div class="footer">
-          <p>Keep this receipt for your records. Use the master barcode to return items.</p>
+          <p>Keep this receipt for your records.</p>
           <p>Generated on ${new Date().toLocaleString()}</p>
         </div>
 
@@ -758,9 +745,6 @@ export const EquipmentManagementScreen: React.FC = () => {
                           <p className="font-semibold text-gray-900">
                             {checkout.purpose || 'Untitled Checkout'}
                           </p>
-                          <p className="font-mono text-sm text-gray-500 mt-0.5">
-                            {checkout.masterBarcode}
-                          </p>
                         </div>
                         {getStatusBadge(checkout.status)}
                       </div>
@@ -848,7 +832,7 @@ export const EquipmentManagementScreen: React.FC = () => {
                           <div>
                             <p className="font-medium text-gray-900">{checkout.purpose}</p>
                             <p className="text-sm text-gray-500">
-                              {checkout.masterBarcode} • {new Date(checkout.checkedOutDate).toLocaleDateString()}
+                              {new Date(checkout.checkedOutDate).toLocaleDateString()}
                             </p>
                           </div>
                         </div>

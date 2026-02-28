@@ -84,7 +84,7 @@ export const PartialReturnModal: React.FC<PartialReturnModalProps> = ({
         <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-primary-50 to-primary-100">
           <div>
             <h2 className="text-xl font-semibold text-gray-900">Partial Return</h2>
-            <p className="text-sm text-gray-600 mt-1">{checkout.masterBarcode}</p>
+            <p className="text-sm text-gray-600 mt-1">{checkout.purpose || 'Untitled Checkout'}</p>
           </div>
           <button
             onClick={onClose}

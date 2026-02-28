@@ -87,9 +87,6 @@ export function MyActiveCheckoutsWidget() {
                     <p className="font-semibold text-gray-900">
                       {checkout.purpose || 'Untitled Checkout'}
                     </p>
-                    <p className="font-mono text-xs text-gray-500 mt-0.5">
-                      {checkout.masterBarcode}
-                    </p>
                   </div>
                   {getStatusBadge(checkout.status)}
                 </div>

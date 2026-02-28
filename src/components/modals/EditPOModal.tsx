@@ -35,19 +35,19 @@ export const EditPOModal: React.FC<EditPOModalProps> = ({ isOpen, po, onClose, o
   useEffect(() => {
     if (isOpen && po) {
       setFormData({
-        poNumber: po.po_number || '',
-        projectCode: po.project_code || po.project?.project_code || '',
-        companyName: po.company_name || po.company?.name || '',
+        poNumber: po.poNumber || po.po_number || '',
+        projectCode: po.projectCode || po.project_code || po.project?.projectCode || po.project?.project_code || '',
+        companyName: po.clientName || po.company_name || po.company?.name || po.project?.company?.name || '',
         amount: po.amount?.toString() || '',
         currency: po.currency || 'MYR',
-        receivedDate: po.received_date || '',
-        dueDate: po.due_date || '',
+        receivedDate: po.receivedDate || po.received_date || '',
+        dueDate: po.dueDate || po.due_date || '',
         description: po.description || '',
         status: po.status || 'received',
-        fileUrl: po.file_url || '',
+        fileUrl: po.fileUrl || po.file_url || '',
       });
-      setExchangeRate(po.exchange_rate || 1.0);
-      setRateDate(po.received_date || '');
+      setExchangeRate(po.exchangeRate || po.exchange_rate || 1.0);
+      setRateDate(po.receivedDate || po.received_date || '');
     }
   }, [isOpen, po]);
 
