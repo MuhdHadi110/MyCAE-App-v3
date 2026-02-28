@@ -122,6 +122,24 @@ export const CheckoutCart: React.FC<CheckoutCartProps> = ({
       <div className="space-y-4">
         <h3 className="font-medium text-gray-900">Checkout Details</h3>
 
+        {/* Title (Purpose) */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            <FileText className="w-4 h-4 inline mr-1" />
+            Title *
+          </label>
+          <Input
+            type="text"
+            placeholder="e.g., Site calibration, Client visit, Lab testing"
+            value={formData.purpose}
+            onChange={(e) => {
+              setFormData((prev) => ({ ...prev, purpose: e.target.value }));
+              if (errors.purpose) setErrors((prev) => ({ ...prev, purpose: undefined }));
+            }}
+            error={errors.purpose}
+          />
+        </div>
+
         {/* Engineer Select */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -145,24 +163,6 @@ export const CheckoutCart: React.FC<CheckoutCartProps> = ({
           {errors.engineerId && (
             <p className="mt-1 text-sm text-red-600">{errors.engineerId}</p>
           )}
-        </div>
-
-        {/* Purpose */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            <FileText className="w-4 h-4 inline mr-1" />
-            Purpose *
-          </label>
-          <Input
-            type="text"
-            placeholder="e.g., Site calibration, Client visit, Lab testing"
-            value={formData.purpose}
-            onChange={(e) => {
-              setFormData((prev) => ({ ...prev, purpose: e.target.value }));
-              if (errors.purpose) setErrors((prev) => ({ ...prev, purpose: undefined }));
-            }}
-            error={errors.purpose}
-          />
         </div>
 
         {/* Location */}
