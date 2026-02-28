@@ -37,6 +37,7 @@ const validatePagination = (limit, offset) => ({
 router.get('/', async (req, res) => {
     try {
         const inventoryRepo = database_1.AppDataSource.getRepository(InventoryItem_1.InventoryItem);
+        const checkoutRepo = database_1.AppDataSource.getRepository(Checkout_1.Checkout);
         const { category, status, lowStock, search, limit = 100, offset = 0 } = req.query;
         const pagination = validatePagination(limit, offset);
         let query = inventoryRepo.createQueryBuilder('item');
@@ -56,8 +57,31 @@ router.get('/', async (req, res) => {
             .take(pagination.limit)
             .skip(pagination.offset)
             .getManyAndCount();
+        // Get checked out quantities for all items
+        const itemIds = items.map(item => item.id);
+        let checkedOutMap = new Map();
+        if (itemIds.length > 0) {
+            const checkouts = await checkoutRepo
+                .createQueryBuilder('checkout')
+                .select('checkout.item_id', 'itemId')
+                .addSelect('SUM(checkout.quantity - checkout.returned_quantity)', 'checkedOut')
+                .where('checkout.item_id IN (:...itemIds)', { itemIds })
+                .andWhere('checkout.status IN (:...statuses)', {
+                statuses: [Checkout_1.CheckoutStatus.CHECKED_OUT, Checkout_1.CheckoutStatus.PARTIAL_RETURN]
+            })
+                .groupBy('checkout.item_id')
+                .getRawMany();
+            checkouts.forEach((checkout) => {
+                checkedOutMap.set(checkout.itemId, parseInt(checkout.checkedOut) || 0);
+            });
+        }
+        // Add checkedOut field to each item
+        const itemsWithCheckedOut = items.map(item => ({
+            ...item,
+            checkedOut: checkedOutMap.get(item.id) || 0
+        }));
         res.json({
-            data: items,
+            data: itemsWithCheckedOut,
             total,
             limit: pagination.limit,
             offset: pagination.offset,
