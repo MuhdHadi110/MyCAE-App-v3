@@ -3,6 +3,7 @@ import { Calendar, AlertCircle } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { ItemSelectorDropdown } from './ItemSelectorDropdown';
 import { useInventoryStore } from '../../store/inventoryStore';
 import { useScheduledMaintenanceStore } from '../../store/scheduledMaintenanceStore';
 import {
@@ -142,29 +143,16 @@ export const AddScheduledMaintenanceModal: React.FC<AddScheduledMaintenanceModal
     >
       <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {/* Item Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Equipment/Item *
-            </label>
-            <select
-              value={formData.item_id}
-              onChange={(e) => setFormData({ ...formData, item_id: e.target.value })}
-              disabled={!!editingSchedule || !!preselectedItemId}
-              className={`w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all ${
-                errors.item_id ? 'border-red-300' : 'border-gray-200'
-              } ${(editingSchedule || preselectedItemId) ? 'bg-gray-50 cursor-not-allowed' : ''}`}
-            >
-              <option value="">Select an item...</option>
-              {items.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.title} ({item.sku})
-                </option>
-              ))}
-            </select>
-            {errors.item_id && (
-              <p className="mt-1 text-sm text-red-600">{errors.item_id}</p>
-            )}
-          </div>
+          <ItemSelectorDropdown
+            items={items}
+            selectedItemId={formData.item_id}
+            onSelect={(item) => setFormData({ ...formData, item_id: item.id })}
+            label="Equipment/Item"
+            required
+            error={errors.item_id}
+            disabled={!!editingSchedule || !!preselectedItemId}
+            placeholder="Select equipment..."
+          />
 
           {/* Maintenance Type */}
           <div>

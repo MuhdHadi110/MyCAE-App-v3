@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Wrench, AlertCircle } from 'lucide-react';
 import { useMaintenanceStore } from '../../store/maintenanceStore';
 import { useInventoryStore } from '../../store/inventoryStore';
+import { ItemSelectorDropdown } from './ItemSelectorDropdown';
 import { toast } from 'react-hot-toast';
 import type { MaintenanceTicket } from '../../types/maintenance.types';
 import { logger } from '../../lib/logger';
@@ -279,21 +280,13 @@ export const NewMaintenanceTicketModal: React.FC<NewMaintenanceTicketModalProps>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Item */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Item (Optional)
-              </label>
-              <select
-                value={formData.itemId}
-                onChange={(e) => handleInputChange('itemId', e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              >
-                <option value="">Select an item</option>
-                {items.map(item => (
-                  <option key={item.id} value={item.id}>
-                    {item.title}
-                  </option>
-                ))}
-              </select>
+              <ItemSelectorDropdown
+                items={items}
+                selectedItemId={formData.itemId}
+                onSelect={(item) => handleInputChange('itemId', item.id)}
+                placeholder="Select an item..."
+                storageKey="recent-maintenance-items"
+              />
             </div>
 
             {/* Assigned To */}

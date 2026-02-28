@@ -21,6 +21,7 @@ export const SingleInventoryRow: React.FC<SingleInventoryRowProps> = ({
   return (
     <>
       <tr className="hover:bg-gray-50 transition-colors border-b border-gray-100">
+        {/* Item */}
         <td className="px-4 py-3">
           <div>
             <p className="font-medium text-gray-900">{item.title}</p>
@@ -29,28 +30,27 @@ export const SingleInventoryRow: React.FC<SingleInventoryRowProps> = ({
             )}
           </div>
         </td>
+        {/* SKUs */}
         <td className="px-4 py-3 text-center">
           <span className="font-medium text-gray-900">1</span>
-          <span className="text-gray-500 text-xs block">SKU</span>
         </td>
-        <td className="px-4 py-3 text-center">
-          <span className="font-medium text-gray-900">{item.quantity}</span>
-          <span className="text-gray-500 text-xs block">qty</span>
-        </td>
+        {/* Available */}
         <td className="px-4 py-3 text-center">
           <span className="font-medium text-green-600">{available}</span>
-          <span className="text-gray-500 text-xs block">available</span>
         </td>
+        {/* Checked Out */}
         <td className="px-4 py-3 text-center">
           <span className="font-medium text-orange-600">{checkedOut}</span>
-          <span className="text-gray-500 text-xs block">checked out</span>
         </td>
+        {/* Category */}
         <td className="px-4 py-3">
           <span className="text-gray-700">{item.category}</span>
         </td>
+        {/* Location */}
         <td className="px-4 py-3">
           <span className="text-gray-700">{item.location}</span>
         </td>
+        {/* Actions */}
         <td className="px-4 py-3 text-right">
           {canEdit && (
             <div className="flex gap-1 justify-end">

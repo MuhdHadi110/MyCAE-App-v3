@@ -1,5 +1,5 @@
 import React from 'react';
-import { Edit2, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Edit2, ChevronDown, ChevronRight } from 'lucide-react';
 import { CalibrationCell } from './CalibrationCell';
 import { Link } from 'react-router-dom';
 import type { InventoryItem } from '../../types/inventory.types';
@@ -24,8 +24,6 @@ export const GroupedInventoryRow: React.FC<GroupedInventoryRowProps> = ({
   title,
   supplier,
   items,
-  totalQuantity,
-  uniqueSKUs,
   category,
   location,
   isExpanded,
@@ -39,71 +37,73 @@ export const GroupedInventoryRow: React.FC<GroupedInventoryRowProps> = ({
 
   // Calculate total checked out and available for the group
   const totalCheckedOut = items.reduce((sum, item) => sum + (item.checkedOut || 0), 0);
-  const totalAvailable = totalQuantity - totalCheckedOut;
+  const totalAvailable = items.reduce((sum, item) => sum + (item.quantity - (item.checkedOut || 0)), 0);
 
   return (
     <>
       {/* Group Header Row */}
       <tr className="bg-gray-50 hover:bg-gray-100 transition-colors border-b border-gray-200">
-        <td className="px-4 py-3" colSpan={6}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={onToggle}
-                className="p-1 hover:bg-gray-200 rounded transition-colors"
-                aria-label={isExpanded ? 'Collapse group' : 'Expand group'}
-              >
-                {isExpanded ? (
-                  <ChevronDown className="w-5 h-5 text-gray-600" />
-                ) : (
-                  <ChevronRight className="w-5 h-5 text-gray-600" />
-                )}
-              </button>
-              <div>
-                <p className="font-semibold text-gray-900">{title}</p>
-                {supplier && (
-                  <p className="text-sm text-gray-500">{supplier}</p>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center gap-6 text-sm">
-              <div className="text-center">
-                <span className="block font-semibold text-gray-900">{uniqueSKUs}</span>
-                <span className="text-gray-500 text-xs">SKUs</span>
-              </div>
-              <div className="text-center">
-                <span className="block font-semibold text-gray-900">{totalQuantity}</span>
-                <span className="text-gray-500 text-xs">qty</span>
-              </div>
-              <div className="text-center">
-                <span className="block font-semibold text-green-600">{totalAvailable}</span>
-                <span className="text-gray-500 text-xs">available</span>
-              </div>
-              <div className="text-center">
-                <span className="block font-semibold text-orange-600">{totalCheckedOut}</span>
-                <span className="text-gray-500 text-xs">checked out</span>
-              </div>
-              <div className="text-center min-w-[120px]">
-                <span className="block text-gray-700">{category}</span>
-              </div>
-              <div className="text-center min-w-[100px]">
-                <span className="block text-gray-700">{location}</span>
-              </div>
+        {/* Item */}
+        <td className="px-4 py-3">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onToggle}
+              className="p-1 hover:bg-gray-200 rounded transition-colors"
+              aria-label={isExpanded ? 'Collapse group' : 'Expand group'}
+            >
+              {isExpanded ? (
+                <ChevronDown className="w-5 h-5 text-gray-600" />
+              ) : (
+                <ChevronRight className="w-5 h-5 text-gray-600" />
+              )}
+            </button>
+            <div>
+              <p className="font-semibold text-gray-900">{title}</p>
+              {supplier && (
+                <p className="text-sm text-gray-500">{supplier}</p>
+              )}
             </div>
           </div>
         </td>
+        {/* SKUs */}
+        <td className="px-4 py-3 text-center">
+          <span className="font-semibold text-gray-900">{items.length}</span>
+        </td>
+        {/* Available */}
+        <td className="px-4 py-3 text-center">
+          <span className="font-semibold text-green-600">{totalAvailable}</span>
+        </td>
+        {/* Checked Out */}
+        <td className="px-4 py-3 text-center">
+          <span className="font-semibold text-orange-600">{totalCheckedOut}</span>
+        </td>
+        {/* Category */}
+        <td className="px-4 py-3">
+          <span className="text-gray-700">{category}</span>
+        </td>
+        {/* Location */}
+        <td className="px-4 py-3">
+          <span className="text-gray-700">{location}</span>
+        </td>
+        {/* Actions */}
+        {canEdit && (
+          <td className="px-4 py-3 text-right">
+            <span className="text-gray-400 text-xs">Expand to edit</span>
+          </td>
+        )}
       </tr>
 
       {/* Expanded Detail Table */}
       {isExpanded && (
         <tr>
-          <td colSpan={6} className="px-4 py-0">
+          <td colSpan={7} className="px-4 py-0">
             <div className="bg-white border-t border-gray-100">
               <table className="w-full">
                 <thead className="bg-gray-50/50">
                   <tr>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">SKU</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Quantity</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Available</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Checked Out</th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Status</th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Last Calibrated</th>
                     <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Actions</th>
@@ -116,7 +116,10 @@ export const GroupedInventoryRow: React.FC<GroupedInventoryRowProps> = ({
                         {item.sku}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-700">
-                        {item.quantity}
+                        {item.quantity - (item.checkedOut || 0)}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-700">
+                        {item.checkedOut || 0}
                       </td>
                       <td className="px-4 py-2">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
