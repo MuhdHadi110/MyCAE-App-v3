@@ -1,5 +1,6 @@
 import { AppDataSource } from '../config/database';
 import { PurchaseOrder, POStatus } from '../entities/PurchaseOrder';
+import { Project, ProjectStatus } from '../entities/Project';
 import { CurrencyService } from './currency.service';
 import { Repository } from 'typeorm';
 
@@ -383,6 +384,7 @@ async getAllActivePOs(filters?: {
 
   /**
    * Delete PO
+   * Also reverts project status from 'ongoing' to 'pre-lim' if no POs remain
    */
   async deletePO(id: string): Promise<void> {
     const po = await this.poRepo.findOne({ where: { id } });
@@ -391,6 +393,8 @@ async getAllActivePOs(filters?: {
       throw new Error('Purchase order not found');
     }
 
+    const projectCode = po.project_code;
+
     // Delete associated file if exists
     if (po.file_url) {
       const { deleteFile } = require('../utils/fileUpload');
@@ -398,6 +402,25 @@ async getAllActivePOs(filters?: {
     }
 
     await this.poRepo.remove(po);
+
+    // Check if any POs remain for this project
+    const remainingPOs = await this.poRepo.count({
+      where: { project_code: projectCode }
+    });
+
+    // If no POs remain, revert project status from 'ongoing' to 'pre-lim'
+    if (remainingPOs === 0) {
+      const projectRepo = AppDataSource.getRepository(Project);
+      const project = await projectRepo.findOne({ where: { project_code: projectCode } });
+
+      if (project && project.status === ProjectStatus.ONGOING) {
+        console.log(`📋 Reverting project ${projectCode} status from ongoing to pre-lim (all POs deleted)`);
+        project.status = ProjectStatus.PRE_LIM;
+        project.po_received_date = undefined;
+        await projectRepo.save(project);
+        console.log(`✅ Project ${projectCode} status reverted to pre-lim`);
+      }
+    }
   }
 
   /**

@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PurchaseOrderService = void 0;
 const database_1 = require("../config/database");
 const PurchaseOrder_1 = require("../entities/PurchaseOrder");
+const Project_1 = require("../entities/Project");
 const currency_service_1 = require("./currency.service");
 class PurchaseOrderService {
     constructor() {
@@ -304,18 +305,36 @@ class PurchaseOrderService {
     }
     /**
      * Delete PO
+     * Also reverts project status from 'ongoing' to 'pre-lim' if no POs remain
      */
     async deletePO(id) {
         const po = await this.poRepo.findOne({ where: { id } });
         if (!po) {
             throw new Error('Purchase order not found');
         }
+        const projectCode = po.project_code;
         // Delete associated file if exists
         if (po.file_url) {
             const { deleteFile } = require('../utils/fileUpload');
             deleteFile(po.file_url);
         }
         await this.poRepo.remove(po);
+        // Check if any POs remain for this project
+        const remainingPOs = await this.poRepo.count({
+            where: { project_code: projectCode }
+        });
+        // If no POs remain, revert project status from 'ongoing' to 'pre-lim'
+        if (remainingPOs === 0) {
+            const projectRepo = database_1.AppDataSource.getRepository(Project_1.Project);
+            const project = await projectRepo.findOne({ where: { project_code: projectCode } });
+            if (project && project.status === Project_1.ProjectStatus.ONGOING) {
+                console.log(`📋 Reverting project ${projectCode} status from ongoing to pre-lim (all POs deleted)`);
+                project.status = Project_1.ProjectStatus.PRE_LIM;
+                project.po_received_date = undefined;
+                await projectRepo.save(project);
+                console.log(`✅ Project ${projectCode} status reverted to pre-lim`);
+            }
+        }
     }
     /**
      * Calculate total revenue for project (active POs only)

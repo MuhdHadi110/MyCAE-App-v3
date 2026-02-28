@@ -494,7 +494,8 @@ router.put(
       if (req.body.hourlyRate !== undefined) updates.hourly_rate = req.body.hourlyRate;
       if (req.body.categories !== undefined) updates.categories = req.body.categories;
       if (req.body.description !== undefined) updates.description = req.body.description;
-      if (req.body.status !== undefined) updates.status = req.body.status;
+      // Status is now auto-managed by PO/Invoice operations - cannot be manually updated
+      // if (req.body.status !== undefined) updates.status = req.body.status;
       if (leadEngineerUserId !== undefined) updates.lead_engineer_id = leadEngineerUserId;
       if (managerUserId !== undefined) updates.manager_id = managerUserId;
       if (req.body.companyId !== undefined) updates.company_id = req.body.companyId;
@@ -513,27 +514,7 @@ router.put(
         updates.billing_type = req.body.billingType === 'lump_sum' ? BillingType.LUMP_SUM : BillingType.HOURLY;
       }
 
-      // Handle status-related date auto-updates
-      if (updates.status) {
-        const now = new Date();
-        switch (updates.status) {
-          case 'pre-lim':
-            if (!project.inquiry_date && !updates.inquiry_date) {
-              updates.inquiry_date = now;
-            }
-            break;
-          case 'ongoing':
-            if (!project.po_received_date && !updates.po_received_date) {
-              updates.po_received_date = now;
-            }
-            break;
-          case 'completed':
-            if (!project.completion_date && !updates.completion_date) {
-              updates.completion_date = now;
-            }
-            break;
-        }
-      }
+      // Status is auto-managed by PO/Invoice operations - status-related date updates removed
 
       projectRepo.merge(project, updates);
       await projectRepo.save(project);
@@ -707,9 +688,25 @@ router.delete(
     project.po_file_url = undefined;
     await projectRepo.save(project);
 
+    // Check if any POs remain for this project in the purchase_orders table
+    const poRepo = AppDataSource.getRepository(PurchaseOrder);
+    const remainingPOs = await poRepo.count({
+      where: { project_code: project.project_code }
+    });
+
+    // If no POs remain, revert project status from 'ongoing' to 'pre-lim'
+    if (remainingPOs === 0 && project.status === ProjectStatus.ONGOING) {
+      console.log(`📋 Reverting project ${project.project_code} status from ongoing to pre-lim (PO file deleted, no POs remain)`);
+      project.status = ProjectStatus.PRE_LIM;
+      project.po_received_date = undefined;
+      await projectRepo.save(project);
+      console.log(`✅ Project ${project.project_code} status reverted to pre-lim`);
+    }
+
     res.json({
       message: 'PO file deleted successfully',
       deleted,
+      statusReverted: remainingPOs === 0 && project.status === ProjectStatus.PRE_LIM,
     });
   } catch (error: any) {
     console.error('Error deleting PO file:', error);
@@ -720,6 +717,8 @@ router.delete(
 /**
  * PATCH /api/projects/:id/status
  * Update project status with related dates
+ * DEPRECATED: Status is now auto-managed by PO/Invoice operations
+ * This endpoint is kept for backwards compatibility but does nothing
  */
 router.patch(
   '/:id/status',
@@ -733,6 +732,7 @@ router.patch(
         return res.status(400).json({ errors: errors.array() });
       }
 
+      // Status is auto-managed - return current status without modification
       const projectRepo = AppDataSource.getRepository(Project);
       const project = await projectRepo.findOne({ where: { id: req.params.id } });
 
@@ -740,35 +740,8 @@ router.patch(
         return res.status(404).json({ error: 'Project not found' });
       }
 
-      const { status } = req.body;
-      const now = new Date();
-
-      // Update status
-      project.status = status as ProjectStatus;
-
-      // Set appropriate date based on status
-      switch (status) {
-        case 'pre-lim':
-          if (!project.inquiry_date) {
-            project.inquiry_date = now;
-          }
-          break;
-        case 'ongoing':
-          if (!project.po_received_date) {
-            project.po_received_date = now;
-          }
-          break;
-        case 'completed':
-          if (!project.completion_date) {
-            project.completion_date = now;
-          }
-          break;
-      }
-
-      await projectRepo.save(project);
-
       res.json({
-        message: 'Project status updated successfully',
+        message: 'Project status is auto-managed and cannot be manually updated. Status changes automatically based on PO and Invoice status.',
         project,
       });
     } catch (error: any) {

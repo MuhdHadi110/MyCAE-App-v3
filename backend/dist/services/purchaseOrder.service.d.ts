@@ -69,6 +69,7 @@ export declare class PurchaseOrderService {
     updatePO(id: string, updates: any): Promise<PurchaseOrder>;
     /**
      * Delete PO
+     * Also reverts project status from 'ongoing' to 'pre-lim' if no POs remain
      */
     deletePO(id: string): Promise<void>;
     /**

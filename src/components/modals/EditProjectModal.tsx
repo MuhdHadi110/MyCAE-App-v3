@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Calendar, CheckCircle2, Users, Building2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import type { Project, ProjectStatus } from '../../types/project.types';
+import type { Project } from '../../types/project.types';
 import { useTeamStore } from '../../store/teamStore';
 import { useCompanyStore } from '../../store/companyStore';
 import { ProjectTeam } from '../projects/ProjectTeam';
@@ -38,18 +38,6 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
   }, [project]);
 
   if (!isOpen || !project) return null;
-
-  const handleStatusChange = (newStatus: ProjectStatus) => {
-    const now = new Date().toISOString();
-    const updates: Partial<Project> = { status: newStatus };
-
-    // Auto-set inquiry date when status changes to preliminary
-    if (newStatus === 'pre-lim' && !formData.inquiryDate) {
-      updates.inquiryDate = now;
-    }
-
-    setFormData({ ...formData, ...updates });
-  };
 
   const handleSave = async () => {
     try {
@@ -243,20 +231,24 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
 
             {/* Status & Dates */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Status Dropdown */}
+              {/* Status Display (Read-only) */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Project Status {formData.status === 'pre-lim' && <span className="text-blue-600 text-xs">(Auto-updates on PO receipt)</span>}
+                  Project Status
                 </label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => handleStatusChange(e.target.value as ProjectStatus)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                >
-                  <option value="pre-lim">Preliminary</option>
-                  <option value="ongoing">Ongoing</option>
-                  <option value="completed">Completed</option>
-                </select>
+                <div className="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg flex items-center justify-between">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium ${
+                    formData.status === 'completed' 
+                      ? 'bg-green-100 text-green-800' 
+                      : formData.status === 'ongoing'
+                      ? 'bg-blue-100 text-blue-800'
+                      : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {formData.status === 'pre-lim' ? 'Preliminary' : 
+                     formData.status === 'ongoing' ? 'Ongoing' : 'Completed'}
+                  </span>
+                  <span className="text-xs text-gray-500">Auto-updates based on PO/Invoice status</span>
+                </div>
               </div>
 
               {/* Inquiry Date */}

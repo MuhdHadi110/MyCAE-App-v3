@@ -403,8 +403,36 @@ router.delete('/:id', (0, auth_1.authorize)(User_1.UserRole.SENIOR_ENGINEER, Use
         if (!invoice) {
             return res.status(404).json({ error: 'Invoice not found' });
         }
+        const projectCode = invoice.project_code;
         await invoiceRepo.remove(invoice);
-        res.json({ message: 'Invoice deleted successfully' });
+        // Check if project status needs to be reverted from completed to ongoing
+        // Extract first project code (in case of multiple like "J22006, J22007")
+        const primaryProjectCode = projectCode.split(',')[0].trim();
+        // Calculate cumulative percentage of remaining invoices
+        const remainingInvoices = await invoiceRepo
+            .createQueryBuilder('invoice')
+            .where('invoice.project_code LIKE :code', { code: `%${primaryProjectCode}%` })
+            .getMany();
+        const cumulativePercentage = remainingInvoices.reduce((sum, inv) => sum + Number(inv.percentage_of_total), 0);
+        let statusReverted = false;
+        // If cumulative percentage is less than 100% and project is completed, revert to ongoing
+        if (cumulativePercentage < 100) {
+            const projectRepo = database_1.AppDataSource.getRepository(Project_1.Project);
+            const project = await projectRepo.findOne({ where: { project_code: primaryProjectCode } });
+            if (project && project.status === Project_1.ProjectStatus.COMPLETED) {
+                logger_1.logger.info(`Reverting project ${primaryProjectCode} status from completed to ongoing (invoice deleted, cumulative: ${cumulativePercentage}%)`);
+                project.status = Project_1.ProjectStatus.ONGOING;
+                project.completion_date = undefined;
+                await projectRepo.save(project);
+                logger_1.logger.info(`Project ${primaryProjectCode} status reverted to ongoing`);
+                statusReverted = true;
+            }
+        }
+        res.json({
+            message: 'Invoice deleted successfully',
+            statusReverted,
+            cumulativePercentage,
+        });
     }
     catch (error) {
         logger_1.logger.error('Error deleting invoice', { error });
