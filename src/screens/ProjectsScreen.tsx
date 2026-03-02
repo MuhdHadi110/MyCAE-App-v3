@@ -505,11 +505,6 @@ export const ProjectsScreen: React.FC = () => {
                               {project.structureStats.totalStructures} structure{project.structureStats.totalStructures !== 1 ? 's' : ''}
                             </span>
                           )}
-                          {project.projectType === 'structure_child' && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                              Structure
-                            </span>
-                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">

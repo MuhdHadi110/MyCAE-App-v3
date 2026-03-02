@@ -171,10 +171,10 @@ export const StructureCreatorModal: React.FC<StructureCreatorModalProps> = ({
             <div>
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                 <FolderPlus className="w-6 h-6 text-amber-600" />
-                Add Structure
+                Add Project
               </h2>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Creating structure for{' '}
+                Creating project for{' '}
                 <span className="font-semibold text-amber-700 dark:text-amber-400">
                   {container.projectCode}
                 </span>
@@ -191,10 +191,10 @@ export const StructureCreatorModal: React.FC<StructureCreatorModalProps> = ({
           {/* Form */}
           <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
             <div className="space-y-6">
-              {/* Structure Code Display */}
+              {/* Project Code Display */}
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Structure Code
+                  Project Code
                 </label>
                 <div className="flex items-center gap-3">
                   <span className="text-2xl font-bold text-blue-700 dark:text-blue-400 font-mono">
@@ -212,7 +212,7 @@ export const StructureCreatorModal: React.FC<StructureCreatorModalProps> = ({
                   htmlFor="structureTitle"
                   className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
                 >
-                  Structure Title <span className="text-red-500">*</span>
+                  Project Title <span className="text-red-500">*</span>
                 </label>
                 <input
                   id="structureTitle"
@@ -369,7 +369,7 @@ export const StructureCreatorModal: React.FC<StructureCreatorModalProps> = ({
                 Cancel
               </Button>
               <Button type="submit" variant="primary" disabled={isLoading}>
-                {isLoading ? 'Creating...' : 'Create Structure'}
+                {isLoading ? 'Creating...' : 'Create Project'}
               </Button>
             </div>
           </form>
