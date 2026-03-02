@@ -527,8 +527,8 @@ export const ProjectsScreen: React.FC = () => {
                          teamMembers.find(tm => tm.userId === project.engineerId)?.name ||
                          'Unassigned'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex flex-col items-center gap-1">
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <div className="flex flex-col items-center gap-1 justify-center">
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                               project.status === 'pre-lim'
