@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const database_1 = require("../config/database");
 const Project_1 = require("../entities/Project");
+const structureStatus_service_1 = require("../services/structureStatus.service");
 const TeamMember_1 = require("../entities/TeamMember");
 const User_1 = require("../entities/User");
 const Company_1 = require("../entities/Company");
@@ -266,6 +267,10 @@ router.post('/', (0, auth_1.authorize)(User_2.UserRole.ENGINEER, User_2.UserRole
             parent_project_id: parentProjectId,
             is_variation_order: isVariationOrder,
             vo_number: voNumber,
+            // Structure container support
+            project_type: req.body.isStructureContainer
+                ? Project_1.ProjectType.STRUCTURE_CONTAINER
+                : (isVariationOrder ? Project_1.ProjectType.VARIATION_ORDER : Project_1.ProjectType.STANDARD),
             // completion_date will be set automatically when status changes to 'completed'
         });
         await projectRepo.save(project);
@@ -763,6 +768,226 @@ router.post('/:id/create-vo', (0, auth_1.authorize)(User_2.UserRole.SENIOR_ENGIN
     catch (error) {
         console.error('Error creating variation order:', error);
         res.status(500).json({ error: 'Failed to create variation order' });
+    }
+});
+/**
+ * POST /api/projects/:id/create-structure
+ * Create a new structure child for a container
+ * Auto-generates structure code (e.g., J25143_1, J25143_2)
+ */
+router.post('/:id/create-structure', (0, auth_1.authorize)(User_2.UserRole.SENIOR_ENGINEER, User_2.UserRole.PRINCIPAL_ENGINEER, User_2.UserRole.MANAGER, User_2.UserRole.MANAGING_DIRECTOR, User_2.UserRole.ADMIN), [
+    (0, express_validator_1.body)('title').notEmpty().withMessage('Title is required'),
+], async (req, res) => {
+    try {
+        const errors = (0, express_validator_1.validationResult)(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
+        }
+        const projectRepo = database_1.AppDataSource.getRepository(Project_1.Project);
+        const teamMemberRepo = database_1.AppDataSource.getRepository(TeamMember_1.TeamMember);
+        // Find container project
+        const container = await projectRepo.findOne({
+            where: { id: req.params.id },
+        });
+        if (!container) {
+            return res.status(404).json({ error: 'Container project not found' });
+        }
+        // Validate it's a structure container
+        if (container.project_type !== Project_1.ProjectType.STRUCTURE_CONTAINER) {
+            return res.status(400).json({
+                error: 'Project is not a structure container',
+                projectType: container.project_type,
+            });
+        }
+        // Generate structure code
+        const structureCode = await structureStatus_service_1.StructureStatusService.generateStructureCode(container.id);
+        // Check for duplicate
+        const existingStructure = await projectRepo.findOne({
+            where: { project_code: structureCode },
+        });
+        if (existingStructure) {
+            return res.status(400).json({
+                error: `Structure ${structureCode} already exists`,
+            });
+        }
+        // Resolve team member IDs
+        let managerUserId = req.body.managerId || container.manager_id;
+        let leadEngineerUserId = req.body.leadEngineerId || container.lead_engineer_id;
+        if (req.body.managerId) {
+            const manager = await teamMemberRepo.findOne({
+                where: { id: req.body.managerId },
+                relations: ['user']
+            });
+            if (manager && manager.user_id) {
+                managerUserId = manager.user_id;
+            }
+        }
+        if (req.body.leadEngineerId) {
+            const leadEngineer = await teamMemberRepo.findOne({
+                where: { id: req.body.leadEngineerId },
+                relations: ['user']
+            });
+            if (leadEngineer && leadEngineer.user_id) {
+                leadEngineerUserId = leadEngineer.user_id;
+            }
+        }
+        // Create structure child
+        const structure = projectRepo.create({
+            project_code: structureCode,
+            title: req.body.title,
+            company_id: req.body.companyId || container.company_id,
+            contact_id: req.body.contactId || container.contact_id,
+            status: Project_1.ProjectStatus.PRE_LIM,
+            billing_type: req.body.billingType === 'lump_sum' ? Project_1.BillingType.LUMP_SUM : Project_1.BillingType.HOURLY,
+            planned_hours: req.body.plannedHours || 0,
+            actual_hours: 0,
+            lead_engineer_id: leadEngineerUserId,
+            manager_id: managerUserId,
+            start_date: req.body.startDate ? new Date(req.body.startDate) : new Date(),
+            inquiry_date: new Date(),
+            description: req.body.description || null,
+            categories: req.body.workTypes || container.categories,
+            // Structure fields
+            parent_project_id: container.id,
+            project_type: Project_1.ProjectType.STRUCTURE_CHILD,
+            is_variation_order: false,
+            vo_number: undefined,
+        });
+        await projectRepo.save(structure);
+        // Sync container status (now has at least one structure)
+        await structureStatus_service_1.StructureStatusService.syncContainerStatus(container.id);
+        res.status(201).json({
+            message: 'Structure created successfully',
+            structure,
+            structureCode,
+            containerStatus: container.status,
+        });
+    }
+    catch (error) {
+        console.error('Error creating structure:', error);
+        res.status(500).json({ error: 'Failed to create structure' });
+    }
+});
+/**
+ * POST /api/projects/:id/convert-to-container
+ * Convert a standard project to structure container
+ * Requirements: No POs attached, not already a VO
+ */
+router.post('/:id/convert-to-container', (0, auth_1.authorize)(User_2.UserRole.SENIOR_ENGINEER, User_2.UserRole.PRINCIPAL_ENGINEER, User_2.UserRole.MANAGER, User_2.UserRole.MANAGING_DIRECTOR, User_2.UserRole.ADMIN), async (req, res) => {
+    try {
+        const projectRepo = database_1.AppDataSource.getRepository(Project_1.Project);
+        const purchaseOrderRepo = database_1.AppDataSource.getRepository(PurchaseOrder_1.PurchaseOrder);
+        const project = await projectRepo.findOne({
+            where: { id: req.params.id },
+        });
+        if (!project) {
+            return res.status(404).json({ error: 'Project not found' });
+        }
+        // Check if already a container or child
+        if (project.project_type === Project_1.ProjectType.STRUCTURE_CONTAINER) {
+            return res.status(400).json({ error: 'Project is already a structure container' });
+        }
+        if (project.project_type === Project_1.ProjectType.STRUCTURE_CHILD) {
+            return res.status(400).json({ error: 'Cannot convert a structure child to container' });
+        }
+        if (project.project_type === Project_1.ProjectType.VARIATION_ORDER) {
+            return res.status(400).json({ error: 'Cannot convert a variation order to container' });
+        }
+        // Check if has POs attached
+        const hasPOs = await purchaseOrderRepo.count({
+            where: { project_code: project.project_code }
+        });
+        if (hasPOs > 0) {
+            return res.status(400).json({
+                error: 'Cannot convert project with existing POs to container',
+                poCount: hasPOs,
+                message: 'Delete all POs first or create a new container project',
+            });
+        }
+        // Convert to container
+        project.project_type = Project_1.ProjectType.STRUCTURE_CONTAINER;
+        // Keep is_variation_order as false (backward compatibility)
+        project.is_variation_order = false;
+        await projectRepo.save(project);
+        res.json({
+            message: 'Project converted to structure container successfully',
+            project: {
+                id: project.id,
+                project_code: project.project_code,
+                title: project.title,
+                project_type: project.project_type,
+            },
+            nextSteps: [
+                'Use "Add Structure" to create J25143_1, J25143_2, etc.',
+                'Each structure will have its own PO and invoicing',
+                'Container status will auto-update based on structures',
+            ],
+        });
+    }
+    catch (error) {
+        console.error('Error converting to container:', error);
+        res.status(500).json({ error: 'Failed to convert project to container' });
+    }
+});
+/**
+ * GET /api/projects/:id/structure-stats
+ * Get statistics for a structure container
+ */
+router.get('/:id/structure-stats', async (req, res) => {
+    try {
+        const stats = await structureStatus_service_1.StructureStatusService.getContainerStats(req.params.id);
+        if (!stats) {
+            return res.status(404).json({ error: 'Container not found or not a structure container' });
+        }
+        res.json(stats);
+    }
+    catch (error) {
+        console.error('Error fetching structure stats:', error);
+        res.status(500).json({ error: 'Failed to fetch structure statistics' });
+    }
+});
+/**
+ * GET /api/projects/:id/structures
+ * Get all structure children for a container
+ */
+router.get('/:id/structures', async (req, res) => {
+    try {
+        const projectRepo = database_1.AppDataSource.getRepository(Project_1.Project);
+        const container = await projectRepo.findOne({
+            where: { id: req.params.id },
+        });
+        if (!container) {
+            return res.status(404).json({ error: 'Container not found' });
+        }
+        // Get all structure children
+        const structures = await projectRepo.find({
+            where: {
+                parent_project_id: container.id,
+                project_type: Project_1.ProjectType.STRUCTURE_CHILD,
+            },
+            relations: ['lead_engineer', 'manager', 'company', 'contact'],
+            order: { project_code: 'ASC' },
+        });
+        res.json({
+            container: {
+                id: container.id,
+                project_code: container.project_code,
+                title: container.title,
+                status: container.status,
+                project_type: container.project_type,
+            },
+            structures: structures.map(s => ({
+                ...s,
+                companyName: s.company?.name || null,
+                engineerName: s.lead_engineer?.name || null,
+                managerName: s.manager?.name || null,
+            })),
+            totalStructures: structures.length,
+        });
+    }
+    catch (error) {
+        console.error('Error fetching structures:', error);
+        res.status(500).json({ error: 'Failed to fetch structures' });
     }
 });
 exports.default = router;

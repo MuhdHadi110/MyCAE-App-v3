@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Project = exports.BillingType = exports.ProjectStatus = void 0;
+exports.Project = exports.ProjectType = exports.BillingType = exports.ProjectStatus = void 0;
 const typeorm_1 = require("typeorm");
 const uuid_1 = require("uuid");
 const User_1 = require("./User");
@@ -27,6 +27,13 @@ var BillingType;
     BillingType["HOURLY"] = "hourly";
     BillingType["LUMP_SUM"] = "lump_sum";
 })(BillingType || (exports.BillingType = BillingType = {}));
+var ProjectType;
+(function (ProjectType) {
+    ProjectType["STANDARD"] = "standard";
+    ProjectType["VARIATION_ORDER"] = "variation_order";
+    ProjectType["STRUCTURE_CONTAINER"] = "structure_container";
+    ProjectType["STRUCTURE_CHILD"] = "structure_child";
+})(ProjectType || (exports.ProjectType = ProjectType = {}));
 let Project = class Project {
     generateId() {
         if (!this.id) {
@@ -77,6 +84,14 @@ __decorate([
     (0, typeorm_1.Column)({ type: 'int', nullable: true }),
     __metadata("design:type", Number)
 ], Project.prototype, "vo_number", void 0);
+__decorate([
+    (0, typeorm_1.Column)({
+        type: 'enum',
+        enum: ProjectType,
+        default: ProjectType.STANDARD,
+    }),
+    __metadata("design:type", String)
+], Project.prototype, "project_type", void 0);
 __decorate([
     (0, typeorm_1.ManyToOne)(() => Project, (project) => project.variationOrders, { nullable: true }),
     (0, typeorm_1.JoinColumn)({ name: 'parent_project_id' }),

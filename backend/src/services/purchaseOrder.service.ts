@@ -1,7 +1,8 @@
 import { AppDataSource } from '../config/database';
 import { PurchaseOrder, POStatus } from '../entities/PurchaseOrder';
-import { Project, ProjectStatus } from '../entities/Project';
+import { Project, ProjectStatus, ProjectType } from '../entities/Project';
 import { CurrencyService } from './currency.service';
+import { StructureStatusService } from './structureStatus.service';
 import { Repository } from 'typeorm';
 
 export class PurchaseOrderService {
@@ -321,6 +322,12 @@ async getAllActivePOs(filters?: {
       }
       await projectRepo.save(project);
       console.log(`✅ Project ${data.projectCode} status updated to ongoing`);
+    }
+
+    // Sync container status if this is a structure child
+    if (project.project_type === ProjectType.STRUCTURE_CHILD && project.parent_project_id) {
+      console.log(`🔄 Syncing container status for structure ${data.projectCode}`);
+      await StructureStatusService.syncContainerStatus(project.parent_project_id);
     }
 
     return savedPO;

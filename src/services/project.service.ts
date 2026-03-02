@@ -150,6 +150,28 @@ class ProjectService {
     const response = await api.post(`/projects/${parentProjectId}/create-vo`, voData);
     return response.data;
   }
+
+  // ==================== Structure Containers ====================
+
+  async createStructure(containerId: string, structureData: any): Promise<any> {
+    const response = await api.post(`/projects/${containerId}/create-structure`, structureData);
+    return transformKeysToCAmelCase(response.data);
+  }
+
+  async convertToContainer(projectId: string): Promise<any> {
+    const response = await api.post(`/projects/${projectId}/convert-to-container`);
+    return transformKeysToCAmelCase(response.data);
+  }
+
+  async getStructureStats(containerId: string): Promise<any> {
+    const response = await api.get(`/projects/${containerId}/structure-stats`);
+    return transformKeysToCAmelCase(response.data);
+  }
+
+  async getStructures(containerId: string): Promise<any> {
+    const response = await api.get(`/projects/${containerId}/structures`);
+    return transformKeysToCAmelCase(response.data);
+  }
 }
 
 // Export singleton instance

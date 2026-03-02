@@ -26,6 +26,13 @@ export enum BillingType {
   LUMP_SUM = 'lump_sum',
 }
 
+export enum ProjectType {
+  STANDARD = 'standard',
+  VARIATION_ORDER = 'variation_order',
+  STRUCTURE_CONTAINER = 'structure_container',
+  STRUCTURE_CHILD = 'structure_child',
+}
+
 @Entity('projects')
 export class Project {
   @PrimaryColumn('varchar', { length: 36 })
@@ -60,6 +67,14 @@ export class Project {
 
   @Column({ type: 'int', nullable: true })
   vo_number?: number;
+
+  // Project type for differentiating standard, VO, and structure projects
+  @Column({
+    type: 'enum',
+    enum: ProjectType,
+    default: ProjectType.STANDARD,
+  })
+  project_type: ProjectType;
 
   // Self-referential relations
   @ManyToOne(() => Project, (project) => project.variationOrders, { nullable: true })

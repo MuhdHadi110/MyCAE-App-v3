@@ -3,7 +3,8 @@ import { AppDataSource } from '../config/database';
 import { Raw } from 'typeorm';
 import { Invoice, InvoiceStatus } from '../entities/Invoice';
 import { ActivityType } from '../entities/Activity';
-import { Project, ProjectStatus } from '../entities/Project';
+import { Project, ProjectStatus, ProjectType } from '../entities/Project';
+import { StructureStatusService } from '../services/structureStatus.service';
 import { User, UserRole } from '../entities/User';
 import { PurchaseOrder } from '../entities/PurchaseOrder';
 import { authenticate, AuthRequest, authorize } from '../middleware/auth';
@@ -305,6 +306,12 @@ router.post(
           await projectRepo.save(project);
           projectCompleted = true;
           logger.info('Project marked as completed', { projectCode: primaryProjectCode });
+          
+          // Sync container status if this is a structure child
+          if (project.project_type === ProjectType.STRUCTURE_CHILD && project.parent_project_id) {
+            logger.info(`🔄 Syncing container status for completed structure ${primaryProjectCode}`);
+            await StructureStatusService.syncContainerStatus(project.parent_project_id);
+          }
         }
       }
 

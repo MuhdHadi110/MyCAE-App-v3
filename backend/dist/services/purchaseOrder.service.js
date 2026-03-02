@@ -5,6 +5,7 @@ const database_1 = require("../config/database");
 const PurchaseOrder_1 = require("../entities/PurchaseOrder");
 const Project_1 = require("../entities/Project");
 const currency_service_1 = require("./currency.service");
+const structureStatus_service_1 = require("./structureStatus.service");
 class PurchaseOrderService {
     constructor() {
         this._poRepo = null;
@@ -248,6 +249,11 @@ class PurchaseOrderService {
             }
             await projectRepo.save(project);
             console.log(`✅ Project ${data.projectCode} status updated to ongoing`);
+        }
+        // Sync container status if this is a structure child
+        if (project.project_type === Project_1.ProjectType.STRUCTURE_CHILD && project.parent_project_id) {
+            console.log(`🔄 Syncing container status for structure ${data.projectCode}`);
+            await structureStatus_service_1.StructureStatusService.syncContainerStatus(project.parent_project_id);
         }
         return savedPO;
     }

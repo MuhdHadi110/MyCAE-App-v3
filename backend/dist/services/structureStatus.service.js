@@ -1,0 +1,157 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.StructureStatusService = void 0;
+const database_1 = require("../config/database");
+const Project_1 = require("../entities/Project");
+/**
+ * Service for managing structure container status auto-sync
+ * Automatically updates container status based on children status
+ */
+class StructureStatusService {
+    static getProjectRepo() {
+        if (!this.projectRepo) {
+            this.projectRepo = database_1.AppDataSource.getRepository(Project_1.Project);
+        }
+        return this.projectRepo;
+    }
+    /**
+     * Calculate and update container status based on children
+     * Called whenever a child's status changes
+     */
+    static async syncContainerStatus(containerId) {
+        const projectRepo = this.getProjectRepo();
+        // Get container
+        const container = await projectRepo.findOne({
+            where: { id: containerId },
+        });
+        if (!container) {
+            console.log(`⚠️ Container ${containerId} not found`);
+            return;
+        }
+        // Only process structure containers
+        if (container.project_type !== Project_1.ProjectType.STRUCTURE_CONTAINER) {
+            return;
+        }
+        // Get all structure children
+        const children = await projectRepo.find({
+            where: {
+                parent_project_id: containerId,
+                project_type: Project_1.ProjectType.STRUCTURE_CHILD,
+            },
+        });
+        if (children.length === 0) {
+            console.log(`📂 Container ${container.project_code} has no structures yet`);
+            return;
+        }
+        // Calculate new status
+        const newStatus = this.calculateContainerStatus(children);
+        // Only update if status changed
+        if (container.status !== newStatus) {
+            console.log(`🔄 Updating container ${container.project_code} status: ${container.status} → ${newStatus}`);
+            container.status = newStatus;
+            // Set dates based on status
+            if (newStatus === Project_1.ProjectStatus.ONGOING && !container.po_received_date) {
+                container.po_received_date = new Date();
+            }
+            if (newStatus === Project_1.ProjectStatus.COMPLETED && !container.completion_date) {
+                container.completion_date = new Date();
+            }
+            await projectRepo.save(container);
+            console.log(`✅ Container ${container.project_code} status updated to ${newStatus}`);
+        }
+    }
+    /**
+     * Calculate container status from children
+     * - All completed → completed
+     * - Any ongoing → ongoing
+     * - All pre-lim → pre-lim
+     */
+    static calculateContainerStatus(children) {
+        const allCompleted = children.every(child => child.status === Project_1.ProjectStatus.COMPLETED);
+        if (allCompleted) {
+            return Project_1.ProjectStatus.COMPLETED;
+        }
+        const anyOngoing = children.some(child => child.status === Project_1.ProjectStatus.ONGOING || child.status === Project_1.ProjectStatus.COMPLETED);
+        if (anyOngoing) {
+            return Project_1.ProjectStatus.ONGOING;
+        }
+        return Project_1.ProjectStatus.PRE_LIM;
+    }
+    /**
+     * Get structure children count and statuses for UI display
+     */
+    static async getContainerStats(containerId) {
+        const projectRepo = this.getProjectRepo();
+        const container = await projectRepo.findOne({
+            where: { id: containerId },
+        });
+        if (!container || container.project_type !== Project_1.ProjectType.STRUCTURE_CONTAINER) {
+            return null;
+        }
+        const children = await projectRepo.find({
+            where: {
+                parent_project_id: containerId,
+                project_type: Project_1.ProjectType.STRUCTURE_CHILD,
+            },
+        });
+        const ongoingCount = children.filter(c => c.status === Project_1.ProjectStatus.ONGOING).length;
+        const completedCount = children.filter(c => c.status === Project_1.ProjectStatus.COMPLETED).length;
+        const prelimCount = children.filter(c => c.status === Project_1.ProjectStatus.PRE_LIM).length;
+        return {
+            totalStructures: children.length,
+            ongoingCount,
+            completedCount,
+            prelimCount,
+            autoStatus: `Auto: ${container.status} (${ongoingCount + completedCount} of ${children.length})`,
+        };
+    }
+    /**
+     * Get next structure number for a container
+     * Finds the highest _N suffix and returns N+1
+     */
+    static async getNextStructureNumber(containerId) {
+        const projectRepo = this.getProjectRepo();
+        const container = await projectRepo.findOne({
+            where: { id: containerId },
+        });
+        if (!container) {
+            throw new Error('Container not found');
+        }
+        // Find all structure children
+        const children = await projectRepo.find({
+            where: {
+                parent_project_id: containerId,
+                project_type: Project_1.ProjectType.STRUCTURE_CHILD,
+            },
+        });
+        if (children.length === 0) {
+            return 1;
+        }
+        // Extract structure numbers from project codes
+        const structureNumbers = children
+            .map(child => {
+            const match = child.project_code.match(/_(\d+)$/);
+            return match ? parseInt(match[1], 10) : 0;
+        })
+            .filter(n => !isNaN(n));
+        const maxNumber = structureNumbers.length > 0 ? Math.max(...structureNumbers) : 0;
+        return maxNumber + 1;
+    }
+    /**
+     * Generate next structure code
+     * e.g., J25143 → J25143_1, J25143_2, etc.
+     */
+    static async generateStructureCode(containerId) {
+        const projectRepo = this.getProjectRepo();
+        const container = await projectRepo.findOne({
+            where: { id: containerId },
+        });
+        if (!container) {
+            throw new Error('Container not found');
+        }
+        const nextNumber = await this.getNextStructureNumber(containerId);
+        return `${container.project_code}_${nextNumber}`;
+    }
+}
+exports.StructureStatusService = StructureStatusService;
+//# sourceMappingURL=structureStatus.service.js.map

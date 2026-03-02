@@ -8,6 +8,16 @@ export type ProjectStatus = 'pre-lim' | 'ongoing' | 'on-hold' | 'open' | 'closed
 export type WorkCategory = 'engineering' | 'project-management' | 'measurement-site' | 'measurement-office';
 export type BillingType = 'hourly' | 'lump_sum';
 
+export type ProjectType = 'standard' | 'variation_order' | 'structure_container' | 'structure_child';
+
+export interface StructureStats {
+  totalStructures: number;
+  ongoingCount: number;
+  completedCount: number;
+  prelimCount: number;
+  autoStatus: string;
+}
+
 export interface Project {
   id: string;
   projectCode: string;
@@ -53,6 +63,10 @@ export interface Project {
     title: string;
   };
   variationOrders?: Project[];
+
+  // Structure Container fields
+  projectType?: ProjectType;
+  structureStats?: StructureStats;
 }
 
 export interface Timesheet {

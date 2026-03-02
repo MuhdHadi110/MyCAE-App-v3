@@ -41,6 +41,7 @@ const database_1 = require("../config/database");
 const Invoice_1 = require("../entities/Invoice");
 const Activity_1 = require("../entities/Activity");
 const Project_1 = require("../entities/Project");
+const structureStatus_service_1 = require("../services/structureStatus.service");
 const User_1 = require("../entities/User");
 const PurchaseOrder_1 = require("../entities/PurchaseOrder");
 const auth_1 = require("../middleware/auth");
@@ -292,6 +293,11 @@ router.post('/', [
                 await projectRepo.save(project);
                 projectCompleted = true;
                 logger_1.logger.info('Project marked as completed', { projectCode: primaryProjectCode });
+                // Sync container status if this is a structure child
+                if (project.project_type === Project_1.ProjectType.STRUCTURE_CHILD && project.parent_project_id) {
+                    logger_1.logger.info(`🔄 Syncing container status for completed structure ${primaryProjectCode}`);
+                    await structureStatus_service_1.StructureStatusService.syncContainerStatus(project.parent_project_id);
+                }
             }
         }
         res.status(201).json({

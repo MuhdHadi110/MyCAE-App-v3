@@ -11,6 +11,12 @@ export declare enum BillingType {
     HOURLY = "hourly",
     LUMP_SUM = "lump_sum"
 }
+export declare enum ProjectType {
+    STANDARD = "standard",
+    VARIATION_ORDER = "variation_order",
+    STRUCTURE_CONTAINER = "structure_container",
+    STRUCTURE_CHILD = "structure_child"
+}
 export declare class Project {
     id: string;
     project_code: string;
@@ -22,6 +28,7 @@ export declare class Project {
     parent_project_id?: string;
     is_variation_order: boolean;
     vo_number?: number;
+    project_type: ProjectType;
     parentProject?: Project;
     variationOrders?: Project[];
     teamMembers?: ProjectTeamMember[];

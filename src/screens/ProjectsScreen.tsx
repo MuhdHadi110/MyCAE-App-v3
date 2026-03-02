@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { Plus, Search, Filter, Edit, Trash2, Eye, FolderOpen, ChevronUp, ChevronDown, ChevronsUpDown, ChevronRight } from 'lucide-react';
+import { Plus, Search, Filter, Edit, Trash2, Eye, FolderOpen, ChevronUp, ChevronDown, ChevronsUpDown, ChevronRight, FolderKanban, FolderTree, PlusCircle } from 'lucide-react';
 import { useProjectStore } from '../store/projectStore';
 import { useClientStore } from '../store/clientStore';
 import { useCompanyStore } from '../store/companyStore';
@@ -8,6 +8,7 @@ import { AddProjectModal } from '../components/modals/AddProjectModal';
 import { AddVOModal } from '../components/modals/AddVOModal';
 import { EditProjectModal } from '../components/modals/EditProjectModal';
 import { ProjectDetailModal } from '../components/modals/ProjectDetailModal';
+import { StructureCreatorModal } from '../components/modals/StructureCreatorModal';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { Card, StatCard, PageHeader } from '../components/ui/Card';
 import { getPermissionMessage } from '../lib/permissions';
@@ -34,6 +35,8 @@ export const ProjectsScreen: React.FC = () => {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [showAddVOModal, setShowAddVOModal] = useState(false);
   const [selectedParentProject, setSelectedParentProject] = useState<Project | null>(null);
+  const [showStructureModal, setShowStructureModal] = useState(false);
+  const [selectedContainer, setSelectedContainer] = useState<Project | null>(null);
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -462,6 +465,26 @@ export const ProjectsScreen: React.FC = () => {
                               <ChevronRight className={`w-4 h-4 transition-transform ${!isCollapsed ? 'rotate-90' : ''}`} />
                             </button>
                           )}
+                          {/* Project Type Icon */}
+                          {project.projectType === 'structure_container' && (
+                            <span title="Structure Container">
+                              <FolderKanban className="w-4 h-4 text-amber-600" />
+                            </span>
+                          )}
+                          {project.projectType === 'structure_child' && (
+                            <span title="Structure">
+                              <FolderTree className="w-4 h-4 text-orange-600" />
+                            </span>
+                          )}
+                          {project.isVariationOrder && (
+                            <span className="text-blue-400 text-sm">↳</span>
+                          )}
+                          {!project.projectType && !project.isVariationOrder && (
+                            <span title="Project">
+                              <FolderOpen className="w-4 h-4 text-gray-400" />
+                            </span>
+                          )}
+                          
                           <button
                             onClick={() => handleViewProject(project.id)}
                             className="text-primary-600 hover:text-primary-700 hover:underline transition-colors cursor-pointer"
@@ -470,9 +493,21 @@ export const ProjectsScreen: React.FC = () => {
                           >
                             {project.projectCode}
                           </button>
+                          
+                          {/* Badges */}
                           {hasVOs && (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                               {vos.length} VO{vos.length > 1 ? 's' : ''}
+                            </span>
+                          )}
+                          {project.projectType === 'structure_container' && project.structureStats && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                              {project.structureStats.totalStructures} structure{project.structureStats.totalStructures !== 1 ? 's' : ''}
+                            </span>
+                          )}
+                          {project.projectType === 'structure_child' && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                              Structure
                             </span>
                           )}
                         </div>
@@ -493,17 +528,24 @@ export const ProjectsScreen: React.FC = () => {
                          'Unassigned'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            project.status === 'pre-lim'
-                              ? 'bg-blue-100 text-blue-800'
-                              : project.status === 'ongoing'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}
-                        >
-                          {project.status === 'pre-lim' ? 'Preliminary' : project.status === 'ongoing' ? 'Ongoing' : 'Completed'}
-                        </span>
+                        <div className="flex flex-col gap-1">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              project.status === 'pre-lim'
+                                ? 'bg-blue-100 text-blue-800'
+                                : project.status === 'ongoing'
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {project.status === 'pre-lim' ? 'Preliminary' : project.status === 'ongoing' ? 'Ongoing' : 'Completed'}
+                          </span>
+                          {project.projectType === 'structure_container' && project.structureStats && (
+                            <span className="text-xs text-gray-500">
+                              Auto: {project.structureStats.ongoingCount + project.structureStats.completedCount} of {project.structureStats.totalStructures}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
                         <div className="flex flex-col items-end gap-1.5">
@@ -537,7 +579,20 @@ export const ProjectsScreen: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {canAdd && (
+                          {canAdd && project.projectType === 'structure_container' && (
+                            <button
+                              onClick={() => {
+                                setSelectedContainer(project);
+                                setShowStructureModal(true);
+                              }}
+                              className="p-2 text-gray-400 hover:text-amber-600 transition-colors"
+                              title="Add Structure"
+                              aria-label={`Add structure to ${project.projectCode}`}
+                            >
+                              <PlusCircle className="w-4 h-4" />
+                            </button>
+                          )}
+                          {canAdd && !project.projectType && (
                             <button
                               onClick={() => {
                                 setSelectedParentProject(project);
@@ -748,6 +803,19 @@ export const ProjectsScreen: React.FC = () => {
           fetchProjects();
         }}
         parentProject={selectedParentProject}
+      />
+
+      {/* Structure Creator Modal */}
+      <StructureCreatorModal
+        isOpen={showStructureModal}
+        onClose={() => {
+          setShowStructureModal(false);
+          setSelectedContainer(null);
+        }}
+        container={selectedContainer}
+        onStructureCreated={() => {
+          fetchProjects();
+        }}
       />
 
       {/* Delete Confirmation Dialog */}

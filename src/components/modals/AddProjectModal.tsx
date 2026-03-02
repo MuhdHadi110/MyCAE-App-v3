@@ -37,6 +37,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
     description: '',
     status: 'pre-lim' as const,
     startDate: new Date().toISOString().split('T')[0],
+    isStructureContainer: false,
   });
 
   const [latestProjectCode, setLatestProjectCode] = useState<{
@@ -115,6 +116,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
         hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
         companyName: selectedCompany?.name || '', // Include company name so it's stored in the project
         billingType: formData.billingType, // Use selected billing type from form
+        isStructureContainer: formData.isStructureContainer,
       };
       const result = await addProject(projectPayload);
 
@@ -171,6 +173,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
         description: '',
         status: 'pre-lim' as const,
         startDate: new Date().toISOString().split('T')[0],
+        isStructureContainer: false,
       });
       setFieldError({ projectCode: null });
       onClose();
@@ -264,10 +267,35 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
                        <span className="text-green-700 font-medium">Suggested: {latestProjectCode.nextSuggestion}</span>
                      </>
                    )}
-                 </p>
+                </p>
+                </div>
+
+               {/* Structure Container Checkbox */}
+               <div className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-xl p-4 border border-amber-200 dark:border-amber-800">
+                 <label className="flex items-start gap-3 cursor-pointer">
+                   <input
+                     type="checkbox"
+                     checked={formData.isStructureContainer}
+                     onChange={(e) => setFormData({ ...formData, isStructureContainer: e.target.checked })}
+                     className="mt-1 h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                   />
+                   <div>
+                     <span className="font-semibold text-gray-900 dark:text-white block">
+                       This is a structure container
+                     </span>
+                     <span className="text-sm text-gray-600 dark:text-gray-400 block mt-1">
+                       Divides into multiple structures with separate POs (e.g., J25143 → J25143_1, J25143_2, J25143_3)
+                     </span>
+                     {formData.isStructureContainer && (
+                       <span className="text-xs text-amber-700 dark:text-amber-400 block mt-2">
+                         ℹ️ Container projects cannot have direct POs. Create structures after project is created.
+                       </span>
+                     )}
+                   </div>
+                 </label>
                </div>
 
-              {/* Title */}
+               {/* Title */}
               <div>
                 <label htmlFor="projectTitle" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Project Title <span className="text-red-500">*</span>
