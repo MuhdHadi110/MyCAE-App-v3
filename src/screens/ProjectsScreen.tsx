@@ -528,7 +528,7 @@ export const ProjectsScreen: React.FC = () => {
                          'Unassigned'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex flex-col gap-1">
+                        <div className="flex flex-col items-center gap-1">
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                               project.status === 'pre-lim'
