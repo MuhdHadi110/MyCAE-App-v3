@@ -2,7 +2,11 @@ import type { InventoryItem, BulkImportResult } from '../types/inventory.types';
 import { getCurrentUser } from '../lib/auth';
 
 export function parseCSV(csvText: string): string[][] {
-  const lines = csvText.split('\n').filter(line => line.trim());
+  const lines = csvText.split('\n').filter(line => {
+    const trimmed = line.trim();
+    // Skip empty lines and comment lines (starting with #)
+    return trimmed && !trimmed.startsWith('#');
+  });
   return lines.map(line => {
     // Simple CSV parser (handles basic cases)
     const values: string[] = [];
@@ -36,27 +40,34 @@ export function validateInventoryRow(
   });
 
   // Required fields
-  if (!rowObj.title || !rowObj.sku) {
-    return { valid: false, error: 'Missing required fields: title or sku' };
+  const requiredFields = ['title', 'sku', 'category', 'quantity', 'minimumStock', 'location'];
+  const missingFields = requiredFields.filter(field => !rowObj[field] || rowObj[field].trim() === '');
+  
+  if (missingFields.length > 0) {
+    return { 
+      valid: false, 
+      error: `Missing required fields: ${missingFields.join(', ')}` 
+    };
   }
 
   // Validate quantity
   const quantity = parseInt(rowObj.quantity);
   if (isNaN(quantity) || quantity < 0) {
-    return { valid: false, error: 'Invalid quantity value' };
+    return { valid: false, error: 'Invalid quantity value (must be a non-negative number)' };
   }
 
   // Validate minimumStock
   const minimumStock = parseInt(rowObj.minimumStock);
   if (isNaN(minimumStock) || minimumStock < 0) {
-    return { valid: false, error: 'Invalid minimumStock value' };
+    return { valid: false, error: 'Invalid minimumStock value (must be a non-negative number)' };
   }
 
-  // Validate cost and price
-  const cost = parseFloat(rowObj.cost || '0');
-  const price = parseFloat(rowObj.price || '0');
-  if (isNaN(cost) || isNaN(price)) {
-    return { valid: false, error: 'Invalid cost or price value' };
+  // Validate date format (DD/MM/YYYY) if provided
+  if (rowObj.lastCalibratedDate && rowObj.lastCalibratedDate.trim() !== '') {
+    const dateRegex = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/\d{4}$/;
+    if (!dateRegex.test(rowObj.lastCalibratedDate.trim())) {
+      return { valid: false, error: 'Invalid date format. Use DD/MM/YYYY (e.g., 15/03/2024)' };
+    }
   }
 
   return { valid: true };
@@ -73,23 +84,35 @@ export function csvRowToInventoryItem(
 
   const currentUser = getCurrentUser();
 
+  // Parse date from DD/MM/YYYY to ISO format if provided
+  let lastCalibratedDate: string | undefined = undefined;
+  if (rowObj.lastCalibratedDate && rowObj.lastCalibratedDate.trim() !== '') {
+    const dateParts = rowObj.lastCalibratedDate.split('/');
+    if (dateParts.length === 3) {
+      const day = dateParts[0];
+      const month = dateParts[1];
+      const year = dateParts[2];
+      lastCalibratedDate = `${year}-${month}-${day}`;
+    }
+  }
+
   return {
     title: rowObj.title,
     sku: rowObj.sku,
     barcode: rowObj.barcode || '',
-    category: rowObj.category || 'Uncategorized',
+    category: rowObj.category,
     quantity: parseInt(rowObj.quantity) || 0,
     minimumStock: parseInt(rowObj.minimumStock) || 0,
-    location: rowObj.location || '',
-    unitOfMeasure: rowObj.unitOfMeasure || 'Unit',
-    cost: parseFloat(rowObj.cost) || 0,
-    price: parseFloat(rowObj.price) || 0,
+    location: rowObj.location,
+    unitOfMeasure: rowObj.unitOfMeasure || 'units',
+    cost: 0,
+    price: 0,
     supplier: rowObj.supplier || '',
-    status: (rowObj.status as 'Active' | 'Inactive' | 'Discontinued') || 'Active',
+    status: 'Available', // Auto-calculated by backend based on quantity vs minimumStock
     notes: rowObj.notes || '',
-    lastCalibratedDate: rowObj.lastCalibratedDate || undefined,
+    lastCalibratedDate,
     lastUpdated: new Date().toISOString(),
-    createdBy: currentUser.displayName,
+    createdBy: currentUser?.displayName || 'Unknown',
   };
 }
 

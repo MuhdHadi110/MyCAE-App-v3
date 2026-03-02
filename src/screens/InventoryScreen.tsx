@@ -266,7 +266,11 @@ export const InventoryScreen: React.FC = () => {
       reader.onload = async (e) => {
         try {
           const csvText = e.target?.result as string;
-          const lines = csvText.split('\n').filter((line) => line.trim());
+          // Filter out empty lines and comment lines (starting with #)
+          const lines = csvText.split('\n').filter((line) => {
+            const trimmed = line.trim();
+            return trimmed && !trimmed.startsWith('#');
+          });
 
           if (lines.length < 2) {
             toast.error('CSV file is empty or has no data rows');
@@ -277,6 +281,7 @@ export const InventoryScreen: React.FC = () => {
           const dataRows = lines.slice(1);
           let validItemCount = 0;
           let errorCount = 0;
+          const errors: string[] = [];
 
           // Parse each row to count valid items
           for (let i = 0; i < dataRows.length; i++) {
@@ -286,28 +291,47 @@ export const InventoryScreen: React.FC = () => {
               rowObj[header] = row[index];
             });
 
-            // Validate required fields
-            if (!rowObj.title || !rowObj.sku) {
+            // Validate required fields: title, sku, category, quantity, minimumStock, location
+            const requiredFields = ['title', 'sku', 'category', 'quantity', 'minimumStock', 'location'];
+            const missingFields = requiredFields.filter(field => !rowObj[field] || rowObj[field].trim() === '');
+            
+            if (missingFields.length > 0) {
               errorCount++;
+              if (errors.length < 3) {
+                errors.push(`Row ${i + 2}: Missing ${missingFields.join(', ')}`);
+              }
               continue;
             }
 
             // Validate numeric fields
             const quantity = parseInt(rowObj.quantity);
             const minimumStock = parseInt(rowObj.minimumStock);
-            const cost = parseFloat(rowObj.cost || '0');
-            const price = parseFloat(rowObj.price || '0');
 
-            if (isNaN(quantity) || isNaN(minimumStock) || isNaN(cost) || isNaN(price)) {
+            if (isNaN(quantity) || isNaN(minimumStock) || quantity < 0 || minimumStock < 0) {
               errorCount++;
+              if (errors.length < 3) {
+                errors.push(`Row ${i + 2}: Invalid quantity or minimumStock`);
+              }
               continue;
+            }
+
+            // Validate date format (DD/MM/YYYY) if provided
+            if (rowObj.lastCalibratedDate && rowObj.lastCalibratedDate.trim() !== '') {
+              const dateRegex = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/\d{4}$/;
+              if (!dateRegex.test(rowObj.lastCalibratedDate.trim())) {
+                errorCount++;
+                if (errors.length < 3) {
+                  errors.push(`Row ${i + 2}: Invalid date format. Use DD/MM/YYYY`);
+                }
+                continue;
+              }
             }
 
             validItemCount++;
           }
 
           if (validItemCount === 0) {
-            toast.error('No valid items found in CSV file');
+            toast.error(`No valid items found in CSV file. ${errors.length > 0 ? errors[0] : ''}`);
             return;
           }
 
@@ -341,7 +365,12 @@ export const InventoryScreen: React.FC = () => {
       reader.onload = async (e) => {
         try {
           const csvText = e.target?.result as string;
-          const lines = csvText.split('\n').filter((line) => line.trim());
+          // Filter out empty lines and comment lines (starting with #)
+          const lines = csvText.split('\n').filter((line) => {
+            const trimmed = line.trim();
+            return trimmed && !trimmed.startsWith('#');
+          });
+          
           const headers = lines[0].split(',').map((h) => h.trim());
           const dataRows = lines.slice(1);
           const itemsToImport: Array<Omit<InventoryItem, 'id'>> = [];
@@ -355,8 +384,11 @@ export const InventoryScreen: React.FC = () => {
               rowObj[header] = row[index];
             });
 
-            // Validate required fields
-            if (!rowObj.title || !rowObj.sku) {
+            // Validate required fields: title, sku, category, quantity, minimumStock, location
+            const requiredFields = ['title', 'sku', 'category', 'quantity', 'minimumStock', 'location'];
+            const missingFields = requiredFields.filter(field => !rowObj[field] || rowObj[field].trim() === '');
+            
+            if (missingFields.length > 0) {
               errorCount++;
               continue;
             }
@@ -364,12 +396,22 @@ export const InventoryScreen: React.FC = () => {
             // Validate numeric fields
             const quantity = parseInt(rowObj.quantity);
             const minimumStock = parseInt(rowObj.minimumStock);
-            const cost = parseFloat(rowObj.cost || '0');
-            const price = parseFloat(rowObj.price || '0');
 
-            if (isNaN(quantity) || isNaN(minimumStock) || isNaN(cost) || isNaN(price)) {
+            if (isNaN(quantity) || isNaN(minimumStock) || quantity < 0 || minimumStock < 0) {
               errorCount++;
               continue;
+            }
+
+            // Parse date from DD/MM/YYYY to ISO format if provided
+            let lastCalibratedDate: string | undefined = undefined;
+            if (rowObj.lastCalibratedDate && rowObj.lastCalibratedDate.trim() !== '') {
+              const dateParts = rowObj.lastCalibratedDate.split('/');
+              if (dateParts.length === 3) {
+                const day = dateParts[0];
+                const month = dateParts[1];
+                const year = dateParts[2];
+                lastCalibratedDate = `${year}-${month}-${day}`;
+              }
             }
 
             // Create item object
@@ -377,18 +419,19 @@ export const InventoryScreen: React.FC = () => {
               title: rowObj.title,
               sku: rowObj.sku,
               barcode: rowObj.barcode || '',
-              category: rowObj.category || 'Uncategorized',
-              quantity: quantity || 0,
-              minimumStock: minimumStock || 0,
-              location: rowObj.location || '',
-              unitOfMeasure: rowObj.unitOfMeasure || 'Unit',
-              cost: cost || 0,
-              price: price || 0,
+              category: rowObj.category,
+              quantity: quantity,
+              minimumStock: minimumStock,
+              location: rowObj.location,
+              unitOfMeasure: rowObj.unitOfMeasure || 'units',
+              cost: 0, // Auto-set to 0, not used in UI
+              price: 0, // Auto-set to 0, not used in UI
               supplier: rowObj.supplier || '',
-              status: (rowObj.status as 'Active' | 'Inactive' | 'Discontinued') || 'Active',
+              status: 'Available', // Auto-calculated by backend based on quantity vs minimumStock
               notes: rowObj.notes || '',
+              lastCalibratedDate,
               lastUpdated: new Date().toISOString(),
-              createdBy: currentUser.displayName,
+              createdBy: currentUser?.displayName || 'Unknown',
             };
 
             itemsToImport.push(item);
