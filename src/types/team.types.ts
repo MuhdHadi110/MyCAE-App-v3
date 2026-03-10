@@ -2,8 +2,8 @@
  * Team/Staff Management Types
  */
 
-export type UserRole = 'engineer' | 'senior-engineer' | 'principal-engineer' | 'manager' | 'managing-director' | 'admin';
-export type Department = 'engineering' | 'project-management';
+export type UserRole = 'engineer' | 'senior-engineer' | 'principal-engineer' | 'manager' | 'managing-director' | 'commercial-director' | 'admin';
+export type Department = 'engineering' | 'project-management' | 'commercial' | 'finance';
 
 export interface TeamMember {
   id: string;

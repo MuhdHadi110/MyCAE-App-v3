@@ -368,9 +368,13 @@ export const ProjectOverviewDashboard: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {filteredProjects.map((project) => {
+                    // Try to get client name from multiple sources
                     const client = clients.find((c) => c.id === project.companyId);
-                    // Display lead engineer's name, fallback to manager's name
-                    const engineerName = (project as any).leadEngineer?.name || (project as any).manager?.name || 'Unassigned';
+                    const clientName = project.companyName || client?.name || project.contact?.company?.name || 'Unknown';
+                    
+                    // Try to get engineer name from multiple sources
+                    const engineerName = project.engineerName || project.managerName || 'Unassigned';
+                    
                     const progress = project.plannedHours > 0 ? ((project.actualHours || 0) / project.plannedHours) * 100 : 0;
 
                     return (
@@ -387,7 +391,7 @@ export const ProjectOverviewDashboard: React.FC = () => {
                         <td className="px-6 py-4">
                           <p className="font-medium text-gray-900 truncate">{project.title}</p>
                         </td>
-                        <td className="px-6 py-4 text-gray-700">{client?.name || 'Unknown'}</td>
+                        <td className="px-6 py-4 text-gray-700">{clientName}</td>
                         <td className="px-6 py-4 text-gray-700">{engineerName}</td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex flex-col items-end gap-1.5">

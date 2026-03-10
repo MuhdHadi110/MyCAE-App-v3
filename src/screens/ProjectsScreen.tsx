@@ -581,8 +581,8 @@ export const ProjectsScreen: React.FC = () => {
                                 setShowStructureModal(true);
                               }}
                               className="p-2 text-gray-400 hover:text-amber-600 transition-colors"
-                              title="Add Structure"
-                              aria-label={`Add structure to ${project.projectCode}`}
+                              title="Add Project"
+                              aria-label={`Add project to ${project.projectCode}`}
                             >
                               <PlusCircle className="w-4 h-4" />
                             </button>

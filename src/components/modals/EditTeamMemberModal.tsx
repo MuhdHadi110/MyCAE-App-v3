@@ -267,6 +267,7 @@ export const EditTeamMemberModal: React.FC<EditTeamMemberModalProps> = ({
                       { value: 'principal-engineer', label: 'Principal Engineer' },
                       { value: 'manager', label: 'Manager' },
                       { value: 'managing-director', label: 'Managing Director' },
+                      { value: 'commercial-director', label: 'Commercial Director' },
                       { value: 'admin', label: 'Admin' },
                     ].map((roleOption) => (
                       <label key={roleOption.value} className="flex items-center gap-2 cursor-pointer">
@@ -309,6 +310,8 @@ export const EditTeamMemberModal: React.FC<EditTeamMemberModalProps> = ({
                   >
                     <option value="engineering">Engineering</option>
                     <option value="project-management">Project Management</option>
+                    <option value="commercial">Commercial</option>
+                    <option value="finance">Finance</option>
                   </select>
                 </div>
               </div>

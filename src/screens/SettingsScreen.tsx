@@ -1,11 +1,10 @@
 import { useRef, useState } from 'react';
-import { User, Database, Info, ChevronRight, Download, Upload, Lock, Settings as SettingsIcon, Building2 } from 'lucide-react';
+import { User, Database, Info, ChevronRight, Download, Upload, Lock, Settings as SettingsIcon } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import toast from 'react-hot-toast';
 import { ChangePasswordModal } from '../components/modals/ChangePasswordModal';
 import { UserPreferencesModal } from '../components/modals/UserPreferencesModal';
-import { CompanySettingsForm } from '../components/settings/CompanySettingsForm';
 import { useTeamStore } from '../store/teamStore';
 import { useProjectStore } from '../store/projectStore';
 import { useClientStore } from '../store/clientStore';
@@ -18,17 +17,10 @@ import { logger } from '../lib/logger';
 import { useAuth } from '../contexts/AuthContext';
 
 export const SettingsScreen: React.FC = () => {
+  const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isPreferencesModalOpen, setIsPreferencesModalOpen] = useState(false);
-  const [isCompanySettingsExpanded, setIsCompanySettingsExpanded] = useState(false);
-  const { user } = useAuth();
-
-  // Check if user has admin role (company settings are admin-only)
-  const canManageCompanySettings = user && (
-    user.role === 'admin' ||
-    (Array.isArray(user.roles) && user.roles.includes('admin'))
-  );
 
   // Get state from all stores
   const teamMembers = useTeamStore((state) => state.teamMembers);
@@ -179,44 +171,6 @@ export const SettingsScreen: React.FC = () => {
             </div>
           </CardContent>
         </Card>
-
-        {/* Company Settings Section - Admin Only */}
-        {canManageCompanySettings && (
-          <Card variant="bordered" className="mb-4">
-            <CardHeader>
-              <CardTitle>Company Settings</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
-                  <p className="text-sm text-amber-800">
-                    <strong>Admin Only:</strong> Configure company branding, logo, and PDF document settings.
-                    These settings will be applied to all generated invoices and purchase orders.
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => setIsCompanySettingsExpanded(!isCompanySettingsExpanded)}
-                  className="w-full flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors border border-gray-200"
-                >
-                  <div className="flex items-center gap-3">
-                    <Building2 className="w-5 h-5 text-primary-600" />
-                    <span className="text-sm font-medium text-gray-700">
-                      {isCompanySettingsExpanded ? 'Hide Company Settings' : 'Edit Company Settings'}
-                    </span>
-                  </div>
-                  <ChevronRight className={`w-5 h-5 text-gray-400 transition-transform ${isCompanySettingsExpanded ? 'rotate-90' : ''}`} />
-                </button>
-
-                {isCompanySettingsExpanded && (
-                  <div className="mt-4 border-t border-gray-200 pt-4">
-                    <CompanySettingsForm />
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Data Management Section */}
         <Card variant="bordered" className="mb-4">

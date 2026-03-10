@@ -81,7 +81,7 @@ export const CardFooter: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({ cla
 export const StatCard: React.FC<{
   title: string;
   value: number | string;
-  color?: 'gray' | 'blue' | 'green' | 'yellow' | 'purple' | 'indigo' | 'red';
+  color?: 'gray' | 'blue' | 'green' | 'yellow' | 'purple' | 'indigo' | 'red' | 'orange';
   onClick?: () => void;
   active?: boolean;
 }> = ({ title, value, color = 'gray', onClick, active }) => {
@@ -93,6 +93,7 @@ export const StatCard: React.FC<{
     purple: 'text-purple-600',
     indigo: 'text-indigo-600',
     red: 'text-red-600',
+    orange: 'text-orange-600',
   };
 
   const ringColorClasses = {
@@ -103,6 +104,7 @@ export const StatCard: React.FC<{
     purple: 'ring-purple-500',
     indigo: 'ring-indigo-500',
     red: 'ring-red-500',
+    orange: 'ring-orange-500',
   };
 
   if (onClick) {

@@ -74,10 +74,6 @@ exports.AppDataSource = new typeorm_1.DataSource({
     // Connection pooling configuration for production performance
     extra: {
         connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || '10'),
-        queueLimit: 0, // Unlimited queue
-        acquireTimeout: 60000, // 60 seconds
-        timeout: 60000, // 60 seconds
-        reconnect: true,
     },
 });
 const initializeDatabase = async () => {

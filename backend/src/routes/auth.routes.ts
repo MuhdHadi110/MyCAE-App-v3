@@ -184,15 +184,9 @@ router.post(
         if (!isValidCaptcha) {
           return res.status(400).json({ error: 'Invalid CAPTCHA. Please try again.' });
         }
-      } else if (captchaToken) {
-        // In development, verify only if provided
-        const remoteIp = req.ip || req.socket.remoteAddress;
-        const isValidCaptcha = await verifyRecaptcha(captchaToken, remoteIp);
-
-        if (!isValidCaptcha) {
-          return res.status(400).json({ error: 'Invalid CAPTCHA. Please try again.' });
-        }
       }
+      // In development, skip reCAPTCHA verification entirely
+      // The frontend still requires users to check the box, but we don't verify it server-side
 
       const userRepo = AppDataSource.getRepository(User);
 

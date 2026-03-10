@@ -18,6 +18,7 @@ const formatRole = (role: UserRole): string => {
     'principal-engineer': 'Principal Engineer',
     'manager': 'Manager',
     'managing-director': 'Managing Director',
+    'commercial-director': 'Commercial Director',
     'admin': 'Admin',
   };
   return roleMap[role] || role;
@@ -146,6 +147,8 @@ export const TeamScreen: React.FC = () => {
         return 'bg-green-100 text-green-800';
       case 'managing-director':
         return 'bg-red-100 text-red-800';
+      case 'commercial-director':
+        return 'bg-orange-100 text-orange-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -197,6 +200,7 @@ export const TeamScreen: React.FC = () => {
                 <option value="principal-engineer">Principal Engineers</option>
                 <option value="manager">Managers</option>
                 <option value="managing-director">Managing Directors</option>
+                <option value="commercial-director">Commercial Directors</option>
               </select>
             </div>
 
@@ -216,13 +220,14 @@ export const TeamScreen: React.FC = () => {
         </Card>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
           <StatCard title="Total" value={teamMembers.length} color="gray" />
           <StatCard title="Engineers" value={teamMembers.filter((m) => m.role === 'engineer').length} color="blue" />
           <StatCard title="Senior Eng" value={teamMembers.filter((m) => m.role === 'senior-engineer').length} color="indigo" />
           <StatCard title="Principal Eng" value={teamMembers.filter((m) => m.role === 'principal-engineer').length} color="purple" />
           <StatCard title="Managers" value={teamMembers.filter((m) => m.role === 'manager').length} color="green" />
           <StatCard title="Man. Directors" value={teamMembers.filter((m) => m.role === 'managing-director').length} color="red" />
+          <StatCard title="Comm. Directors" value={teamMembers.filter((m) => m.role === 'commercial-director').length} color="orange" />
         </div>
 
         {/* Team Members Grid */}

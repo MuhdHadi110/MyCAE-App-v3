@@ -161,14 +161,8 @@ router.post('/login', authLimiter, [
                 return res.status(400).json({ error: 'Invalid CAPTCHA. Please try again.' });
             }
         }
-        else if (captchaToken) {
-            // In development, verify only if provided
-            const remoteIp = req.ip || req.socket.remoteAddress;
-            const isValidCaptcha = await (0, recaptcha_1.verifyRecaptcha)(captchaToken, remoteIp);
-            if (!isValidCaptcha) {
-                return res.status(400).json({ error: 'Invalid CAPTCHA. Please try again.' });
-            }
-        }
+        // In development, skip reCAPTCHA verification entirely
+        // The frontend still requires users to check the box, but we don't verify it server-side
         const userRepo = database_1.AppDataSource.getRepository(User_1.User);
         // Find user - use constant-time comparison to prevent timing attacks
         const user = await userRepo.findOne({ where: { email } });

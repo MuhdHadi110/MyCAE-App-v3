@@ -388,6 +388,7 @@ export class TeamService {
         UserRole.PRINCIPAL_ENGINEER,
         UserRole.MANAGER,
         UserRole.MANAGING_DIRECTOR,
+        UserRole.COMMERCIAL_DIRECTOR,
         UserRole.ADMIN,
       ];
 

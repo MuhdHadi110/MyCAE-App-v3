@@ -1,16 +1,23 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { UserPlus, Plus, Mail, Phone, Briefcase, Trash2 } from 'lucide-react';
+import { UserPlus, Plus, Mail, Phone, Briefcase, Trash2, Edit2, Upload } from 'lucide-react';
 import { useCompanyStore } from '../store/companyStore';
 import { Button } from '../components/ui/Button';
 import { AddCompanyModal } from '../components/modals/AddCompanyModal';
 import { AddContactModal } from '../components/modals/AddContactModal';
-import { CompanyWithContacts } from '../types/company.types';
+import { EditCompanyModal } from '../components/modals/EditCompanyModal';
+import { EditContactModal } from '../components/modals/EditContactModal';
+import { BulkImportModal } from '../components/modals/BulkImportModal';
+import { CompanyWithContacts, Contact } from '../types/company.types';
 
 export const CompaniesScreen: React.FC = () => {
   const { companies, fetchCompanies, deleteCompany, deleteContact } = useCompanyStore();
   const [isAddCompanyModalOpen, setIsAddCompanyModalOpen] = useState(false);
   const [isAddContactModalOpen, setIsAddContactModalOpen] = useState(false);
+  const [isEditCompanyModalOpen, setIsEditCompanyModalOpen] = useState(false);
+  const [isEditContactModalOpen, setIsEditContactModalOpen] = useState(false);
+  const [isBulkImportModalOpen, setIsBulkImportModalOpen] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<CompanyWithContacts | null>(null);
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [expandedCompanyId, setExpandedCompanyId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -28,9 +35,37 @@ export const CompaniesScreen: React.FC = () => {
     setSelectedCompany(null);
   }, []);
 
+  const handleCloseEditCompanyModal = useCallback(() => {
+    setIsEditCompanyModalOpen(false);
+    setSelectedCompany(null);
+  }, []);
+
+  const handleCloseEditContactModal = useCallback(() => {
+    setIsEditContactModalOpen(false);
+    setSelectedContact(null);
+    setSelectedCompany(null);
+  }, []);
+
+  const handleCloseBulkImportModal = useCallback(() => {
+    setIsBulkImportModalOpen(false);
+  }, []);
+
   const handleAddContact = (company: CompanyWithContacts) => {
     setSelectedCompany(company);
     setIsAddContactModalOpen(true);
+  };
+
+  const handleEditCompany = (company: CompanyWithContacts, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedCompany(company);
+    setIsEditCompanyModalOpen(true);
+  };
+
+  const handleEditContact = (contact: Contact, company: CompanyWithContacts, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedContact(contact);
+    setSelectedCompany(company);
+    setIsEditContactModalOpen(true);
   };
 
   const handleDeleteCompany = async (companyId: string, companyName: string) => {
@@ -74,13 +109,22 @@ export const CompaniesScreen: React.FC = () => {
                 Manage your business contacts and company information
               </p>
             </div>
-            <Button
-              variant="primary"
-              onClick={() => setIsAddCompanyModalOpen(true)}
-              icon={<Plus className="w-4 h-4" />}
-            >
-              Add Company
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsBulkImportModalOpen(true)}
+                icon={<Upload className="w-4 h-4" />}
+              >
+                Bulk Import
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => setIsAddCompanyModalOpen(true)}
+                icon={<Plus className="w-4 h-4" />}
+              >
+                Add Company
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -168,6 +212,13 @@ export const CompaniesScreen: React.FC = () => {
                       <Button
                         variant="ghost"
                         size="sm"
+                        onClick={(e) => handleEditCompany(company, e)}
+                        icon={<Edit2 className="w-4 h-4" />}
+                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleDeleteCompany(company.id, company.name);
@@ -233,13 +284,22 @@ export const CompaniesScreen: React.FC = () => {
                                   )}
                                 </div>
                               </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteContact(contact.id, contact.name)}
-                                icon={<Trash2 className="w-4 h-4" />}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                              />
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => handleEditContact(contact, company, e)}
+                                  icon={<Edit2 className="w-4 h-4" />}
+                                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                />
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteContact(contact.id, contact.name)}
+                                  icon={<Trash2 className="w-4 h-4" />}
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                />
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -266,6 +326,25 @@ export const CompaniesScreen: React.FC = () => {
           companyName={selectedCompany.name}
         />
       )}
+      {selectedCompany && (
+        <EditCompanyModal
+          isOpen={isEditCompanyModalOpen}
+          onClose={handleCloseEditCompanyModal}
+          company={selectedCompany}
+        />
+      )}
+      {selectedCompany && selectedContact && (
+        <EditContactModal
+          isOpen={isEditContactModalOpen}
+          onClose={handleCloseEditContactModal}
+          contact={selectedContact}
+          companyName={selectedCompany.name}
+        />
+      )}
+      <BulkImportModal
+        isOpen={isBulkImportModalOpen}
+        onClose={handleCloseBulkImportModal}
+      />
     </div>
   );
 };

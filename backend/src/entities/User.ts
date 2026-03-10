@@ -14,6 +14,7 @@ export enum UserRole {
   PRINCIPAL_ENGINEER = 'principal-engineer',
   MANAGER = 'manager',
   MANAGING_DIRECTOR = 'managing-director',
+  COMMERCIAL_DIRECTOR = 'commercial-director',
   ADMIN = 'admin',
 }
 
@@ -137,6 +138,7 @@ export class User {
     const roleHierarchy: Record<UserRole, number> = {
       [UserRole.ADMIN]: 5,
       [UserRole.MANAGING_DIRECTOR]: 4,
+      [UserRole.COMMERCIAL_DIRECTOR]: 4,
       [UserRole.MANAGER]: 3,
       [UserRole.PRINCIPAL_ENGINEER]: 3,
       [UserRole.SENIOR_ENGINEER]: 2,

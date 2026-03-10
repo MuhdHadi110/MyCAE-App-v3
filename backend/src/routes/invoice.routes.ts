@@ -1025,36 +1025,6 @@ router.get('/:id/pdf', async (req: AuthRequest, res: Response) => {
 });
 
 /**
- * Debug endpoint to check company settings
- * Only available in development mode
- */
-router.get('/debug-settings', async (req: AuthRequest, res: Response) => {
-  // Only allow in development mode
-  if (process.env.NODE_ENV === 'production') {
-    return res.status(404).json({ error: 'Not found' });
-  }
-
-  try {
-    const { CompanySettingsService } = await import('../services/companySettings.service');
-    const settings = await CompanySettingsService.getSettings();
-
-    res.json({
-      success: true,
-      settings: {
-        company_name: settings.company_name,
-        logo_url: settings.logo_url,
-        logo_size: settings.logo_size,
-        header_position: settings.header_position,
-        page_margin: settings.page_margin
-      }
-    });
-  } catch (error: any) {
-    logger.error('Settings debug failed', { error });
-    res.status(500).json({ error: `Failed to load settings: ${error.message}` });
-  }
-});
-
-/**
  * Test specific invoice PDF generation with size reporting
  * Only available in development mode
  */
