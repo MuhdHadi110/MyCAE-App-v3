@@ -79,6 +79,11 @@ export const TeamWorkloadHeatmap: React.FC = () => {
       // Roles to exclude from team workload view
       const excludedRoles = ['commercial', 'admin', 'finance'];
       
+      // Helper function to get role from team member (handles nested user object)
+      const getMemberRole = (member: any): string => {
+        return member.user?.role || member.role || 'engineer';
+      };
+      
       for (const member of allMembers) {
         try {
           // Handle nested user data structure from backend
@@ -86,7 +91,7 @@ export const TeamWorkloadHeatmap: React.FC = () => {
           const memberName = userData.name || member.name || 'Unknown';
           const memberEmail = userData.email || member.email || '';
           const memberAvatar = userData.avatar || member.avatar || 'male-01';
-          const memberRole = userData.role || member.role || 'engineer';
+          const memberRole = getMemberRole(member);
           
           // Skip commercial, admin, and finance personnel
           if (excludedRoles.includes(memberRole)) {

@@ -90,19 +90,26 @@ export const StructureCreatorModal: React.FC<StructureCreatorModalProps> = ({
   // Roles to exclude from project assignment
   const excludedRoles = ['commercial', 'admin', 'finance'];
 
+  // Helper function to get role from team member (handles nested user object)
+  const getMemberRole = (tm: any): string => {
+    return tm.user?.role || tm.role || '';
+  };
+
   // Filter out commercial, admin, and finance personnel from lead engineers
   const leadEngineers = teamMembers.filter(
-    (tm) => !excludedRoles.includes(tm.role)
+    (tm) => !excludedRoles.includes(getMemberRole(tm))
   );
 
   // Project Managers: Senior Engineers and above (excluding commercial, admin, finance)
   const projectManagers = teamMembers.filter(
-    (tm) =>
-      !excludedRoles.includes(tm.role) &&
-      (tm.role === 'senior-engineer' ||
-        tm.role === 'principal-engineer' ||
-        tm.role === 'manager' ||
-        tm.role === 'managing-director')
+    (tm) => {
+      const role = getMemberRole(tm);
+      return !excludedRoles.includes(role) &&
+        (role === 'senior-engineer' ||
+          role === 'principal-engineer' ||
+          role === 'manager' ||
+          role === 'managing-director');
+    }
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
