@@ -255,6 +255,7 @@ export const AddTeamMemberModal: React.FC<AddTeamMemberModalProps> = ({ isOpen, 
                     <option value="manager">Manager</option>
                     <option value="managing-director">Managing Director</option>
                     <option value="commercial-director">Commercial Director</option>
+                    <option value="commercial">Commercial</option>
                   </select>
                 </div>
 

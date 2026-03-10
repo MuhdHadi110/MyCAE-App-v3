@@ -190,6 +190,12 @@ export const getRoleInfo = (role: UserRole) => {
       icon: '💼',
       level: ROLE_HIERARCHY['commercial-director'],
     },
+    'commercial': {
+      label: 'Commercial Director',
+      color: 'bg-orange-100 text-orange-800 border-orange-200',
+      icon: '💼',
+      level: ROLE_HIERARCHY.commercial,
+    },
     'admin': {
         label: 'Admin',
         color: 'bg-yellow-100 text-yellow-800 border-yellow-200',

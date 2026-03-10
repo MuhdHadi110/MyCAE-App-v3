@@ -19,6 +19,7 @@ const formatRole = (role: UserRole): string => {
     'manager': 'Manager',
     'managing-director': 'Managing Director',
     'commercial-director': 'Commercial Director',
+    'commercial': 'Commercial Director',
     'admin': 'Admin',
   };
   return roleMap[role] || role;
@@ -148,6 +149,7 @@ export const TeamScreen: React.FC = () => {
       case 'managing-director':
         return 'bg-red-100 text-red-800';
       case 'commercial-director':
+      case 'commercial':
         return 'bg-orange-100 text-orange-800';
       default:
         return 'bg-gray-100 text-gray-800';

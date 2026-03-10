@@ -1,4 +1,4 @@
-export type UserRole = 'engineer' | 'senior-engineer' | 'principal-engineer' | 'manager' | 'managing-director' | 'commercial-director' | 'admin';
+export type UserRole = 'engineer' | 'senior-engineer' | 'principal-engineer' | 'manager' | 'managing-director' | 'commercial-director' | 'commercial' | 'admin';
 
 export interface User {
   id: string;
@@ -26,7 +26,8 @@ export const ROLE_HIERARCHY: Record<UserRole, number> = {
   'senior-engineer': 2,
   'principal-engineer': 3,
   'manager': 3,
-  'managing-director': 4,
   'commercial-director': 4,
+  'commercial': 4,
+  'managing-director': 4,
   'admin': 5,
 };

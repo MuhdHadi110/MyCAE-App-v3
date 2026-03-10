@@ -268,6 +268,7 @@ export const EditTeamMemberModal: React.FC<EditTeamMemberModalProps> = ({
                       { value: 'manager', label: 'Manager' },
                       { value: 'managing-director', label: 'Managing Director' },
                       { value: 'commercial-director', label: 'Commercial Director' },
+                      { value: 'commercial', label: 'Commercial' },
                       { value: 'admin', label: 'Admin' },
                     ].map((roleOption) => (
                       <label key={roleOption.value} className="flex items-center gap-2 cursor-pointer">
