@@ -58,8 +58,8 @@ export function BulkUploadModal({ isOpen, onClose, onImport }: BulkUploadModalPr
 
   const downloadTemplate = () => {
     const link = document.createElement('a');
-    link.href = '/templates/inventory-bulk-upload-template.csv';
-    link.download = 'inventory-bulk-upload-template.csv';
+    link.href = '/templates/inventory-bulk-upload-template.xlsx';
+    link.download = 'inventory-bulk-upload-template.xlsx';
     link.click();
   };
 
@@ -83,9 +83,10 @@ export function BulkUploadModal({ isOpen, onClose, onImport }: BulkUploadModalPr
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <h3 className="font-medium text-blue-900 mb-2">How to use bulk import:</h3>
             <ol className="list-decimal list-inside space-y-1 text-sm text-blue-800">
-              <li>Download the CSV template below</li>
-              <li>Fill in your inventory data (keep the header row)</li>
-              <li>Upload the completed CSV file</li>
+              <li>Download the Excel template below</li>
+              <li>Open in Excel and review the Instructions sheet</li>
+              <li>Fill in your inventory data in the "Inventory Data" sheet (keep the header row)</li>
+              <li>Save as CSV format and upload the file</li>
               <li>Review the validation results</li>
             </ol>
           </div>
@@ -98,14 +99,14 @@ export function BulkUploadModal({ isOpen, onClose, onImport }: BulkUploadModalPr
               className="w-full"
             >
               <Download className="w-4 h-4 mr-2" />
-              Download CSV Template
+              Download Excel Template
             </Button>
           </div>
 
           {/* File Upload */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Upload CSV File
+              Upload CSV File (Save Excel as CSV)
             </label>
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
               <input
