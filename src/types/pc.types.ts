@@ -15,6 +15,12 @@ export interface PC {
   notes?: string;
   softwareUsed?: string[];
   lastUpdated: string;
+  assignee?: {
+    id: string;
+    name: string;
+    email: string;
+    avatar?: string;
+  };
 }
 
 export interface PCAssignment {

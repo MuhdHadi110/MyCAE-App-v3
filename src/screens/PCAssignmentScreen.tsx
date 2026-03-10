@@ -7,6 +7,7 @@ import { AddPCModal } from '../components/modals/AddPCModal';
 import { AssignPCModal } from '../components/modals/AssignPCModal';
 import { EditPCModal } from '../components/modals/EditPCModal';
 import { DropdownMenu, DropdownTrigger } from '../components/ui/DropdownMenu';
+import { Avatar } from '../components/ui/Avatar';
 import type { PC } from '../types/pc.types';
 
 export const PCAssignmentScreen: React.FC = () => {
@@ -200,11 +201,20 @@ export const PCAssignmentScreen: React.FC = () => {
               {pc.status === 'assigned' && (
                 <div className="mb-4 p-4 bg-gray-50 rounded-lg">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center flex-shrink-0">
-                      <span className="text-white font-semibold text-sm">
-                        {pc.assignedTo ? pc.assignedTo.charAt(0).toUpperCase() : '?'}
-                      </span>
-                    </div>
+                    {pc.assignee?.avatar ? (
+                      <Avatar 
+                        src={pc.assignee.avatar} 
+                        alt={pc.assignee.name || 'User'} 
+                        size="md"
+                        className="flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-white font-semibold text-sm">
+                          {pc.assignedTo ? pc.assignedTo.charAt(0).toUpperCase() : '?'}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{pc.assignedTo || 'Unknown User'}</p>
                       {pc.assignedToEmail && (
