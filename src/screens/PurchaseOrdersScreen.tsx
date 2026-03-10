@@ -266,7 +266,21 @@ export const PurchaseOrdersScreen: React.FC = () => {
                     </div>
                     <div className="flex flex-col items-end gap-3">
                       <div className="text-right">
-                        <p className="text-2xl font-bold text-gray-900">RM {(po.amount || 0).toLocaleString('en-MY', { minimumFractionDigits: 2 })}</p>
+                        {/* Show original currency if not MYR, with MYR conversion below */}
+                        {po.currency && po.currency !== 'MYR' ? (
+                          <div className="flex flex-col items-end">
+                            <p className="text-2xl font-bold text-gray-900">
+                              {po.currency} {(po.amount || 0).toLocaleString('en-MY', { minimumFractionDigits: 2 })}
+                            </p>
+                            <p className="text-sm text-gray-500 mt-1">
+                              ≈ RM {(po.amountMyrAdjusted || po.amountMyr || 0).toLocaleString('en-MY', { minimumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-2xl font-bold text-gray-900">
+                            RM {(po.amountMyrAdjusted || po.amountMyr || po.amount || 0).toLocaleString('en-MY', { minimumFractionDigits: 2 })}
+                          </p>
+                        )}
                       </div>
                       {canUpload && (
                         <div className="flex gap-2">
