@@ -140,18 +140,24 @@ export const ReceivedPOsTab: React.FC<ReceivedPOsTabProps> = memo(({
       accessor: 'amount',
       sortable: true,
       align: 'right',
-      cell: (_, row) => (
-        <div className="flex flex-col items-end">
-          <span className="font-bold text-gray-900">
-            {row.currency} {row.amount.toLocaleString()}
-          </span>
-          {row.amount_myr && (
-            <span className="text-xs text-gray-500">
-              RM {row.amount_myr.toLocaleString()}
+      cell: (_, row) => {
+        // Check for MYR amount in various property names (backend uses different naming)
+        const amountMyr = row.amount_myr || (row as any).amountMyr || (row as any).amount_myr_adjusted || (row as any).amountMyrAdjusted;
+        const isForeignCurrency = row.currency && row.currency !== 'MYR';
+        
+        return (
+          <div className="flex flex-col items-end">
+            <span className="font-bold text-gray-900">
+              {row.currency} {row.amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
             </span>
-          )}
-        </div>
-      ),
+            {isForeignCurrency && amountMyr && (
+              <span className="text-xs text-gray-500 mt-0.5">
+                ≈ RM {amountMyr.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: 'receivedDate',
@@ -216,7 +222,18 @@ export const ReceivedPOsTab: React.FC<ReceivedPOsTabProps> = memo(({
                 </span>
               )}
             </div>
-            <p className="text-2xl font-bold text-gray-900">{row.currency} {row.amount.toLocaleString()}</p>
+            <div className="flex flex-col items-end">
+              <p className="text-2xl font-bold text-gray-900">{row.currency} {row.amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })}</p>
+              {(() => {
+                const amountMyr = row.amount_myr || (row as any).amountMyr || (row as any).amount_myr_adjusted || (row as any).amountMyrAdjusted;
+                const isForeignCurrency = row.currency && row.currency !== 'MYR';
+                return isForeignCurrency && amountMyr ? (
+                  <p className="text-sm text-gray-500 mt-0.5">
+                    ≈ RM {amountMyr.toLocaleString('en-MY', { minimumFractionDigits: 2 })}
+                  </p>
+                ) : null;
+              })()}
+            </div>
           </div>
 
           {/* Project code and title */}
