@@ -156,23 +156,7 @@ export const FinanceOverviewScreen: React.FC = () => {
                 </select>
               </div>
 
-              {/* Currency Toggle */}
-              <button
-                onClick={() => setShowOriginalCurrency(!showOriginalCurrency)}
-                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-colors ${
-                  showOriginalCurrency
-                    ? 'bg-primary-100 text-primary-700 border border-primary-200'
-                    : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
-                }`}
-                title={showOriginalCurrency ? 'Showing original currencies' : 'Showing MYR'}
-              >
-                {showOriginalCurrency ? (
-                  <ToggleRight className="w-5 h-5" />
-                ) : (
-                  <ToggleLeft className="w-5 h-5" />
-                )}
-                {showOriginalCurrency ? 'Original' : 'MYR'}
-              </button>
+
             </div>
           </div>
         </div>
