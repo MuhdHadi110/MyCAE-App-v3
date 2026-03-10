@@ -87,8 +87,8 @@ export const StructureCreatorModal: React.FC<StructureCreatorModalProps> = ({
     });
   };
 
-  // Roles to exclude from project assignment
-  const excludedRoles = ['commercial', 'admin', 'finance'];
+  // Roles to exclude from project assignment (commercial roles, admin, finance)
+  const excludedRoles = ['commercial', 'commercial-director', 'admin', 'finance'];
 
   // Helper function to get role from team member (handles nested user object)
   const getMemberRole = (tm: any): string => {

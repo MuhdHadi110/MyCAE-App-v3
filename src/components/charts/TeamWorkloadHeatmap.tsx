@@ -76,8 +76,8 @@ export const TeamWorkloadHeatmap: React.FC = () => {
       // Build workload data
       const workloads: EngineerWorkload[] = [];
       
-      // Roles to exclude from team workload view
-      const excludedRoles = ['commercial', 'admin', 'finance'];
+      // Roles to exclude from team workload view (commercial roles, admin, finance)
+      const excludedRoles = ['commercial', 'commercial-director', 'admin', 'finance'];
       
       // Helper function to get role from team member (handles nested user object)
       const getMemberRole = (member: any): string => {
