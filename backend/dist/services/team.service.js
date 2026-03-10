@@ -300,6 +300,7 @@ class TeamService {
                 User_1.UserRole.PRINCIPAL_ENGINEER,
                 User_1.UserRole.MANAGER,
                 User_1.UserRole.MANAGING_DIRECTOR,
+                User_1.UserRole.COMMERCIAL_DIRECTOR,
                 User_1.UserRole.ADMIN,
             ];
             // Ensure all roles are valid

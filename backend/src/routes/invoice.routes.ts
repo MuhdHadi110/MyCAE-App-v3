@@ -543,12 +543,12 @@ router.post('/:id/submit-for-approval',
        } catch (activityError) {
         logger.error('Activity logging failed', { error: activityError });
         // Don't fail the request if activity logging fails
-      }
+       }
 
-      // Fetch all Managing Directors
+      // Fetch all Managing Directors and Commercial Directors
       const userRepo = AppDataSource.getRepository(User);
       const mds = await userRepo.createQueryBuilder('user')
-        .where(`JSON_CONTAINS(user.roles, '"managing-director"')`)
+        .where(`JSON_CONTAINS(user.roles, '"managing-director"') OR JSON_CONTAINS(user.roles, '"commercial"')`)
         .getMany();
 
       // Format date/time
@@ -736,10 +736,10 @@ router.post('/:id/withdraw',
         // Don't fail the request if activity logging fails
       }
 
-      // Fetch all Managing Directors
+      // Fetch all Managing Directors and Commercial Directors
       const userRepo = AppDataSource.getRepository(User);
       const mds = await userRepo.createQueryBuilder('user')
-        .where(`JSON_CONTAINS(user.roles, '"managing-director"')`)
+        .where(`JSON_CONTAINS(user.roles, '"managing-director"') OR JSON_CONTAINS(user.roles, '"commercial"')`)
         .getMany();
 
       // Format date/time

@@ -1,37 +1,4 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -477,10 +444,10 @@ router.post('/:id/submit-for-approval', (0, auth_1.authorize)(User_1.UserRole.SE
             logger_1.logger.error('Activity logging failed', { error: activityError });
             // Don't fail the request if activity logging fails
         }
-        // Fetch all Managing Directors
+        // Fetch all Managing Directors and Commercial Directors
         const userRepo = database_1.AppDataSource.getRepository(User_1.User);
         const mds = await userRepo.createQueryBuilder('user')
-            .where(`JSON_CONTAINS(user.roles, '"managing-director"')`)
+            .where(`JSON_CONTAINS(user.roles, '"managing-director"') OR JSON_CONTAINS(user.roles, '"commercial"')`)
             .getMany();
         // Format date/time
         const submittedDate = invoice.submitted_for_approval_at.toLocaleDateString('en-MY', {
@@ -610,10 +577,10 @@ router.post('/:id/withdraw', (0, auth_1.authorize)(User_1.UserRole.ADMIN, User_1
             logger_1.logger.error('Activity logging failed', { error: activityError });
             // Don't fail the request if activity logging fails
         }
-        // Fetch all Managing Directors
+        // Fetch all Managing Directors and Commercial Directors
         const userRepo = database_1.AppDataSource.getRepository(User_1.User);
         const mds = await userRepo.createQueryBuilder('user')
-            .where(`JSON_CONTAINS(user.roles, '"managing-director"')`)
+            .where(`JSON_CONTAINS(user.roles, '"managing-director"') OR JSON_CONTAINS(user.roles, '"commercial"')`)
             .getMany();
         // Format date/time
         const withdrawnDate = new Date().toLocaleDateString('en-MY', {
@@ -836,34 +803,6 @@ router.get('/:id/pdf', async (req, res) => {
             invoiceId: req.params.id
         });
         res.status(500).json({ error: `Failed to serve invoice document: ${error.message}` });
-    }
-});
-/**
- * Debug endpoint to check company settings
- * Only available in development mode
- */
-router.get('/debug-settings', async (req, res) => {
-    // Only allow in development mode
-    if (process.env.NODE_ENV === 'production') {
-        return res.status(404).json({ error: 'Not found' });
-    }
-    try {
-        const { CompanySettingsService } = await Promise.resolve().then(() => __importStar(require('../services/companySettings.service')));
-        const settings = await CompanySettingsService.getSettings();
-        res.json({
-            success: true,
-            settings: {
-                company_name: settings.company_name,
-                logo_url: settings.logo_url,
-                logo_size: settings.logo_size,
-                header_position: settings.header_position,
-                page_margin: settings.page_margin
-            }
-        });
-    }
-    catch (error) {
-        logger_1.logger.error('Settings debug failed', { error });
-        res.status(500).json({ error: `Failed to load settings: ${error.message}` });
     }
 });
 /**

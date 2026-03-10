@@ -19,6 +19,7 @@ var UserRole;
     UserRole["PRINCIPAL_ENGINEER"] = "principal-engineer";
     UserRole["MANAGER"] = "manager";
     UserRole["MANAGING_DIRECTOR"] = "managing-director";
+    UserRole["COMMERCIAL_DIRECTOR"] = "commercial-director";
     UserRole["ADMIN"] = "admin";
 })(UserRole || (exports.UserRole = UserRole = {}));
 let User = class User {
@@ -85,6 +86,7 @@ let User = class User {
         const roleHierarchy = {
             [UserRole.ADMIN]: 5,
             [UserRole.MANAGING_DIRECTOR]: 4,
+            [UserRole.COMMERCIAL_DIRECTOR]: 4,
             [UserRole.MANAGER]: 3,
             [UserRole.PRINCIPAL_ENGINEER]: 3,
             [UserRole.SENIOR_ENGINEER]: 2,

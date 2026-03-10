@@ -165,11 +165,11 @@ router.post(
       // Fetch the complete PO with project relation
       const fullPO = await poService.getById(po.id);
 
-      // Send notification to Managing Directors (don't fail request if email fails)
+      // Send notification to Managing Directors and Commercial Directors (don't fail request if email fails)
       try {
         const userRepo = AppDataSource.getRepository(User);
         const mds = await userRepo.createQueryBuilder('user')
-          .where(`JSON_CONTAINS(user.roles, '"managing-director"')`)
+          .where(`JSON_CONTAINS(user.roles, '"managing-director"') OR JSON_CONTAINS(user.roles, '"commercial"')`)
           .getMany();
 
         if (mds.length > 0) {

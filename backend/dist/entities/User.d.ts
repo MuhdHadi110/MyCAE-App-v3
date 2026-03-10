@@ -4,6 +4,7 @@ export declare enum UserRole {
     PRINCIPAL_ENGINEER = "principal-engineer",
     MANAGER = "manager",
     MANAGING_DIRECTOR = "managing-director",
+    COMMERCIAL_DIRECTOR = "commercial-director",
     ADMIN = "admin"
 }
 export declare class User {
