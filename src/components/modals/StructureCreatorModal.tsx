@@ -87,17 +87,22 @@ export const StructureCreatorModal: React.FC<StructureCreatorModalProps> = ({
     });
   };
 
-  // All staff can be lead engineers
-  const leadEngineers = teamMembers;
+  // Roles to exclude from project assignment
+  const excludedRoles = ['commercial', 'admin', 'finance'];
 
-  // Project Managers
+  // Filter out commercial, admin, and finance personnel from lead engineers
+  const leadEngineers = teamMembers.filter(
+    (tm) => !excludedRoles.includes(tm.role)
+  );
+
+  // Project Managers: Senior Engineers and above (excluding commercial, admin, finance)
   const projectManagers = teamMembers.filter(
     (tm) =>
-      tm.role === 'senior-engineer' ||
-      tm.role === 'principal-engineer' ||
-      tm.role === 'manager' ||
-      tm.role === 'managing-director' ||
-      tm.role === 'admin'
+      !excludedRoles.includes(tm.role) &&
+      (tm.role === 'senior-engineer' ||
+        tm.role === 'principal-engineer' ||
+        tm.role === 'manager' ||
+        tm.role === 'managing-director')
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
