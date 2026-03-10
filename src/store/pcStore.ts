@@ -50,12 +50,6 @@ export const usePCStore = create<PCStore>((set) => ({
           notes: computer.notes,
           softwareUsed: computer.installed_software ? computer.installed_software.split(',').filter((s: string) => s.trim()) : [],
           lastUpdated: computer.updated_at || new Date().toISOString(),
-          assignee: computer.assignee ? {
-            id: computer.assignee.id,
-            name: computer.assignee.name,
-            email: computer.assignee.email,
-            avatar: computer.assignee.avatar,
-          } : undefined,
         };
       });
       set({ pcs: Array.isArray(pcs) ? pcs : [], loading: false });
