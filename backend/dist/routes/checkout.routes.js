@@ -397,7 +397,11 @@ router.get('/', async (req, res) => {
             group.returnedItems += checkout.returned_quantity;
             group.remainingItems += remainingQty;
             // Update overall status
-            if (group.remainingItems === 0) {
+            // Special handling for RECEIVED status (inventory receipts)
+            if (checkout.status === Checkout_1.CheckoutStatus.RECEIVED) {
+                group.status = 'received';
+            }
+            else if (group.remainingItems === 0) {
                 group.status = 'fully-returned';
             }
             else if (group.returnedItems > 0) {

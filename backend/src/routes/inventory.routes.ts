@@ -165,6 +165,22 @@ router.post(
       item.last_action_by = req.user!.name || req.user!.email;
       await inventoryRepo.save(item);
 
+      // Create a receipt record for tracking (item received into inventory)
+      const initialCheckout = checkoutRepo.create({
+        id: uuidv4(),
+        masterBarcode: `REC-${item.sku}-${Date.now()}`,
+        item_id: item.id,
+        user_id: req.user!.id,
+        quantity: item.quantity,
+        returned_quantity: 0, // Set to 0 so it doesn't show as "fully-returned"
+        checkout_date: new Date(),
+        status: CheckoutStatus.RECEIVED,
+        location: item.location || 'Warehouse',
+        purpose: `Item received: ${item.title}`,
+      });
+
+      await checkoutRepo.save(initialCheckout);
+
       res.status(201).json(item);
     } catch (error: any) {
       console.error('Error creating item:', error);
