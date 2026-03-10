@@ -298,7 +298,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ isOpen, onClos
                     />
                     <div>
                        <span className="font-semibold text-gray-900 dark:text-white block">
-                         This is master folder
+                          Master Folder
                        </span>
                        <span className="text-sm text-gray-600 dark:text-gray-400 block mt-1">
                          Divides into multiple sub folders with separate POs (eg : Substructures project with multiple POs)
