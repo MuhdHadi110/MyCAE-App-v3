@@ -22,7 +22,6 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
     let query = computerRepo.createQueryBuilder('computer')
       .leftJoinAndSelect('computer.assignee', 'assignee')
-      .addSelect(['assignee.id', 'assignee.name', 'assignee.email', 'assignee.avatar'])
       .orderBy('computer.device_name', 'ASC');
 
     // Exclude decommissioned PCs by default (unless explicitly requested)

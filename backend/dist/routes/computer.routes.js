@@ -20,7 +20,6 @@ router.get('/', async (req, res) => {
         const computerRepo = database_1.AppDataSource.getRepository(Computer_1.Computer);
         let query = computerRepo.createQueryBuilder('computer')
             .leftJoinAndSelect('computer.assignee', 'assignee')
-            .addSelect(['assignee.id', 'assignee.name', 'assignee.email', 'assignee.avatar'])
             .orderBy('computer.device_name', 'ASC');
         // Exclude decommissioned PCs by default (unless explicitly requested)
         if (includeDecommissioned !== 'true') {
