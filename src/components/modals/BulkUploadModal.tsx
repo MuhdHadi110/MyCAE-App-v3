@@ -59,13 +59,6 @@ export function BulkUploadModal({ isOpen, onClose, onImport }: BulkUploadModalPr
     onClose();
   };
 
-  const downloadTemplate = () => {
-    const link = document.createElement('a');
-    link.href = '/templates/inventory-bulk-upload-template.xlsx';
-    link.download = 'inventory-bulk-upload-template.xlsx';
-    link.click();
-  };
-
   const downloadCSVTemplate = () => {
     const template = `title,sku,barcode,category,quantity,unitOfMeasure,minimumStock,location,supplier,notes,lastCalibratedDate
 Chassis 9171,CHAS-9171,2114DF2,Chassis,14,units,2,Office,Kabex,Used for engine testing,15/03/2024
@@ -87,7 +80,7 @@ Wilcoxon Sensor,WILC-731-20G,1FADE7E,Vibration Sensor,1,pcs,1,Office,Mutiara Jay
     { name: 'title', label: 'Item Title', required: true, example: 'Chassis 9171', type: 'Text', description: 'Name or description of the inventory item' },
     { name: 'sku', label: 'SKU', required: true, example: 'CHAS-9171', type: 'Text', description: 'Unique Stock Keeping Unit code' },
     { name: 'barcode', label: 'Barcode', required: false, example: '2114DF2', type: 'Text', description: 'Product barcode or serial number' },
-    { name: 'category', label: 'Category', required: true, example: 'Chassis', type: 'Select', description: 'Must match existing system categories exactly' },
+    { name: 'category', label: 'Category', required: true, example: 'Chassis', type: 'Text', description: 'Item category - new categories will be created automatically if they do not exist' },
     { name: 'quantity', label: 'Quantity', required: true, example: '14', type: 'Number', description: 'Current stock quantity' },
     { name: 'unitOfMeasure', label: 'Unit of Measure', required: false, example: 'units', type: 'Text', description: 'Unit type: units, pcs, box, set, etc.' },
     { name: 'minimumStock', label: 'Minimum Stock', required: true, example: '2', type: 'Number', description: 'Minimum stock level for low stock alerts' },
@@ -164,51 +157,26 @@ Wilcoxon Sensor,WILC-731-20G,1FADE7E,Vibration Sensor,1,pcs,1,Office,Mutiara Jay
         <div className="p-6">
           {activeTab === 'upload' ? (
             <div className="space-y-6">
-              {/* Template Download Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5">
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <FileText className="w-6 h-6 text-blue-600" />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-blue-900 mb-1">Excel Template</h4>
-                      <p className="text-sm text-blue-700 mb-3">
-                        Download Excel template with instructions sheet and sample data.
-                      </p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={downloadTemplate}
-                        className="bg-white border-blue-300 text-blue-700 hover:bg-blue-50"
-                      >
-                        <Download className="w-4 h-4 mr-2" />
-                        Download Excel
-                      </Button>
-                    </div>
+              {/* Template Download */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <FileText className="w-6 h-6 text-blue-600" />
                   </div>
-                </div>
-
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-5">
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <FileText className="w-6 h-6 text-green-600" />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-green-900 mb-1">CSV Template</h4>
-                      <p className="text-sm text-green-700 mb-3">
-                        Direct CSV template ready to fill and upload.
-                      </p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={downloadCSVTemplate}
-                        className="bg-white border-green-300 text-green-700 hover:bg-green-50"
-                      >
-                        <Download className="w-4 h-4 mr-2" />
-                        Download CSV
-                      </Button>
-                    </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-blue-900 mb-1">Download CSV Template</h4>
+                    <p className="text-sm text-blue-700 mb-3">
+                      Download the CSV template with sample data to get started.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={downloadCSVTemplate}
+                      className="bg-white border-blue-300 text-blue-700 hover:bg-blue-50"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Download Template
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -217,9 +185,9 @@ Wilcoxon Sensor,WILC-731-20G,1FADE7E,Vibration Sensor,1,pcs,1,Office,Mutiara Jay
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h3 className="font-medium text-blue-900 mb-2">How to use bulk import:</h3>
                 <ol className="list-decimal list-inside space-y-1 text-sm text-blue-800">
-                  <li>Download the template (Excel or CSV)</li>
+                  <li>Download the CSV template</li>
                   <li>Fill in your inventory data (keep the header row)</li>
-                  <li>For <strong>Category</strong>, use exact names from the Field Reference tab</li>
+                  <li>For <strong>Category</strong>, you can use any category name - new categories will be created automatically</li>
                   <li>Date format: <strong>DD/MM/YYYY</strong> (e.g., 15/03/2024)</li>
                   <li>Upload the completed file</li>
                   <li>Review the validation results</li>
@@ -329,7 +297,7 @@ Wilcoxon Sensor,WILC-731-20G,1FADE7E,Vibration Sensor,1,pcs,1,Office,Mutiara Jay
                 <div>
                   <h4 className="font-medium text-blue-900 mb-1">Field Reference Guide</h4>
                   <p className="text-sm text-blue-700">
-                    Required fields are marked with a red badge. Categories must match exactly as listed below.
+                    Required fields are marked with a red badge. <strong>New categories</strong> can be added by simply typing them in the CSV - they will be created automatically.
                     Status is automatically calculated based on quantity vs minimum stock.
                   </p>
                 </div>
@@ -380,15 +348,15 @@ Wilcoxon Sensor,WILC-731-20G,1FADE7E,Vibration Sensor,1,pcs,1,Office,Mutiara Jay
                 </div>
               </div>
 
-              {/* Valid Categories */}
+              {/* Common Categories */}
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <Tag className="w-5 h-5 text-gray-600" />
-                  <h4 className="font-semibold text-gray-900">Valid Categories</h4>
+                  <h4 className="font-semibold text-gray-900">Common Categories</h4>
                 </div>
                 <div className="bg-white border border-gray-200 rounded-xl p-4">
                   <p className="text-sm text-gray-600 mb-3">
-                    Categories must match exactly as shown below (case-sensitive):
+                    These are commonly used categories. <strong>You can add new categories</strong> by simply typing them in the CSV file - they will be created automatically when you import.
                   </p>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                     {validCategories.map((category) => (
@@ -408,7 +376,7 @@ Wilcoxon Sensor,WILC-731-20G,1FADE7E,Vibration Sensor,1,pcs,1,Office,Mutiara Jay
                 </h4>
                 <ul className="text-sm text-amber-800 space-y-1 list-disc list-inside">
                   <li><strong>SKU must be unique</strong> - Each item needs a different SKU code</li>
-                  <li><strong>Category names are case-sensitive</strong> - Use exact spelling from the list above</li>
+                  <li><strong>You can add new categories</strong> - Just type any category name in the CSV, it will be created automatically</li>
                   <li><strong>Quantity and Minimum Stock</strong> must be numbers (no text)</li>
                   <li><strong>Date format:</strong> DD/MM/YYYY (e.g., 15/03/2024 for March 15, 2024)</li>
                   <li><strong>Status is auto-calculated</strong> - Don't include a status column, it's calculated automatically</li>
