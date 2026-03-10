@@ -140,21 +140,6 @@ router.post('/', (0, auth_1.authorize)(...INVENTORY_MODIFY_ROLES), [
         item.last_action_date = new Date();
         item.last_action_by = req.user.name || req.user.email;
         await inventoryRepo.save(item);
-        // Create an initial "in-stock" checkout record to track the item
-        // This represents the item being received/created in inventory
-        const initialCheckout = checkoutRepo.create({
-            id: (0, uuid_1.v4)(),
-            masterBarcode: `REC-${item.sku}-${Date.now()}`, // Receipt barcode
-            item_id: item.id,
-            user_id: req.user.id, // The user who added the item
-            quantity: item.quantity,
-            returned_quantity: item.quantity, // Fully "returned" to warehouse = in stock
-            checkout_date: new Date(),
-            status: Checkout_1.CheckoutStatus.RECEIVED, // Status is RECEIVED means it's newly added to warehouse
-            location: 'Warehouse', // Default location for new items
-            purpose: `Item received: ${item.title}`,
-        });
-        await checkoutRepo.save(initialCheckout);
         res.status(201).json(item);
     }
     catch (error) {
