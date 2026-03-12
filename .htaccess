@@ -5,7 +5,7 @@ RewriteCond %{HTTPS} off
 RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
 # DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN
-PassengerAppRoot "/home/mycaec78/mycaetracker-backend"
+PassengerAppRoot "/home/mycaec78/app.mycae.co/backend"
 PassengerBaseURI "/api"
 PassengerNodejs "/home/mycaec78/nodevenv/app.mycae.co/20/bin/node"
 PassengerAppType node
