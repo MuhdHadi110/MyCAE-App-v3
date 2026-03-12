@@ -7,7 +7,7 @@ deployment:
     - export REPO_PATH=/home/mycaec78/repositories/MyCAE-App
     - export BACKENDPATH=/home/mycaec78/mycaetracker-backend
     - export LOGPATH=/home/mycaec78/logs
-    - export DEPLOYPATH=/home/mycaec78/public_html/
+    - export DEPLOYPATH=/home/mycaec78/public_html/app.mycae.co/dist
     
     # Ensure directories exist
     - /bin/mkdir -p $DEPLOYPATH
