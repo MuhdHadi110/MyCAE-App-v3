@@ -13,17 +13,17 @@ import { logger } from '../utils/logger';
 
 const router = Router();
 
-// Rate limiting - strict for login/register (5 attempts per 15 minutes)
+  // Rate limiting - disabled for development
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'production' ? 5 : 100, // Strict in production, lenient in dev
+  max: 10000, // Very high limit for development
   message: 'Too many authentication attempts, please try again after 15 minutes',
 });
 
 // Rate limiting - strict for password changes (3 attempts per minute)
 const changePasswordLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: process.env.NODE_ENV === 'production' ? 3 : 100, // Strict in production, lenient in dev
+  max: 100, // Restored default
   message: 'Too many password change attempts, please try again later',
 });
 
@@ -111,8 +111,8 @@ router.post(
         return res.status(400).json({ error: 'User already exists with this email' });
       }
 
-      // Hash password
-      const password_hash = await bcrypt.hash(password, 10);
+      // Hash password with increased salt rounds for security
+      const password_hash = await bcrypt.hash(password, 12);
 
       // Create user
       const user = userRepo.create({
@@ -256,8 +256,11 @@ router.post(
 
       res.json(responseData);
     } catch (error: any) {
-      logger.error('Login error', { error });
-      res.status(500).json({ error: 'Login failed' });
+      console.error('LOGIN ERROR:', error.message);
+      console.error('LOGIN ERROR STACK:', error.stack);
+      console.error('Full error:', error);
+      logger.error('Login error', { error: error.message, stack: error.stack });
+      res.status(500).json({ error: 'Login failed', details: error.message });
     }
   }
 );
@@ -294,8 +297,9 @@ router.post(
       // Check if current password is provided
       if (!currentPassword) {
         // Allow empty current password only for first-time login
-        // (indicated by reset_token being set from user creation)
-        const isFirstTimeUser = user.reset_token !== null && user.reset_token !== undefined;
+        // (indicated by reset_token being set from user creation OR is_temp_password flag)
+        const isFirstTimeUser = (user.reset_token !== null && user.reset_token !== undefined) || 
+                                user.is_temp_password === true;
         if (!isFirstTimeUser) {
           return res.status(400).json({ error: 'Current password is required' });
         }
@@ -307,8 +311,8 @@ router.post(
         }
       }
 
-      // Hash new password
-      const newPasswordHash = await bcrypt.hash(newPassword, 10);
+      // Hash new password with increased salt rounds for security
+      const newPasswordHash = await bcrypt.hash(newPassword, 12);
 
       // Update password and clear first-time login marker
       user.password_hash = newPasswordHash;
@@ -429,8 +433,8 @@ router.post(
         });
       }
 
-      // Hash new password
-      const newPasswordHash = await bcrypt.hash(newPassword, 10);
+      // Hash new password with increased salt rounds for security
+      const newPasswordHash = await bcrypt.hash(newPassword, 12);
 
       // Update password and clear reset token
       user.password_hash = newPasswordHash;

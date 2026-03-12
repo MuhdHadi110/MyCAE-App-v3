@@ -41,6 +41,37 @@ export class User {
   })
   roleValue: string;
 
+  @Column({
+    name: 'is_active',
+    type: 'boolean',
+    default: false,
+  })
+  is_active: boolean;
+
+  @Column({
+    name: 'department',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
+  department?: string;
+
+  @Column({
+    name: 'position',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
+  position?: string;
+
+  @Column({
+    name: 'avatar',
+    type: 'varchar',
+    length: 500,
+    nullable: true,
+  })
+  avatar?: string;
+
   /**
    * Get all roles as an array
    */
@@ -81,15 +112,6 @@ export class User {
   set role(value: UserRole) {
     this.roles = [value];
   }
-
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  department?: string;
-
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  position?: string;
-
-  @Column({ type: 'varchar', length: 500, nullable: true })
-  avatar?: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   reset_token?: string;

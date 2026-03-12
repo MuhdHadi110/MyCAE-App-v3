@@ -194,8 +194,7 @@ export const Modal: React.FC<ModalProps> = ({
         tabIndex={-1}
         className={cn(
           'bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-scale-in',
-          'max-w-[95vw]',
-          `md:${sizeClasses[size]}`,
+          sizeClasses[size],
           size === 'full' && 'h-[90vh]',
           className
         )}

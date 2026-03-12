@@ -1,6 +1,7 @@
 import { DataSource } from 'typeorm';
 import dotenv from 'dotenv';
 import { logger } from '../utils/logger';
+import path from 'path';
 
 // Import all entities explicitly for TypeORM to recognize them
 import { Activity } from '../entities/Activity';
@@ -60,12 +61,10 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME,
-  synchronize: false, // Disabled for performance
+  synchronize: false, // Disable auto-sync to avoid constraint issues
   logging: false, // Disabled for performance
   entities: entities,
-  migrations: process.env.NODE_ENV === 'production'
-    ? ['dist/migrations/**/*.js']
-    : ['src/migrations/**/*.ts'],
+  migrations: [path.join(__dirname, '../migrations/*.ts')],
   subscribers: [],
   charset: 'utf8mb4',
   timezone: 'Z',

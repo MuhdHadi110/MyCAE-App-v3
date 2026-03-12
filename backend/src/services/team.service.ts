@@ -239,7 +239,7 @@ export class TeamService {
       }
 
       tempPassword = generateTempPassword();
-      const hashedPassword = await bcrypt.hash(tempPassword, 10);
+      const hashedPassword = await bcrypt.hash(tempPassword, 12); // Increased salt rounds for security
       
       // Set password expiry to 7 days from now
       const expiryDate = new Date();
@@ -249,10 +249,12 @@ export class TeamService {
         name,
         email,
         password_hash: hashedPassword,
-        role: role as UserRole,
         temp_password_expires: expiryDate,
         is_temp_password: true,
       });
+      
+      // Set role using the setter to ensure it's properly stored as JSON array
+      newUser.roles = [role as UserRole];
 
       await this.userRepo.save(newUser);
       

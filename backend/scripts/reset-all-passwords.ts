@@ -26,10 +26,10 @@ async function resetAllPasswords() {
     const allUsers = await userRepo.find();
     console.log(`📊 Found ${allUsers.length} users in database\n`);
 
-    // Hash the standard password
-    const hashedPassword = await bcrypt.hash(STANDARD_PASSWORD, 10);
-    console.log(`🔑 Standard password: ${STANDARD_PASSWORD}`);
-    console.log(`🔒 Password hash created\n`);
+    // Hash the standard password with increased salt rounds for security
+    const hashedPassword = await bcrypt.hash(STANDARD_PASSWORD, 12);
+    // Password intentionally not logged for security
+    console.log(`🔒 Password hash created (password not logged for security)\n`);
 
     let resetCount = 0;
     let skippedCount = 0;

@@ -66,7 +66,7 @@ export const EditContactModal: React.FC<EditContactModalProps> = ({
   if (!contact) return null;
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title={`Edit Contact - ${companyName}`} icon={<User className="w-5 h-5 text-primary-600" />} size="md">
+    <Modal isOpen={isOpen} onClose={handleClose} title={`Edit Contact - ${companyName}`} icon={<User className="w-5 h-5 text-primary-600" />} size="lg">
       <form onSubmit={handleSubmit} className="space-y-6 p-6">
         <div className="space-y-4">
           <div>

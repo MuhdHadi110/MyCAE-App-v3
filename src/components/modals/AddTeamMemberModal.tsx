@@ -157,11 +157,35 @@ export const AddTeamMemberModal: React.FC<AddTeamMemberModalProps> = ({ isOpen, 
                 </div>
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="text-sm text-blue-800">
-                  <strong>📧 Email Sent:</strong> Login credentials have been sent to {successData.email}. The user must change their password on first login.
-                </p>
-              </div>
+              {successData.emailStatus === 'sent' ? (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-sm text-blue-800">
+                    <strong>📧 Email Sent:</strong> Login credentials have been sent to {successData.email}. The user must change their password on first login.
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-3">
+                  <p className="text-sm text-red-800 font-medium">
+                    ⚠️ Email Failed to Send
+                  </p>
+                  <p className="text-sm text-red-700">
+                    Please copy and share this password with the user manually:
+                  </p>
+                  <div className="flex items-center gap-2 bg-white border border-red-300 rounded-lg p-3">
+                    <code className="flex-1 text-lg font-mono text-red-900">{successData.tempPassword}</code>
+                    <button
+                      onClick={() => copyToClipboard(successData.tempPassword!)}
+                      className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Copy password"
+                    >
+                      {copiedPassword ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+                    </button>
+                  </div>
+                  {copiedPassword && (
+                    <p className="text-xs text-green-600 font-medium">✓ Password copied to clipboard!</p>
+                  )}
+                </div>
+              )}
 
               <div className="flex justify-end pt-4 border-t border-gray-200">
                 <button

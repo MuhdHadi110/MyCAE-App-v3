@@ -101,8 +101,12 @@ export default {
         'scale-out': 'scaleOut 0.15s ease-in',
         'bounce-in': 'bounceIn 0.5s ease-out',
         'shimmer': 'shimmer 2s infinite linear',
-        'pulse-slow': 'pulse 3s ease-in-out infinite',
+        'pulse-slow': 'pulseSlow 6s ease-in-out infinite',
+        'pulse-slow-delayed': 'pulseSlowDelayed 8s ease-in-out infinite',
+        'ping-slow': 'pingSlow 4s ease-in-out infinite',
+        'ping-slow-delayed': 'pingSlowDelayed 5s ease-in-out infinite',
         'spin-slow': 'spin 2s linear infinite',
+        'flow': 'flow 8s linear infinite',
       },
       keyframes: {
         fadeIn: {
@@ -146,6 +150,28 @@ export default {
         shimmer: {
           '0%': { backgroundPosition: '-200% 0' },
           '100%': { backgroundPosition: '200% 0' },
+        },
+        pulseSlow: {
+          '0%, 100%': { opacity: '0.3', transform: 'scale(1)' },
+          '50%': { opacity: '0.6', transform: 'scale(1.05)' },
+        },
+        pulseSlowDelayed: {
+          '0%, 100%': { opacity: '0.2', transform: 'scale(1)' },
+          '50%': { opacity: '0.5', transform: 'scale(1.08)' },
+        },
+        pingSlow: {
+          '0%': { transform: 'scale(1)', opacity: '0.5' },
+          '50%': { transform: 'scale(1.5)', opacity: '0.2' },
+          '100%': { transform: 'scale(1)', opacity: '0.5' },
+        },
+        pingSlowDelayed: {
+          '0%': { transform: 'scale(1)', opacity: '0.4' },
+          '60%': { transform: 'scale(1.3)', opacity: '0.15' },
+          '100%': { transform: 'scale(1)', opacity: '0.4' },
+        },
+        flow: {
+          '0%': { strokeDashoffset: '1000' },
+          '100%': { strokeDashoffset: '0' },
         },
       },
     },

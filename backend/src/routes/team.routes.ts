@@ -4,6 +4,7 @@ import { UserRole } from '../entities/User';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth';
 import { body, validationResult } from 'express-validator';
 import teamService from '../services/team.service';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
@@ -44,7 +45,8 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     res.json(result);
   } catch (error: any) {
     console.error('Error fetching team members:', error);
-    res.status(500).json({ error: 'Failed to fetch team members' });
+    logger.error('Error fetching team members', { error: error.message, stack: error.stack });
+    res.status(500).json({ error: 'Failed to fetch team members', details: error.message });
   }
 });
 
