@@ -5,7 +5,7 @@ RewriteCond %{HTTPS} off
 RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
 # DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN
-PassengerAppRoot "/home/mycaec78/app.mycae.co/repositories/MyCAE-App-v3/backend"
+PassengerAppRoot "/home/mycaec78/mycaetracker-backend"
 PassengerBaseURI "/api"
 PassengerNodejs "/home/mycaec78/nodevenv/app.mycae.co/20/bin/node"
 PassengerAppType node
@@ -18,3 +18,16 @@ RewriteCond %{REQUEST_URI} !^/api
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.html [L]
+
+# Security Headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# Enable compression
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json
+</IfModule>

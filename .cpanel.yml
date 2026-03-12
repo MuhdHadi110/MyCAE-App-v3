@@ -1,30 +1,27 @@
 ---
 deployment:
   tasks:
-    # Set paths
-    - export DEPLOYPATH=/home/mycaet40/public_html/
-    - export REPO_PATH=/home/mycaet40/repositories/MyCAE-App-v3
+    # Set paths for mycaec78 / app.mycae.co
+    - export DEPLOYPATH=/home/mycaec78/public_html/
+    - export REPO_PATH=/home/mycaec78/repositories/MyCAE-App
     
     # Build and deploy frontend
     - cd $REPO_PATH
-    - npm install
+    - npm ci --production=false
     - npm run build
     - /bin/cp -R dist/* $DEPLOYPATH
     
     # Build backend
     - cd $REPO_PATH/backend
-    - npm install
+    - npm ci --production=false
     - npm run build
     
     # Copy backend files - force update
-    - export BACKENDPATH=/home/mycaet40/mycaetracker-backend/
+    - export BACKENDPATH=/home/mycaec78/mycaetracker-backend/
     - /bin/mkdir -p $BACKENDPATH
     - /bin/rm -rf $BACKENDPATH/dist
     - /bin/cp -R $REPO_PATH/backend/dist $BACKENDPATH
     - /bin/cp -f $REPO_PATH/backend/package.json $BACKENDPATH
     - /bin/cp -f $REPO_PATH/backend/package-lock.json $BACKENDPATH
     - if [ ! -f $BACKENDPATH.env ]; then /bin/cp $REPO_PATH/backend/.env.example $BACKENDPATH.env; fi
-    - echo "Backend deployed at $(date)" >> $BACKENDPATH/deploy.log
-    
-    # Restart backend (optional - remove if not using PM2)
-    - /usr/local/bin/pm2 restart mycae-api 2>/dev/null || true
+    - echo "Deployed at $(date)" >> $BACKENDPATH/deploy.log
