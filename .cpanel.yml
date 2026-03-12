@@ -1,27 +1,45 @@
 ---
 deployment:
   tasks:
-    # Set paths for mycaec78 / app.mycae.co
-    - export DEPLOYPATH=/home/mycaec78/public_html/
+    # Configuration for mycaec78 / app.mycae.co
+    - export CPANEL_USER=mycaec78
+    - export DOMAIN=app.mycae.co
     - export REPO_PATH=/home/mycaec78/repositories/MyCAE-App
+    - export BACKENDPATH=/home/mycaec78/mycaetracker-backend
+    - export LOGPATH=/home/mycaec78/logs
+    - export DEPLOYPATH=/home/mycaec78/public_html/
+    
+    # Ensure directories exist
+    - /bin/mkdir -p $DEPLOYPATH
+    - /bin/mkdir -p $BACKENDPATH
+    - /bin/mkdir -p $LOGPATH
     
     # Build and deploy frontend
+    - echo "=== Building Frontend ===" >> $LOGPATH/deploy.log
     - cd $REPO_PATH
-    - npm ci --production=false
-    - npm run build
-    - /bin/cp -R dist/* $DEPLOYPATH
+    - npm ci --production=false 2>&1 | tee -a $LOGPATH/deploy.log
+    - npm run build 2>&1 | tee -a $LOGPATH/deploy.log
+    
+    # Deploy frontend (preserving .htaccess if exists)
+    - if [ -f $DEPLOYPATH.htaccess ]; then /bin/cp $DEPLOYPATH.htaccess $DEPLOYPATH.htaccess.backup; fi
+    - /bin/cp -R $REPO_PATH/dist/* $DEPLOYPATH
+    - if [ -f $DEPLOYPATH.htaccess.backup ]; then /bin/mv $DEPLOYPATH.htaccess.backup $DEPLOYPATH.htaccess; fi
+    - echo "Frontend deployed" >> $LOGPATH/deploy.log
     
     # Build backend
+    - echo "=== Building Backend ===" >> $LOGPATH/deploy.log
     - cd $REPO_PATH/backend
-    - npm ci --production=false
-    - npm run build
+    - npm ci --production=false 2>&1 | tee -a $LOGPATH/deploy.log
+    - npm run build 2>&1 | tee -a $LOGPATH/deploy.log
     
-    # Copy backend files - force update
-    - export BACKENDPATH=/home/mycaec78/mycaetracker-backend/
-    - /bin/mkdir -p $BACKENDPATH
+    # Copy backend files
     - /bin/rm -rf $BACKENDPATH/dist
     - /bin/cp -R $REPO_PATH/backend/dist $BACKENDPATH
     - /bin/cp -f $REPO_PATH/backend/package.json $BACKENDPATH
     - /bin/cp -f $REPO_PATH/backend/package-lock.json $BACKENDPATH
-    - if [ ! -f $BACKENDPATH.env ]; then /bin/cp $REPO_PATH/backend/.env.example $BACKENDPATH.env; fi
-    - echo "Deployed at $(date)" >> $BACKENDPATH/deploy.log
+    
+    # Create .env.production template if doesn't exist
+    - if [ ! -f $BACKENDPATH/.env.production ]; then echo "Creating .env.production template..." >> $LOGPATH/deploy.log; touch $BACKENDPATH/.env.production; echo "NODE_ENV=production" > $BACKENDPATH/.env.production; echo "PORT=3001" >> $BACKENDPATH/.env.production; echo "" >> $BACKENDPATH/.env.production; echo "# Database Configuration (UPDATE THESE)" >> $BACKENDPATH/.env.production; echo "DB_HOST=localhost" >> $BACKENDPATH/.env.production; echo "DB_PORT=3306" >> $BACKENDPATH/.env.production; echo "DB_NAME=mycaec78_mycaeapp" >> $BACKENDPATH/.env.production; echo "DB_USER=mycaec78_mycaetracker_user" >> $BACKENDPATH/.env.production; echo "DB_PASSWORD=YOUR_DB_PASSWORD_HERE" >> $BACKENDPATH/.env.production; echo "" >> $BACKENDPATH/.env.production; echo "# JWT Secret (Generate with: openssl rand -hex 64)" >> $BACKENDPATH/.env.production; echo "JWT_SECRET=YOUR_JWT_SECRET_HERE" >> $BACKENDPATH/.env.production; echo "JWT_EXPIRES_IN=7d" >> $BACKENDPATH/.env.production; echo "" >> $BACKENDPATH/.env.production; echo "# Frontend URL" >> $BACKENDPATH/.env.production; echo "FRONTEND_URL=https://app.mycae.co" >> $BACKENDPATH/.env.production; echo "CORS_ORIGINS=https://app.mycae.co" >> $BACKENDPATH/.env.production; echo "" >> $BACKENDPATH/.env.production; echo "# reCAPTCHA Secret Key" >> $BACKENDPATH/.env.production; echo "RECAPTCHA_SECRET_KEY=YOUR_RECAPTCHA_SECRET_KEY" >> $BACKENDPATH/.env.production; echo "" >> $BACKENDPATH/.env.production; echo "# SMTP Configuration (Optional)" >> $BACKENDPATH/.env.production; echo "SMTP_HOST=mail.app.mycae.co" >> $BACKENDPATH/.env.production; echo "SMTP_PORT=465" >> $BACKENDPATH/.env.production; echo "SMTP_USER=noreply@app.mycae.co" >> $BACKENDPATH/.env.production; echo "SMTP_PASS=YOUR_SMTP_PASSWORD" >> $BACKENDPATH/.env.production; echo "⚠️ IMPORTANT: Edit .env.production with your real credentials" >> $LOGPATH/deploy.log; fi
+    
+    # Log deployment
+    - echo "=== Deployment completed at $(date) ===" >> $LOGPATH/deploy.log
